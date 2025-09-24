@@ -1,0 +1,92 @@
+/* styles/Booking.module.css - replace broken CSS with this clear, modular style set */
+
+/* Overlay for modal */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Modal content */
+.modalContent {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  min-width: 320px;
+  max-width: 560px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Buttons */
+.confirmButton {
+  background: #0b76ef;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.cancelButton {
+  background: #eee;
+  color: #333;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.bookNowButton {
+  background: #0b76ef;
+  color: #fff;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Time slots grid */
+.timeSlotsWrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Each slot */
+.timeSlot {
+  border: 1px solid #ddd;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin: 4px;
+  cursor: pointer;
+  min-width: 90px;
+  text-align: center;
+  user-select: none;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  background: #fff;
+}
+
+/* Hover effect */
+.timeSlot:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Disabled / unavailable slot */
+.timeSlot.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Selected slot */
+.timeSlot.selected {
+  border-color: #0b76ef;
+  background: rgba(11, 118, 239, 0.08);
+  color: #0b76ef;
+  font-weight: 600;
+}

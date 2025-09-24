@@ -1,0 +1,306 @@
+/* styles/SalonDetail.module.css */
+
+/* Container */
+.container {
+  padding: 24px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.backButton {
+  font-size: 14px;
+  padding: 8px 16px;
+}
+
+.salonName {
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+  flex: 1;
+  color: var(--gold-primary);
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+}
+
+.shareButton,
+.favoriteButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  transition: transform 0.2s ease;
+}
+
+.shareButton:hover,
+.favoriteButton:hover {
+  transform: scale(1.1);
+  color: var(--gold-primary);
+}
+
+/* Hero Section */
+.heroSection {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.imageGallery {
+  height: 400px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--background-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mainImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholderImage {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.salonBasicInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ratingSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mainRating {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold-primary);
+}
+
+.reviewCount {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.locationInfo {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.quickStats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  padding: 12px;
+  text-align: center;
+  flex: 1;
+}
+
+.statNumber {
+  font-weight: 700;
+  color: var(--gold-primary);
+}
+
+.statLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.serviceItem {
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin: 6px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.serviceItem:hover {
+  border-color: #0b76ef;
+  background: rgba(11, 118, 239, 0.06);
+}
+
+.serviceItem.selected {
+  border-color: #0b76ef;
+  background: rgba(11, 118, 239, 0.12);
+  color: #0b76ef;
+  font-weight: 600;
+}
+
+/* Remove blockers completely */
+.overlayBlocker {
+  display: none !important;
+}
+
+/* Sections */
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+/* Services Grid */
+.servicesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.serviceCard {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  text-align: center;
+}
+
+.serviceCard:hover {
+  transform: translateY(-4px);
+}
+
+.serviceCard.selected {
+  border: 2px solid var(--gold-primary);
+}
+
+.serviceName {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.servicePrice {
+  font-weight: 700;
+  color: var(--gold-primary);
+}
+
+.serviceDuration,
+.serviceGender {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Barbers */
+.barbersGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.barberCard {
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.barberCard:hover {
+  transform: translateY(-4px);
+}
+
+.barberCard.selected {
+  border: 2px solid var(--gold-primary);
+}
+
+.barberImage {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 8px;
+}
+
+/* Booking */
+.dateTimePicker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dateInput {
+  max-width: 250px;
+}
+
+.timeSlots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.timeSlot {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--background-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.timeSlot:hover:not(:disabled) {
+  border-color: var(--gold-primary);
+  color: var(--gold-primary);
+}
+
+.timeSlot.selected {
+  background: var(--gold-primary);
+  color: var(--contrast-dark);
+  border-color: var(--gold-dark);
+}
+
+.timeSlot:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Map */
+.mapSection {
+  margin-top: 24px;
+}
+
+.mapSection .leaflet-container {
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+/* CTA */
+.bookButtonContainer {
+  margin: 32px 0;
+  text-align: center;
+}
+
+/* Modal */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modalContent {
+  max-width: 500px;
+  width: 100%;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
