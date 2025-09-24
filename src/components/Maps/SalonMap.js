@@ -1,5 +1,6 @@
 //pages/src/components/Maps/SalonMap.js
 import React, { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/router";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -42,10 +43,15 @@ const userIcon = new L.Icon({
   iconSize: [25, 25],
   iconAnchor: [12.5, 12.5],
 });
-const handleViewDetails = (salonId) => {
-  router.push(`/salon-details/${salonId}`);
-};
-const SalonCard = ({ salon, onBookNow, userGender }) => {
+
+const SalonCard = ({
+  salon,
+  userLocation,
+  selectedSalon,
+  onSalonSelect,
+  onBookNow,
+  userGender,
+}) => {
   const getGenderServices = (gender) => {
     const maleServices = [
       { name: "Haircut", price: 200, icon: "✂️" },
@@ -167,7 +173,11 @@ const SalonMap = ({
 }) => {
   const [mapLoaded, setMapLoaded] = useState(false);
   const selectedSalonData = salons.find((s) => s._id === selectedSalon);
+  const router = useRouter();
 
+  const handleView = (salonId) => {
+    router.push(`/salon-details/${salonId}`);
+  };
   const defaultCenter =
     userLocation?.lat && userLocation?.lng
       ? [userLocation.lat, userLocation.lng]
@@ -221,14 +231,24 @@ const SalonMap = ({
                 <div className={styles.popupContent}>
                   <strong>{salon.salonName}</strong>
                   <p>
-                    ⭐ {(salon.ratings?.overall ?? 4.5).toFixed(1)} • 📍{" "}
+                    {(salon.ratings?.overall ?? 4.5).toFixed(1)} •{" "}
                     {salon.distance?.toFixed(1)}km
                   </p>
                   <button
-                    onClick={() => handleViewDetails}
+                    onClick={() => handleView(salon._id || salon.id)}
                     className={styles.popupButton}
                   >
                     View Details
+                  </button>
+                  <button
+                    onClick={() =>
+                      router.push(
+                        `https://maps.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+                      )
+                    }
+                    className={styles.directionsBtn}
+                  >
+                    Get Directions
                   </button>
                 </div>
               </Popup>

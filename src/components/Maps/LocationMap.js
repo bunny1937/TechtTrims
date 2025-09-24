@@ -121,12 +121,22 @@ const LocationMap = ({ salonLocation, userLocation, salonName, address }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calculateDirectRoute]);
 
+  // In SalonMap.js or LocationMap.js
   const openInGoogleMaps = () => {
     if (salonLocation) {
-      const url = userLocation
-        ? `https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${salonLocation[0]},${salonLocation[1]}`
-        : `https://www.google.com/maps/place/${salonLocation[0]},${salonLocation[1]}`;
-      window.open(url, "_blank");
+      const [salonLat, salonLng] = salonLocation;
+      let url;
+
+      if (userLocation) {
+        // Directions from user location to salon
+        url = `https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${salonLat},${salonLng}`;
+      } else {
+        // Just show salon location
+        url = `https://www.google.com/maps/search/?api=1&query=${salonLat},${salonLng}`;
+      }
+
+      // Use location.href instead of window.open for better mobile compatibility
+      window.location.href = url;
     }
   };
 
@@ -145,7 +155,7 @@ const LocationMap = ({ salonLocation, userLocation, salonName, address }) => {
         </div>
         <div className={styles.mapActions}>
           <button className={styles.directionsBtn} onClick={openInGoogleMaps}>
-            🗺️ Google Maps
+            Get Directions
           </button>
           {userLocation && (
             <button
@@ -153,7 +163,7 @@ const LocationMap = ({ salonLocation, userLocation, salonName, address }) => {
               onClick={getAdvancedDirections}
               disabled={loading}
             >
-              {loading ? "⏳" : "🚗"} Route
+              {loading ? "Loading..." : "Show Route"}
             </button>
           )}
         </div>

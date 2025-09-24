@@ -1,4 +1,4 @@
-// models/Booking.js
+// src/models/Booking.js - Match your actual database structure
 import mongoose from "mongoose";
 
 const BookingSchema = new mongoose.Schema(
@@ -11,38 +11,35 @@ const BookingSchema = new mongoose.Schema(
     },
     customerName: { type: String, required: true },
     customerPhone: { type: String, required: true },
-    serviceId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Service",
-      required: true,
-    },
-    staffId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Staff",
-      default: null,
-    },
-    status: {
-      type: String,
-      enum: [
-        "requested",
-        "accepted",
-        "rescheduled",
-        "completed",
-        "cancelled",
-        "no-show",
-      ],
-      default: "requested",
-    },
-    appointmentAt: { type: Date, required: true, index: true },
-    durationMinutes: { type: Number, default: 30 },
+    service: { type: String, required: true }, // Change from serviceId to service (string)
+    barber: { type: String, default: null }, // Change from staffId to barber (string)
+    date: { type: String, required: true }, // Your DB uses string dates like "2025-09-25"
+    time: { type: String, required: true }, // Your DB uses string times like "14:00"
     price: { type: Number, default: 0 },
     paymentStatus: {
       type: String,
       enum: ["pending", "partial", "paid"],
       default: "pending",
     },
-    createdAt: { type: Date, default: Date.now },
-    notes: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: [
+        "requested",
+        "confirmed", // Your DB uses "confirmed" not "accepted"
+        "completed",
+        "cancelled",
+      ],
+      default: "confirmed",
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    feedback: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   { timestamps: true }
 );
