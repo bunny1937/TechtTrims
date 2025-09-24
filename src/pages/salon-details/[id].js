@@ -1,5 +1,5 @@
 // pages/salon-details/[id].js - CHANGE FROM basic details TO comprehensive details page
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -31,6 +31,40 @@ export default function SalonDetailsPage() {
   const [selectedService, setSelectedService] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [isFavorite, setIsFavorite] = useState(false);
+  const services = useMemo(() => {
+    if (!salon) return [];
+
+    // Check if salon has services array
+    if (salon.services && Array.isArray(salon.services)) {
+      return salon.services;
+    }
+
+    // Check if salon has services object (convert to array)
+    if (salon.services && typeof salon.services === "object") {
+      return Object.entries(salon.services).map(([key, value]) => ({
+        name: key,
+        price: value.price || 0,
+        duration: value.duration || 30,
+        enabled: value.enabled || true,
+        ...value,
+      }));
+    }
+
+    // Fallback to gender-based services
+    return getGenderServices(salon.targetGender || "Male");
+  }, [salon]);
+
+  const salonCoords = useMemo(() => {
+    if (!salon?.location?.coordinates) return null;
+
+    // Handle different coordinate formats
+    const coords = salon.location.coordinates;
+    if (Array.isArray(coords) && coords.length >= 2) {
+      // GeoJSON format [lng, lat] -> Leaflet format [lat, lng]
+      return [coords[1], coords[0]];
+    }
+    return null;
+  }, [salon]);
 
   const fetchSalonDetails = useCallback(async () => {
     if (!id) return;
@@ -73,41 +107,6 @@ export default function SalonDetailsPage() {
       );
     }
   };
-
-  const getDirections = () => {
-    if (salon?.location?.coordinates && userLocation) {
-      const [lng, lat] = salon.location.coordinates;
-      const url = `https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${lat},${lng}`;
-      window.open(url, "_blank");
-    } else if (salon?.location?.coordinates) {
-      const [lng, lat] = salon.location.coordinates;
-      const url = `https://www.google.com/maps/place/${lat},${lng}`;
-      window.open(url, "_blank");
-    }
-  };
-
-  const handleBookNow = () => {
-    router.push(`/salons/${id}`);
-  };
-
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: salon.salonName,
-          text: `Check out ${salon.salonName} - a great salon near you!`,
-          url: window.location.href,
-        });
-      } catch (error) {
-        console.log("Error sharing:", error);
-      }
-    } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href);
-      alert("Link copied to clipboard!");
-    }
-  };
-
   const getGenderServices = (gender) => {
     const maleServices = [
       {
@@ -201,6 +200,39 @@ export default function SalonDetailsPage() {
 
     return gender === "Male" ? maleServices : femaleServices;
   };
+  const getDirections = () => {
+    if (salon?.location?.coordinates && userLocation) {
+      const [lng, lat] = salon.location.coordinates;
+      const url = `https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${lat},${lng}`;
+      window.open(url, "_blank");
+    } else if (salon?.location?.coordinates) {
+      const [lng, lat] = salon.location.coordinates;
+      const url = `https://www.google.com/maps/place/${lat},${lng}`;
+      window.open(url, "_blank");
+    }
+  };
+
+  const handleBookNow = () => {
+    router.push(`/salons/${id}`);
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: salon.salonName,
+          text: `Check out ${salon.salonName} - a great salon near you!`,
+          url: window.location.href,
+        });
+      } catch (error) {
+        console.log("Error sharing:", error);
+      }
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(window.location.href);
+      alert("Link copied to clipboard!");
+    }
+  };
 
   if (loading) {
     return (
@@ -230,12 +262,6 @@ export default function SalonDetailsPage() {
       </div>
     );
   }
-
-  const services =
-    salon.services || getGenderServices(salon.targetGender || "Male");
-  const salonCoords = salon.location?.coordinates
-    ? [salon.location.coordinates[1], salon.location.coordinates[0]]
-    : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -446,7 +472,7 @@ export default function SalonDetailsPage() {
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h3 className="text-xl font-semibold mb-4">Popular Services</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {services.slice(0, 4).map((service, index) => (
+                  {(services || []).slice(0, 4).map((service, index) => (
                     <div
                       key={index}
                       className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"

@@ -43,6 +43,7 @@ export default function BookingConfirmed() {
       <div
         style={{
           background: "#f8f9fa",
+          color: "black",
           padding: 20,
           borderRadius: 8,
           marginBottom: 20,
@@ -112,14 +113,15 @@ export default function BookingConfirmed() {
         <div
           style={{
             background: "#d4edda",
+            color: "black",
             border: "1px solid #c3e6cb",
             padding: 15,
             borderRadius: 5,
             marginBottom: 20,
           }}
         >
-          <h3 style={{ color: "#155724", margin: 0 }}>Service Completed!</h3>
-          <p style={{ margin: "10px 0 0 0" }}>
+          <h3 style={{ color: "black", margin: 0 }}>Service Completed!</h3>
+          <p style={{ color: "black", margin: "10px 0 0 0" }}>
             Your service has been completed. Please provide feedback.
           </p>
           <button

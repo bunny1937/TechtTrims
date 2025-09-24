@@ -1,18 +1,24 @@
-// pages/api/salons/bookings/[id].js
-import { connectToDatabase } from "../../../../lib/mongodb";
+// src/pages/api/salons/bookings/[id].js - Only handle specific booking IDs
+import connectToDatabase from "../../../../lib/mongodb";
 import Booking from "../../../../models/Booking";
+import { ObjectId } from "mongodb";
 
 export default async function handler(req, res) {
   await connectToDatabase();
   const { method } = req;
   const { id } = req.query;
 
-  if (!id) return res.status(400).json({ error: "id required" });
+  // Check if id is actually a valid ObjectId
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "Invalid booking ID format" });
+  }
 
   try {
     if (method === "GET") {
       const booking = await Booking.findById(id);
-      if (!booking) return res.status(404).json({ error: "Not found" });
+      if (!booking) {
+        return res.status(404).json({ error: "Booking not found" });
+      }
       return res.status(200).json(booking);
     }
 
@@ -21,7 +27,9 @@ export default async function handler(req, res) {
       const booking = await Booking.findByIdAndUpdate(id, update, {
         new: true,
       });
-      if (!booking) return res.status(404).json({ error: "Not found" });
+      if (!booking) {
+        return res.status(404).json({ error: "Booking not found" });
+      }
       return res.status(200).json(booking);
     }
 
@@ -35,7 +43,7 @@ export default async function handler(req, res) {
       .status(405)
       .end(`Method ${method} Not Allowed`);
   } catch (err) {
-    console.error("api/bookings/[id] error", err);
+    console.error("api/bookings/[id] error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 }
