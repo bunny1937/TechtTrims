@@ -49,8 +49,8 @@ const SalonRegisterForm = () => {
       navigator.geolocation.getCurrentPosition((pos) => {
         setFormData((prev) => ({
           ...prev,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
+          latitude: prev.latitude || pos.coords.latitude,
+          longitude: prev.longitude || pos.coords.longitude,
         }));
       });
     }
@@ -73,10 +73,7 @@ const SalonRegisterForm = () => {
 
     if (step === 2) {
       if (!formData.salonName) errors.salonName = "Salon name is required";
-      if (
-        !formData.locationData &&
-        (!formData.latitude || !formData.longitude)
-      ) {
+      if (!formData.locationData) {
         errors.location = "Please select a location on the map";
       }
       if (!formData.address) errors.address = "Address is required";
@@ -124,11 +121,18 @@ const SalonRegisterForm = () => {
   };
 
   const handleLocationSelect = (locationData) => {
+    const lat = locationData.lat ? parseFloat(locationData.lat) : "";
+    const lng = locationData.lng ? parseFloat(locationData.lng) : "";
+
     setFormData((prev) => ({
       ...prev,
-      locationData, // ✅ save full object for validation
-      latitude: parseFloat(locationData.lat),
-      longitude: parseFloat(locationData.lng),
+      locationData: {
+        lat: lat,
+        lng: lng,
+        address: locationData.address,
+      },
+      latitude: lat,
+      longitude: lng,
       address: locationData.address || prev.address,
     }));
     setShowLocationPicker(false);
@@ -155,26 +159,24 @@ const SalonRegisterForm = () => {
   const handleSubmit = async () => {
     if (!validateStep(3)) return;
 
+    // Remove this duplicate validation check - it's already in validateStep
+    console.log("Location data:", formData.locationData);
+    console.log("Form lat/lng:", formData.latitude, formData.longitude);
+
+    const lat = formData.locationData?.lat || parseFloat(formData.latitude);
+    const lng = formData.locationData?.lng || parseFloat(formData.longitude);
+
     try {
       const registrationData = {
-        ownerName: formData.fullName, // Changed from fullName to ownerName
+        ownerName: formData.fullName,
         phone: formData.phone,
         email: formData.email,
         password: formData.password,
         salonName: formData.salonName,
-        address: formData.address,
-        latitude: parseFloat(
-          formData.latitude || formData.locationData?.lat || 0
-        ),
-        longitude: parseFloat(
-          formData.longitude || formData.locationData?.lng || 0
-        ),
-
-        coordinates: [
-          parseFloat(formData.locationData?.lat ?? formData.latitude),
-
-          parseFloat(formData.locationData?.lng ?? formData.longitude),
-        ],
+        address: formData.locationData?.address || formData.address,
+        latitude: lat,
+        longitude: lng,
+        coordinates: [lng, lat],
         openingTime: formData.openingTime,
         closingTime: formData.closingTime,
         services: formData.services,
@@ -597,13 +599,14 @@ const SalonRegisterForm = () => {
                       <input
                         type="hidden"
                         name="latitude"
-                        value={formData.latitude}
+                        value={formData.latitude || ""}
                       />
                       <input
                         type="hidden"
                         name="longitude"
-                        value={formData.longitude}
+                        value={formData.longitude || ""}
                       />
+
                       <div className="space-y-2">
                         <label
                           className={`form-label ${

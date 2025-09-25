@@ -44,11 +44,13 @@ export default async function handler(req, res) {
     );
 
     const normalized = salons.map((s) => {
-      // Calculate distance using coordinates
       let distance = 5; // default
       if (s.location?.coordinates && s.location.coordinates.length === 2) {
         const [salonLng, salonLat] = s.location.coordinates;
         distance = calculateDistance(lat, lng, salonLat, salonLng);
+        console.log(
+          `Distance calc: User(${lat}, ${lng}) -> Salon(${salonLat}, ${salonLng}) = ${distance}km`
+        );
       }
 
       return {
