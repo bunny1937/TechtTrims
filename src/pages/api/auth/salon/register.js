@@ -73,15 +73,10 @@ export default async function handler(req, res) {
     }
 
     // Validate coordinates
-    if (
-      latitude === undefined ||
-      longitude === undefined ||
-      isNaN(latitude) ||
-      isNaN(longitude)
-    ) {
+    if (isNaN(latitude) || isNaN(longitude)) {
       return res
         .status(400)
-        .json({ message: "Valid latitude and longitude are required" });
+        .json({ message: "Location (latitude) is required" });
     }
 
     const client = await clientPromise;

@@ -124,12 +124,19 @@ const LocationPicker = ({
   };
 
   const handleConfirm = () => {
-    if (position && address) {
-      onLocationSelect({
-        coordinates: [position[1], position[0]], // lng, lat for MongoDB
+    if (position && address && onLocationSelect) {
+      console.log("Confirming location:", {
+        lat: position[0],
+        lng: position[1],
         address: address,
-        position: position, // lat, lng for Leaflet
       });
+      onLocationSelect({
+        lat: position[0],
+        lng: position[1],
+        address: address,
+      });
+    } else {
+      console.log("Missing data:", { position, address, onLocationSelect });
     }
   };
 

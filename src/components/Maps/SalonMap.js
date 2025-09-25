@@ -1,5 +1,5 @@
 //pages/src/components/Maps/SalonMap.js
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useRouter } from "next/router";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -33,15 +33,9 @@ const salonIcon = new L.Icon({
 
 // User location marker
 const userIcon = new L.Icon({
-  iconUrl:
-    "data:image/svg+xml;base64=" +
-    btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3b82f6" width="25" height="25">
-      <circle cx="12" cy="12" r="10" stroke="#fff" stroke-width="2"/>
-    </svg>
-  `),
-  iconSize: [25, 25],
-  iconAnchor: [12.5, 12.5],
+  iconUrl: "/maps/usericon.jpg", // Put your icon here
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
 });
 
 const SalonCard = ({
@@ -163,6 +157,24 @@ const MapUpdater = ({ selectedSalon, salons }) => {
   return null;
 };
 
+// const AutoOpenPopup = ({ children, position, ...props }) => {
+//   const map = useMap();
+
+//   const popupOptions = useMemo(() => props, [props]);
+
+//   useEffect(() => {
+//     const marker = L.marker(position, { icon: salonIcon }).addTo(map);
+//     const popup = L.popup(popupOptions).setContent(children);
+//     marker.bindPopup(popup).openPopup();
+
+//     return () => {
+//       map.removeLayer(marker);
+//     };
+//   }, [map, position, children, popupOptions]);
+
+//   return null;
+// };
+
 const SalonMap = ({
   salons,
   userLocation,
@@ -174,28 +186,86 @@ const SalonMap = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const selectedSalonData = salons.find((s) => s._id === selectedSalon);
   const router = useRouter();
+  const mapRef = useRef(null);
+  const [mapTheme, setMapTheme] = useState("standard");
 
-  const handleView = (salonId) => {
-    router.push(`/salon-details/${salonId}`);
+  const mapThemes = {
+    standard: {
+      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      name: "Standard",
+    },
+    dark: {
+      url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      name: "Dark",
+    },
+    light: {
+      url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      name: "Light",
+    },
+    satellite: {
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      name: "Satellite",
+    },
+    terrain: {
+      url: "https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}{r}.png",
+      name: "Terrain",
+    },
   };
+
   const defaultCenter =
     userLocation?.lat && userLocation?.lng
       ? [userLocation.lat, userLocation.lng]
       : [19.076, 72.8777]; // Mumbai default
+  const ThemeSelector = () => (
+    <div className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg p-2 text-black">
+      <select
+        value={mapTheme}
+        onChange={(e) => setMapTheme(e.target.value)}
+        className="text-sm border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        {Object.entries(mapThemes).map(([key, theme]) => (
+          <option key={key} value={key}>
+            {theme.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+  // Add this component inside the MapContainer, after TileLayer
+  const PopupOpener = ({ salons }) => {
+    const map = useMap();
+
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        map.eachLayer((layer) => {
+          if (layer instanceof L.Marker && layer.getPopup()) {
+            layer.openPopup();
+          }
+        });
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }, [map, salons]);
+
+    return null;
+  };
 
   return (
     <div className={styles.mapContainer}>
+      <ThemeSelector />
       <MapContainer
         center={defaultCenter}
-        zoom={13}
+        zoom={15}
+        maxZoom={20}
+        ref={mapRef}
         className={styles.map}
         whenCreated={() => setMapLoaded(true)}
       >
         <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url={mapThemes[mapTheme].url}
+          attribution="&copy; Map Data"
         />
-
+        <PopupOpener salons={salons} />
         <MapUpdater selectedSalon={selectedSalon} salons={salons} />
 
         {/* User location marker */}
@@ -212,49 +282,69 @@ const SalonMap = ({
           </Marker>
         )}
 
-        {/* Salon markers */}
-        {salons.map((salon) => {
-          if (!salon.location?.coordinates) return null;
-
-          const [lng, lat] = salon.location.coordinates;
-
-          return (
-            <Marker
-              key={salon._id}
-              position={[lat, lng]}
-              icon={salonIcon}
-              eventHandlers={{
-                click: () => onSalonSelect(salon._id),
-              }}
+        {/* Salon markers with always-open popups */}
+        {salons.map((salon) => (
+          <Marker
+            key={salon._id}
+            position={[
+              salon.location.coordinates[1],
+              salon.location.coordinates[0],
+            ]}
+            icon={salonIcon}
+            eventHandlers={{
+              click: () => onSalonSelect(salon),
+            }}
+          >
+            <Popup
+              autoClose={false}
+              closeButton={false}
+              closeOnClick={false}
+              closeOnEscapeKey={false}
+              autoPan={false}
+              className="custom-popup"
             >
-              <Popup>
-                <div className={styles.popupContent}>
-                  <strong>{salon.salonName}</strong>
-                  <p>
-                    {(salon.ratings?.overall ?? 4.5).toFixed(1)} •{" "}
-                    {salon.distance?.toFixed(1)}km
-                  </p>
+              <div className="text-center p-2 min-w-[20px]">
+                <h3 className="font-bold text-sm mb-1">{salon.salonName}</h3>
+                <p className="text-xs font-medium text-blue-600 ">
+                  {salon.distance?.toFixed(1)}km away
+                </p>
+                <div className="flex flex-col gap-1">
                   <button
-                    onClick={() => handleView(salon._id || salon.id)}
-                    className={styles.popupButton}
+                    className="text-xs bg-orange-500 text-white rounded px-4 py-1 font-medium hover:bg-orange-600"
+                    onClick={() => onSalonSelect(salon)}
                   >
                     View Details
                   </button>
                   <button
-                    onClick={() =>
-                      router.push(
-                        `https://maps.google.com/maps/dir/?api=1&destination=${lat},${lng}`
-                      )
-                    }
-                    className={styles.directionsBtn}
+                    className="text-xs bg-blue-500 text-white rounded px-2 py-1 font-medium hover:bg-blue-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(
+                        `https://maps.google.com/maps?daddr=${salon.location.coordinates[1]},${salon.location.coordinates[0]}`
+                      );
+                    }}
                   >
                     Get Directions
                   </button>
                 </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {salons.map((salon) => (
+          <Marker
+            key={`marker-${salon._id}`}
+            position={[
+              salon.location.coordinates[1],
+              salon.location.coordinates[0],
+            ]}
+            icon={salonIcon}
+            eventHandlers={{
+              click: () => onSalonSelect(salon),
+            }}
+          />
+        ))}
       </MapContainer>
 
       {/* Salon Details Card */}
