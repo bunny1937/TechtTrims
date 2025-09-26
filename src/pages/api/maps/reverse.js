@@ -1,4 +1,3 @@
-// pages/api/maps/reverse.js
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -11,8 +10,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Nominatim requires a proper User-Agent identifying your app (and ideally contact info).
-    // Replace contact@yourdomain.com with a valid email/domain.
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(
       lat
     )}&lon=${encodeURIComponent(lng)}&addressdetails=1`;
@@ -35,8 +32,10 @@ export default async function handler(req, res) {
     const data = await response.json();
     const displayName = data.display_name || null;
 
-    // Return the human-readable address (and raw if you want it for debugging)
-    return res.status(200).json({ address: displayName, raw: data });
+    return res.status(200).json({
+      address: displayName,
+      raw: data,
+    });
   } catch (err) {
     console.error("Reverse geocoding error:", err);
     return res.status(500).json({ error: "Internal server error" });

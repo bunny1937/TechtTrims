@@ -44,13 +44,22 @@ export default function Onboarding() {
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const { latitude, longitude } = position.coords;
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        console.log("🔍 ACTUAL GPS COORDINATES:", { latitude, longitude });
 
         try {
           // Reverse geocoding to get address
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-          );
+          const response = await fetch("/api/maps/reverse", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat: latitude, lng: longitude }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to reverse geocode");
+          }
+
           const data = await response.json();
 
           setFormData((prev) => ({
@@ -58,7 +67,7 @@ export default function Onboarding() {
             location: {
               latitude,
               longitude,
-              address: data.display_name || `${latitude}, ${longitude}`,
+              address: data.address || `${latitude}, ${longitude}`,
             },
           }));
           setLocationStatus("success");

@@ -5,92 +5,119 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: "Method Not Allowed" });
   }
 
-  const { latitude, longitude, radius = "10" } = req.query;
+  const { latitude, longitude, radius = 30 } = req.query;
+
   if (!latitude || !longitude) {
     return res.status(400).json({ message: "latitude and longitude required" });
   }
 
   const lat = parseFloat(latitude);
   const lng = parseFloat(longitude);
-  const meters = parseFloat(radius) * 1000;
+  const radiusKm = parseFloat(radius);
 
-  try {
-    const { db } = await connectToDatabase();
+  let retryCount = 0;
+  const maxRetries = 3;
 
-    // Ensure 2dsphere index exists
-    await db.collection("salons").createIndex({ location: "2dsphere" });
+  while (retryCount < maxRetries) {
+    try {
+      const { db } = await connectToDatabase();
 
-    // Fetch salons near location
-    const salons = await db
-      .collection("salons")
-      .find({
-        location: {
-          $near: {
-            $geometry: { type: "Point", coordinates: [lng, lat] },
-            $maxDistance: meters,
-          },
-        },
-      })
-      .limit(50)
-      .toArray();
+      console.log("=== DEBUGGING SALON SEARCH ===");
+      console.log("Search coordinates:", { lat, lng });
+      console.log("Search radius:", radiusKm, "km");
 
-    // 🔥 Normalize documents
-    console.log(
-      "Raw salons from DB:",
-      salons.map((s) => ({
-        name: s.salonName,
-        coords: s.location?.coordinates,
-      }))
-    );
+      // Get all salons with timeout
+      const allSalons = await db
+        .collection("salons")
+        .find({})
+        .maxTimeMS(30000)
+        .toArray();
 
-    const normalized = salons.map((s) => {
-      let distance = 5; // default
-      if (s.location?.coordinates && s.location.coordinates.length === 2) {
-        const [salonLng, salonLat] = s.location.coordinates;
-        distance = calculateDistance(lat, lng, salonLat, salonLng);
-        console.log(
-          `Distance calc: User(${lat}, ${lng}) -> Salon(${salonLat}, ${salonLng}) = ${distance}km`
-        );
+      console.log(`Found ${allSalons.length} total salons in database`);
+
+      // Filter salons by distance
+      const nearbySalons = [];
+
+      for (const salon of allSalons) {
+        if (
+          !salon.location?.coordinates ||
+          salon.location.coordinates.length !== 2
+        ) {
+          continue;
+        }
+
+        const [salonLng, salonLat] = salon.location.coordinates;
+
+        if (isNaN(salonLat) || isNaN(salonLng)) {
+          continue;
+        }
+
+        const distance = calculateDistance(lat, lng, salonLat, salonLng);
+
+        if (distance <= radiusKm) {
+          nearbySalons.push({
+            ...salon,
+            calculatedDistance: distance,
+          });
+        }
       }
 
-      return {
-        ...s,
-        _id: s._id.toString(),
-        distance: Number(distance.toFixed(2)),
-        topServices:
-          s.topServices?.map((svc) => ({
-            name: String(svc.name),
-            price: Number(svc.price),
-          })) || [],
-        stats: s.stats
-          ? {
-              ...s.stats,
-              totalBookings: Number(s.stats.totalBookings || 0),
-            }
-          : { totalBookings: 0 },
-      };
-    });
+      // Process salon data
+      const processedSalons = nearbySalons.map((salon) => ({
+        ...salon,
+        id: salon._id.toString(),
+        distance: Number(salon.calculatedDistance.toFixed(2)),
+        topServices: salon.services
+          ? Object.entries(salon.services)
+              .filter(([key, service]) => service.enabled)
+              .slice(0, 3)
+              .map(([key, service]) => ({
+                name: key,
+                price: Number(service.price || 0),
+              }))
+          : [],
+        stats: {
+          ...salon.stats,
+          totalBookings: Number(salon.stats?.totalBookings || 0),
+          rating: Number(salon.stats?.rating || 4.5),
+          totalRatings: Number(salon.stats?.totalRatings || 0),
+        },
+      }));
 
-    // Helper function for distance calculation
-    function calculateDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371; // Earth's radius in kilometers
-      const dLat = ((lat2 - lat1) * Math.PI) / 180;
-      const dLon = ((lon2 - lon1) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos((lat1 * Math.PI) / 180) *
-          Math.cos((lat2 * Math.PI) / 180) *
-          Math.sin(dLon / 2) *
-          Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c; // Distance in kilometers
+      processedSalons.sort((a, b) => a.distance - b.distance);
+
+      return res.status(200).json({
+        success: true,
+        salons: processedSalons,
+      });
+    } catch (err) {
+      console.error(`Attempt ${retryCount + 1} failed:`, err.message);
+      retryCount++;
+
+      if (retryCount >= maxRetries) {
+        console.error("Max retries reached. Final error:", err);
+        return res.status(500).json({
+          message: "Database connection failed after retries",
+          error: err.message,
+        });
+      }
+
+      // Wait before retrying
+      await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount));
     }
-
-    return res.status(200).json({ salons: normalized });
-  } catch (err) {
-    console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: String(err) });
   }
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
