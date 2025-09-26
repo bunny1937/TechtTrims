@@ -37,6 +37,15 @@ const SalonRegisterForm = () => {
       facial: { enabled: false, price: "" },
       hairColor: { enabled: false, price: "" },
     },
+    barbers: [],
+    services: {
+      haircut: { enabled: false, price: "" },
+      shave: { enabled: false, price: "" },
+      hairWash: { enabled: false, price: "" },
+      hairStyling: { enabled: false, price: "" },
+      facial: { enabled: false, price: "" },
+      hairColor: { enabled: false, price: "" },
+    },
   });
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -120,6 +129,58 @@ const SalonRegisterForm = () => {
     }));
   };
 
+  // Add barber management functions
+  const addBarber = () => {
+    setFormData((prev) => ({
+      ...prev,
+      barbers: [
+        ...prev.barbers,
+        {
+          name: "",
+          experience: "",
+          skills: [],
+          bio: "",
+          photo: "",
+          isAvailable: true,
+          totalBookings: 0,
+          rating: 5.0,
+        },
+      ],
+    }));
+  };
+
+  const removeBarber = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      barbers: prev.barbers.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleBarberChange = (index, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      barbers: prev.barbers.map((barber, i) =>
+        i === index ? { ...barber, [field]: value } : barber
+      ),
+    }));
+  };
+
+  const handleBarberSkillChange = (index, skill, checked) => {
+    setFormData((prev) => ({
+      ...prev,
+      barbers: prev.barbers.map((barber, i) =>
+        i === index
+          ? {
+              ...barber,
+              skills: checked
+                ? [...barber.skills, skill]
+                : barber.skills.filter((s) => s !== skill),
+            }
+          : barber
+      ),
+    }));
+  };
+
   const handleLocationSelect = (locationData) => {
     const lat = locationData.lat ? parseFloat(locationData.lat) : "";
     const lng = locationData.lng ? parseFloat(locationData.lng) : "";
@@ -157,11 +218,12 @@ const SalonRegisterForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(3)) return;
+    if (!validateStep(4)) return;
 
     // Remove this duplicate validation check - it's already in validateStep
     console.log("Location data:", formData.locationData);
     console.log("Form lat/lng:", formData.latitude, formData.longitude);
+    console.log("Barbers data:", formData.barbers); // ADD THIS LOG
 
     const lat = formData.locationData?.lat || parseFloat(formData.latitude);
     const lng = formData.locationData?.lng || parseFloat(formData.longitude);
@@ -180,6 +242,7 @@ const SalonRegisterForm = () => {
         openingTime: formData.openingTime,
         closingTime: formData.closingTime,
         services: formData.services,
+        barbers: formData.barbers,
       };
 
       console.log("Salon Registration Data:", registrationData);
@@ -194,10 +257,28 @@ const SalonRegisterForm = () => {
       });
 
       if (response.ok) {
-        await response.json();
-        alert("Salon registered successfully! Welcome to the platform.");
+        const result = await response.json();
+        console.log("Registration result:", result);
+
+        // Store salon session with proper structure
+        const salonSession = {
+          id: result.salon._id || result.salon.id,
+          salonName: result.salon.salonName,
+          ownerName: result.salon.ownerName,
+          email: result.salon.email,
+        };
+
+        localStorage.setItem("salonSession", JSON.stringify(salonSession));
+        localStorage.setItem("salonToken", result.token);
+        // alert("Salon registered successfully! Welcome to the platform.");
+        alert(
+          `Salon registered successfully! ${
+            result.barbersCreated || 0
+          } barbers added. Welcome!`
+        );
+
         // Redirect to dashboard or login
-        window.location.href = "/salons/dashboard";
+        // window.location.href = "/salons/dashboard";
       } else {
         const error = await response.json();
         alert(`Registration failed: ${error.message}`);
@@ -291,7 +372,7 @@ const SalonRegisterForm = () => {
 
             {/* Progress Steps */}
             <div className="flex items-center justify-center mb-8">
-              {[1, 2, 3].map((step) => (
+              {[1, 2, 3, 4].map((step) => (
                 <React.Fragment key={step}>
                   <div
                     className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${
@@ -306,7 +387,7 @@ const SalonRegisterForm = () => {
                   >
                     {step}
                   </div>
-                  {step < 3 && (
+                  {step < 4 && (
                     <div
                       className={`w-12 h-1 mx-2 transition-all duration-300 ${
                         currentStep > step
@@ -667,9 +748,177 @@ const SalonRegisterForm = () => {
                     </div>
                   </div>
                 )}
-
-                {/* Step 3: Services */}
+                {/* Step 3: Barber Management */}
                 {currentStep === 3 && (
+                  <div className="animate-slideIn">
+                    <h2
+                      className={`text-2xl font-bold mb-6 flex items-center ${
+                        isDarkMode ? "text-yellow-400" : "text-amber-600"
+                      }`}
+                    >
+                      <div className="w-6 h-6 mr-3" />
+                      Add Your Barbers
+                    </h2>
+
+                    <div className="space-y-6">
+                      {formData.barbers.map((barber, index) => (
+                        <div
+                          key={index}
+                          className={`p-6 rounded-xl border-2 transition-all duration-300 ${
+                            isDarkMode
+                              ? "border-gray-600 bg-gray-700/50"
+                              : "border-gray-200 bg-gray-50"
+                          }`}
+                        >
+                          <div className="flex justify-between items-center mb-4">
+                            <h3
+                              className={`font-semibold ${
+                                isDarkMode ? "text-white" : "text-gray-900"
+                              }`}
+                            >
+                              Barber {index + 1}
+                            </h3>
+                            {formData.barbers.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeBarber(index)}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <input
+                              type="text"
+                              placeholder="Barber Name"
+                              value={barber.name}
+                              onChange={(e) =>
+                                handleBarberChange(
+                                  index,
+                                  "name",
+                                  e.target.value
+                                )
+                              }
+                              className={`w-full px-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
+                                isDarkMode
+                                  ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
+                                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
+                              }`}
+                            />
+
+                            <input
+                              type="number"
+                              placeholder="Years of Experience"
+                              value={barber.experience}
+                              onChange={(e) =>
+                                handleBarberChange(
+                                  index,
+                                  "experience",
+                                  e.target.value
+                                )
+                              }
+                              className={`w-full px-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
+                                isDarkMode
+                                  ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
+                                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
+                              }`}
+                            />
+                          </div>
+
+                          <div className="mt-4">
+                            <label
+                              className={`block text-sm font-medium mb-2 ${
+                                isDarkMode ? "text-gray-300" : "text-gray-700"
+                              }`}
+                            >
+                              Specializations
+                            </label>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                              {[
+                                "Haircut",
+                                "Shaving",
+                                "Hair Styling",
+                                "Beard Trim",
+                                "Hair Color",
+                                "Facial",
+                              ].map((skill) => (
+                                <label
+                                  key={skill}
+                                  className="flex items-center"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={barber.skills.includes(skill)}
+                                    onChange={(e) =>
+                                      handleBarberSkillChange(
+                                        index,
+                                        skill,
+                                        e.target.checked
+                                      )
+                                    }
+                                    className={`mr-2 ${
+                                      isDarkMode
+                                        ? "text-yellow-500 focus:ring-yellow-500"
+                                        : "text-amber-500 focus:ring-amber-500"
+                                    }`}
+                                  />
+                                  <span
+                                    className={`text-sm ${
+                                      isDarkMode
+                                        ? "text-gray-300"
+                                        : "text-gray-700"
+                                    }`}
+                                  >
+                                    {skill}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="mt-4">
+                            <label
+                              className={`block text-sm font-medium mb-2 ${
+                                isDarkMode ? "text-gray-300" : "text-gray-700"
+                              }`}
+                            >
+                              Bio/Accomplishments
+                            </label>
+                            <textarea
+                              placeholder="Describe barber's achievements, awards, etc."
+                              value={barber.bio}
+                              onChange={(e) =>
+                                handleBarberChange(index, "bio", e.target.value)
+                              }
+                              rows={2}
+                              className={`w-full px-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 resize-none ${
+                                isDarkMode
+                                  ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
+                                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
+                              }`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={addBarber}
+                        className={`w-full py-3 border-2 border-dashed rounded-xl transition-all duration-300 ${
+                          isDarkMode
+                            ? "border-gray-600 text-gray-400 hover:border-yellow-500 hover:text-yellow-400"
+                            : "border-gray-300 text-gray-600 hover:border-amber-500 hover:text-amber-600"
+                        }`}
+                      >
+                        + Add Another Barber
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {/* Step 3: Services */}
+                {currentStep === 4 && (
                   <div className="animate-slideIn">
                     <h2
                       className={`text-2xl font-bold mb-6 flex items-center ${
@@ -800,11 +1049,15 @@ const SalonRegisterForm = () => {
                     </button>
                   )}
 
-                  {currentStep < 3 ? (
+                  {currentStep < 4 ? (
                     <button
                       type="button"
-                      onClick={handleNextStep}
-                      className={`btn btn-primary ml-auto transform hover:scale-105`}
+                      onClick={() => setCurrentStep(currentStep + 1)}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ml-auto ${
+                        isDarkMode
+                          ? "bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 hover:from-yellow-400 hover:to-amber-400"
+                          : "bg-gradient-to-r from-amber-500 to-yellow-600 text-white hover:from-amber-600 hover:to-yellow-700"
+                      }`}
                     >
                       Next Step
                     </button>
@@ -812,7 +1065,11 @@ const SalonRegisterForm = () => {
                     <button
                       type="button"
                       onClick={handleSubmit}
-                      className={`btn btn-primary ml-auto transform hover:scale-105`}
+                      className={`px-8 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ml-auto ${
+                        isDarkMode
+                          ? "bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 hover:from-yellow-400 hover:to-amber-400"
+                          : "bg-gradient-to-r from-amber-500 to-yellow-600 text-white hover:from-amber-600 hover:to-yellow-700"
+                      }`}
                     >
                       Register My Salon
                     </button>

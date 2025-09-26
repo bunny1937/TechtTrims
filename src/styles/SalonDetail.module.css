@@ -150,6 +150,109 @@
 .overlayBlocker {
   display: none !important;
 }
+/* Add to SalonDetail.module.css */
+.barbersSection {
+  margin: 3rem 0;
+}
+
+.barbersGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.barberCard {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 2px solid #e5e7eb;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  text-align: center;
+}
+
+.barberCard:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.15);
+}
+
+.barberCard.selected {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.25);
+}
+
+.barberImage {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.barberPhoto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.defaultBarberImage {
+  font-size: 2rem;
+}
+
+.barberName {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #111827;
+}
+
+.barberExperience {
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.barberRating {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.barberSkills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.skillChip {
+  background: #fef3c7;
+  color: #d97706;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.barberBio {
+  font-size: 0.85rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.noBarbersSection {
+  margin: 2rem 0;
+}
 
 /* Sections */
 .sectionTitle {
