@@ -2,7 +2,7 @@
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 import styles from "../../styles/Booking.module.css";
-import Layout from "../../components/Layout";
+import Layout from "../../components/Layout/Layout";
 
 export default function BookingPage() {
   const router = useRouter();

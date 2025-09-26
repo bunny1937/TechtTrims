@@ -63,7 +63,7 @@ export default function SalonBarbersPage() {
         console.error("No salon session found in localStorage");
         setError("No salon session found. Please login first.");
         setTimeout(() => {
-          router.push("/auth/salon-login");
+          router.push("/auth/salon/login");
         }, 2000);
       }
     }
@@ -183,7 +183,7 @@ export default function SalonBarbersPage() {
           <div className="text-center py-8">
             <p className="text-red-600 mb-4">{error}</p>
             <button
-              onClick={() => router.push("/auth/salon-login")}
+              onClick={() => router.push("/auth/salon/login")}
               className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
             >
               Go to Login
