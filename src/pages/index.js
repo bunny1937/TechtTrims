@@ -62,20 +62,26 @@ export default function Home() {
 
   const loadNearbySalons = async (latitude, longitude, gender) => {
     setIsLoadingSalons(true);
-
     try {
+      console.log("Loading salons for coordinates:", latitude, longitude);
+
       const response = await fetch(
-        `/api/salons/nearby?latitude=${latitude}&longitude=${longitude}&radius=10&gender=${gender}`
+        `/api/salons/nearby?latitude=${latitude}&longitude=${longitude}&radius=40&gender=${gender}`
       );
+
       const data = await response.json();
+      console.log("Salon API response:", data);
 
       if (response.ok) {
-        setNearbySalons(data.salons);
+        setNearbySalons(data.salons || []);
+        console.log("Set nearby salons:", data.salons?.length || 0);
       } else {
         console.error("Error loading salons:", data.message);
+        setNearbySalons([]);
       }
     } catch (error) {
       console.error("Error loading salons:", error);
+      setNearbySalons([]);
     } finally {
       setIsLoadingSalons(false);
     }
@@ -144,7 +150,7 @@ export default function Home() {
 
             <button
               className={styles.loginButton}
-              onClick={() => navigateToAuth("login", "user")}
+              onClick={() => navigateToAuth("login", "salon")}
             >
               Login
             </button>

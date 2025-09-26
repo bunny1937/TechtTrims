@@ -43,6 +43,22 @@ export default function SalonDetail({ initialSalon }) {
   const [regMobile, setRegMobile] = useState("");
   const [regEmail, setRegEmail] = useState("");
 
+  // In your [id].js file - ADD THIS CORRECTLY
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const interval = setInterval(() => {
+        // Your refresh logic here
+        console.log("Refreshing slots...");
+      }, 30000);
+
+      return () => {
+        if (typeof window !== "undefined") {
+          clearInterval(interval);
+        }
+      };
+    }
+  }, []);
+
   useEffect(() => {
     const stored = localStorage.getItem("userOnboardingData");
     if (stored) {
@@ -189,40 +205,80 @@ export default function SalonDetail({ initialSalon }) {
     setSelectedTime(time);
     setSelectedSlot(time); // optional: keep both in sync
   };
+
   const handleBooking = async () => {
-    if (selectedServices.length > 0 && selectedSlot && selectedDate) {
-      try {
-        const payload = {
-          salonId: id,
-          service: selectedServices[0].name, // API expects single service
-          barber: selectedBarber,
-          date: selectedDate,
-          time: selectedSlot,
-          user: userInfo,
-          price: selectedServices[0].price,
-          customerName: userInfo?.name || "Guest",
-          customerPhone: userInfo?.mobile || "",
-        };
+    try {
+      console.log("Available variables:", {
+        selectedServices, // ← Use the PLURAL version
+        selectedSlot,
+        selectedBarber,
+        userInfo,
+      });
 
-        const res = await fetch("/api/bookings/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+      // Since you have multiple services selected, you can:
+      // Option 1: Use all services
+      const allServices = selectedServices
+        .map((service) => service.name)
+        .join(", ");
+      const totalPrice = selectedServices.reduce(
+        (sum, service) => sum + service.price,
+        0
+      );
 
-        if (!res.ok) throw new Error("Booking failed");
+      // Option 2: Use just the first service
+      const firstService = selectedServices[0];
 
-        const data = await res.json();
-        console.log("✅ Booking confirmed with:", data);
+      const payload = {
+        salonId: salon._id,
+        service: allServices, // or firstService.name
+        barber: selectedBarber,
+        date: selectedDate,
+        time: selectedSlot,
+        price: totalPrice, // or firstService.price
+        customerName: userInfo?.name || "Anonymous",
+        customerPhone: userInfo?.phone || "",
+        user: userInfo,
+      };
 
-        // Redirect to booking confirmation page
-        router.push(`/booking/confirmed?id=${data.bookingId || data._id}`);
-      } catch (err) {
-        console.error("❌ Booking error:", err);
-        alert("Something went wrong. Please try again.");
+      console.log("Booking data to send:", payload);
+
+      const response = await fetch("/api/bookings/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      // FIX 1: Handle 409 conflict BEFORE checking response.ok
+      if (response.status === 409) {
+        const errorData = await response.json();
+        alert(
+          "⚠️ Sorry! This time slot was just booked by another customer. Please select a different time."
+        );
+        // Refresh the page to show updated available slots
+        window.location.reload();
+        return; // Exit early, don't continue
       }
-    } else {
-      console.log("⚠ Please select at least one service and a time slot.");
+
+      // FIX 2: Use 'response' instead of 'res'
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || `Booking failed: ${response.status}`
+        );
+      }
+
+      const data = await response.json(); // ← FIX: 'response' not 'res'
+      console.log("✅ Booking confirmed with:", data);
+
+      alert("✅ Booking confirmed successfully!");
+
+      // Redirect to booking confirmation page
+      router.push(`/booking/confirmed?id=${data.bookingId || data._id}`);
+    } catch (error) {
+      console.error("❌ Booking error:", error);
+      alert(`Booking failed: ${error.message}`);
     }
   };
 

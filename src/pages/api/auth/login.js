@@ -10,7 +10,7 @@ export default async function handler(req, res) {
 
   try {
     const client = await clientPromise;
-    const db = client.db("salon-booking");
+    const db = client.db("techtrims");
 
     const collection = userType === "owner" ? "salons" : "users";
 

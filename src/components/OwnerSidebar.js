@@ -1,11 +1,10 @@
 import { useRouter } from "next/router";
-import styles from "../styles/OwnerSidebar.module.css";
 
-export default function OwnerSidebar() {
+export default function OwnerSidebar({ closeSidebar }) {
   const router = useRouter();
 
   const menuItems = [
-    { icon: "profile", label: "profile", path: "/salons/profile" },
+    { icon: "👤", label: "Profile", path: "/salons/profile" },
     { icon: "📊", label: "Dashboard", path: "/owner/dashboard" },
     { icon: "📅", label: "Bookings", path: "/owner/bookings" },
     { icon: "👥", label: "Staff", path: "/owner/staff" },
@@ -21,29 +20,53 @@ export default function OwnerSidebar() {
   };
 
   return (
-    <div className={styles.sidebar}>
-      <div className={styles.logo}>
-        <h2>💈 SalonBook Pro</h2>
-        <p>Owner Dashboard</p>
+    <div className="flex flex-col h-full bg-white shadow-md">
+      {/* Logo */}
+      <div className="p-6 border-b flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-bold gold-gradient-text">
+            💈 SalonBook Pro
+          </h2>
+          <p className="text-sm text-text-secondary">Owner Dashboard</p>
+        </div>
+        {/* Mobile close button */}
+        {closeSidebar && (
+          <button
+            onClick={closeSidebar}
+            className="md:hidden p-2 rounded-md hover:bg-gray-100"
+          >
+            ❌
+          </button>
+        )}
       </div>
 
-      <nav className={styles.menu}>
+      {/* Nav Menu */}
+      <nav className="flex-1 overflow-y-auto p-4 space-y-1">
         {menuItems.map((item) => (
-          <a
+          <button
             key={item.path}
-            href={item.path}
-            className={`${styles.menuItem} ${
-              router.pathname === item.path ? styles.active : ""
+            onClick={() => {
+              router.push(item.path);
+              if (closeSidebar) closeSidebar();
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
+              router.pathname === item.path
+                ? "bg-primary text-white shadow-md"
+                : "hover:bg-gray-100 text-text-primary"
             }`}
           >
-            <span className={styles.icon}>{item.icon}</span>
-            <span>{item.label}</span>
-          </a>
+            <span className="text-lg">{item.icon}</span>
+            <span className="capitalize">{item.label}</span>
+          </button>
         ))}
       </nav>
 
-      <div className={styles.footer}>
-        <button onClick={handleLogout} className={styles.logoutBtn}>
+      {/* Footer */}
+      <div className="p-4 border-t">
+        <button
+          onClick={handleLogout}
+          className="btn btn-secondary w-full flex items-center justify-center gap-2"
+        >
           🚪 Logout
         </button>
       </div>
