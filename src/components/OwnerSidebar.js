@@ -5,18 +5,25 @@ export default function OwnerSidebar({ closeSidebar }) {
 
   const menuItems = [
     { icon: "👤", label: "Profile", path: "/salons/profile" },
-    { icon: "📊", label: "Dashboard", path: "/owner/dashboard" },
-    { icon: "📅", label: "Bookings", path: "/owner/bookings" },
-    { icon: "👥", label: "Staff", path: "/owner/staff" },
-    { icon: "✂️", label: "Services", path: "/owner/services" },
-    { icon: "💰", label: "Payments", path: "/owner/payments" },
-    { icon: "📈", label: "Analytics", path: "/owner/analytics" },
-    { icon: "⚙️", label: "Settings", path: "/owner/settings" },
+    { icon: "📊", label: "Dashboard", path: "/salons/dashboard" },
+    { icon: "📅", label: "Bookings", path: "/salons/bookings" },
+    {
+      icon: "👨‍💼",
+      label: "Barber Management",
+      href: "/salons/barbers",
+      path: "/salons/barbers",
+    },
+
+    { icon: "👥", label: "Staff", path: "/salons/staff" },
+    { icon: "✂️", label: "Services", path: "/salons/services" },
+    { icon: "💰", label: "Payments", path: "/salons/payments" },
+    { icon: "📈", label: "Analytics", path: "/salons/analytics" },
+    { icon: "⚙️", label: "Settings", path: "/salons/settings" },
   ];
 
   const handleLogout = () => {
     localStorage.removeItem("ownerToken");
-    router.push("/owner/login");
+    router.push("/salons/login");
   };
 
   return (

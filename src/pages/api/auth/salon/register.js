@@ -9,7 +9,26 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
+  const client = await clientPromise;
+  const db = client.db("techtrims");
+  const salons = db.collection("salons");
+  const barbersCollection = db.collection("barbers");
 
+  // ADD DATABASE CONNECTION VERIFICATION
+  console.log("=== DATABASE CONNECTION DEBUG ===");
+  console.log("Client connected:", !!client);
+  console.log("Database name:", db.databaseName);
+  console.log("Collections initialized:", !!salons && !!barbersCollection);
+
+  // Test database write access
+  try {
+    await db.admin().ping();
+    console.log("Database ping successful");
+  } catch (pingError) {
+    console.error("Database ping failed:", pingError);
+  }
+
+  console.log("=== END CONNECTION DEBUG ===");
   try {
     let {
       salonName,
@@ -21,11 +40,19 @@ export default async function handler(req, res) {
       latitude,
       longitude,
       services,
+      barbers = [],
       operatingHours,
       description,
       amenities,
       salonImages,
     } = req.body;
+
+    console.log("Registration request:", {
+      salonName,
+      ownerName,
+      barbers: barbers,
+      barbersCount: barbers.length,
+    });
 
     // Ensure latitude/longitude are numbers
     latitude = parseFloat(latitude);
@@ -82,6 +109,7 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db("techtrims");
     const salons = db.collection("salons");
+    const barbersCollection = db.collection("barbers"); // ADD THIS LINE
 
     // Check if salon already exists
     const existingSalon = await salons.findOne({
@@ -190,6 +218,71 @@ export default async function handler(req, res) {
     };
 
     const result = await salons.insertOne(newSalon);
+    console.log("Creating salon with data:", newSalon);
+    console.log("Salon created with ID:", result.insertedId);
+
+    // CREATE BARBERS IF PROVIDED - ADD THIS SECTION
+    let barbersCreatedCount = 0;
+    let barberIds = [];
+
+    if (barbers && barbers.length > 0) {
+      console.log("Creating barbers for salon:", result.insertedId);
+
+      try {
+        const barberDocuments = barbers.map((barber) => ({
+          salonId: result.insertedId, // Link to the salon
+          name: barber.name || "",
+          experience: parseInt(barber.experience) || 0,
+          skills: Array.isArray(barber.skills) ? barber.skills : [],
+          bio: barber.bio || "",
+          photo: barber.photo || "",
+          isAvailable: barber.isAvailable !== false, // Default to true
+          workingHours: {
+            start: "09:00",
+            end: "21:00",
+          },
+          totalBookings: 0,
+          rating: 5.0,
+          accomplishments: [],
+          earnings: 0,
+          lastActiveAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
+        console.log("Inserting barbers:", barberDocuments);
+
+        // Insert all barbers at once
+        const barberResult = await barbersCollection.insertMany(
+          barberDocuments
+        );
+
+        barbersCreatedCount = barberResult.insertedCount || 0;
+        barberIds = Object.values(barberResult.insertedIds || {});
+
+        console.log("Barbers created:", barbersCreatedCount);
+        console.log("Barber IDs:", barberIds);
+
+        // UPDATE SALON DOCUMENT WITH BARBER IDS
+        console.log("Updating salon document with barber IDs...");
+        const salonUpdateResult = await salons.updateOne(
+          { _id: result.insertedId },
+          {
+            $set: {
+              barbers: barberIds, // Add barber IDs to salon
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        console.log("Salon update result:", salonUpdateResult);
+      } catch (barberError) {
+        console.error("Error creating barbers:", barberError);
+        barbersCreatedCount = 0;
+      }
+    } else {
+      console.log("No barbers provided");
+    }
 
     // Generate JWT token
     const token = generateToken(result.insertedId, "salon", email);
@@ -197,10 +290,13 @@ export default async function handler(req, res) {
     // Remove password from response
     const { hashedPassword: _, ...salonResponse } = newSalon;
     salonResponse._id = result.insertedId;
+    console.log("Final barbersCreatedCount to send:", barbersCreatedCount);
 
     res.status(201).json({
       message: "Salon registered successfully",
       salon: salonResponse,
+      barbersCreated: barbersCreatedCount, // ADD THIS LINE
+
       token,
     });
   } catch (error) {
