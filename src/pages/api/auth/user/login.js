@@ -1,5 +1,6 @@
 import clientPromise from "../../../../lib/mongodb";
-import { verifyPassword, generateToken } from "../../../../lib/auth";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -7,48 +8,40 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { emailOrPhone, password } = req.body;
+    const { email, password } = req.body;
 
-    // Validate required fields
-    if (!emailOrPhone || !password) {
-      return res.status(400).json({
-        message: "Email/Phone and password are required",
-      });
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
     }
 
     const client = await clientPromise;
     const db = client.db("techtrims");
-    const users = db.collection("users");
 
-    // Find user by email or phone
-    const user = await users.findOne({
-      $or: [{ email: emailOrPhone.toLowerCase() }, { phone: emailOrPhone }],
+    // Find user by email
+    const user = await db.collection("users").findOne({
+      email: email.toLowerCase(),
+      role: "user",
     });
 
     if (!user) {
-      return res.status(401).json({
-        message: "Invalid credentials",
-      });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Check if user is active
+    // Check if account is active
     if (!user.isActive) {
-      return res.status(401).json({
-        message: "Account has been deactivated. Please contact support.",
-      });
+      return res.status(401).json({ message: "Account is deactivated" });
     }
 
     // Verify password
-    const isPasswordValid = await verifyPassword(password, user.hashedPassword);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        message: "Invalid credentials",
-      });
+    const isValidPassword = await bcrypt.compare(password, user.hashedPassword);
+    if (!isValidPassword) {
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // Update last login
-    await users.updateOne(
+    await db.collection("users").updateOne(
       { _id: user._id },
       {
         $set: {
@@ -58,16 +51,36 @@ export default async function handler(req, res) {
       }
     );
 
-    // Generate JWT token
-    const token = generateToken(user._id, user.role, user.email);
+    // Create JWT token
+    const token = jwt.sign(
+      {
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
-    // Remove sensitive data from response
-    const { hashedPassword, ...userResponse } = user;
+    // Return user data without sensitive info
+    const userResponse = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      gender: user.gender,
+      role: user.role,
+      bookingHistory: user.bookingHistory || [],
+      preferences: user.preferences || {},
+      createdAt: user.createdAt,
+      lastLogin: new Date(),
+    };
 
     res.status(200).json({
       message: "Login successful",
-      user: userResponse,
       token,
+      user: userResponse,
     });
   } catch (error) {
     console.error("User login error:", error);

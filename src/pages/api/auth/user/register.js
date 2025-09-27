@@ -57,24 +57,49 @@ export default async function handler(req, res) {
     const hashedPassword = await hashPassword(password);
 
     // Create new user
+    // Check for existing bookings by phone/name before creating user
+    const existingBookings = await db
+      .collection("bookings")
+      .find({
+        $or: [
+          { customerPhone: phone },
+          { customerName: { $regex: name, $options: "i" } },
+        ],
+      })
+      .toArray();
+
+    console.log(
+      `Found ${existingBookings.length} existing bookings for this user`
+    );
+
     const newUser = {
-      name: name.trim(),
-      email: email.toLowerCase(),
-      phone: phone,
-      gender: gender,
+      name,
+      email,
+      phone,
+      gender,
       role: "user",
       hashedPassword,
-      bookingHistory: [],
-      preferences: {
-        favoriteServices: [],
-        preferredSalons: [],
-      },
+      bookingHistory: existingBookings.map((booking) => booking._id), // Store booking IDs
+      preferences: {},
       createdAt: new Date(),
       updatedAt: new Date(),
       isActive: true,
     };
 
-    const result = await users.insertOne(newUser);
+    const result = await db.collection("users").insertOne(newUser);
+
+    // Update existing bookings with userId
+    if (existingBookings.length > 0) {
+      await db
+        .collection("bookings")
+        .updateMany(
+          { _id: { $in: existingBookings.map((b) => b._id) } },
+          { $set: { userId: result.insertedId } }
+        );
+      console.log(
+        `Updated ${existingBookings.length} bookings with new userId`
+      );
+    }
 
     // Generate JWT token
     const token = generateToken(result.insertedId, "user", email);

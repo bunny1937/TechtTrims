@@ -15,6 +15,7 @@ export default function Home() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
   const [selectedSalon, setSelectedSalon] = useState(null);
+  const [showLoginMenu, setShowLoginMenu] = useState(false);
 
   // Dynamic import for map component
   const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
@@ -140,7 +141,27 @@ export default function Home() {
             >
               {isDarkMode ? "☀️" : "🌙"}
             </button>
-
+            <button
+              className={styles.bookingButton}
+              onClick={() => {
+                // Check if user is logged in
+                const userToken = localStorage.getItem("userToken");
+                if (userToken) {
+                  router.push("/user/dashboard");
+                } else {
+                  alert("Please login first to view your bookings");
+                  router.push("/auth/user/login");
+                }
+              }}
+            >
+              Show Bookings
+            </button>
+            <button
+              className="dashboard-button"
+              onClick={() => router.push("/user/dashboard")}
+            >
+              Dashboard
+            </button>
             <button
               className={styles.ownerButton}
               onClick={() => navigateToAuth("register", "salon")}
@@ -148,12 +169,34 @@ export default function Home() {
               Register as Owner
             </button>
 
-            <button
-              className={styles.loginButton}
-              onClick={() => navigateToAuth("login", "salon")}
-            >
-              Login
-            </button>
+            <div className={styles.loginDropdown}>
+              <button
+                className={styles.loginButton}
+                onClick={() => setShowLoginMenu(!showLoginMenu)}
+              >
+                Login ▼
+              </button>
+              {showLoginMenu && (
+                <div className={styles.loginMenu}>
+                  <button
+                    onClick={() => {
+                      router.push("/auth/user/login");
+                      setShowLoginMenu(false);
+                    }}
+                  >
+                    👤 User Login
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigateToAuth("login", "salon");
+                      setShowLoginMenu(false);
+                    }}
+                  >
+                    🏪 Salon Login
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
