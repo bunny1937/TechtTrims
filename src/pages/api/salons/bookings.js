@@ -1,65 +1,49 @@
-// src/pages/api/salons/bookings.js
-import { connectToDatabase } from "../../../lib/mongodb";
+import clientPromise from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  const { salonId, date, status, from, to } = req.query;
-
-  if (!salonId) {
-    return res.status(400).json({ error: "salonId is required" });
+    return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const { client, db } = await connectToDatabase(); // Note: destructure both client and db
+    const { salonId, date, from } = req.query;
 
-    // Build filter object
-    const filter = {};
-
-    // Handle salonId - could be string or ObjectId
-    if (ObjectId.isValid(salonId)) {
-      filter.salonId = new ObjectId(salonId);
-    } else {
-      filter.salonId = salonId;
+    if (!salonId) {
+      return res.status(400).json({ message: "Salon ID is required" });
     }
 
-    // Add status filter
-    if (status) {
-      filter.status = status;
-    }
+    const client = await clientPromise;
+    const db = client.db("techtrims");
 
-    // Add date filter
+    let query = { salonId: new ObjectId(salonId) };
+
+    // Add date filtering
     if (date) {
-      // For specific date, match the date string exactly
-      filter.date = date;
-    } else if (from || to) {
-      // For date range, use appointmentAt if it exists
-      filter.appointmentAt = {};
-      if (from) filter.appointmentAt.$gte = new Date(from);
-      if (to) filter.appointmentAt.$lte = new Date(to);
+      // Specific date
+      query.date = date;
+    } else if (from) {
+      // From a specific date onwards
+      query.date = { $gte: from };
     }
 
-    console.log("Booking query filter:", JSON.stringify(filter, null, 2));
-
-    // Query bookings
     const bookings = await db
       .collection("bookings")
-      .find(filter)
-      .sort({ date: 1, time: 1 })
-      .limit(100)
+      .find(query)
+      .sort({ date: 1, time: 1 }) // Sort by date and time
       .toArray();
 
-    console.log(`Found ${bookings.length} bookings for salon ${salonId}`);
+    // Format bookings with additional info
+    const formattedBookings = bookings.map((booking) => ({
+      ...booking,
+      _id: booking._id.toString(),
+      salonId: booking.salonId.toString(),
+      userId: booking.userId?.toString(),
+    }));
 
-    return res.status(200).json(bookings);
+    res.status(200).json(formattedBookings);
   } catch (error) {
-    console.error("Bookings API error:", error);
-    return res.status(500).json({
-      error: "Internal server error",
-      message: error.message,
-    });
+    console.error("Error fetching salon bookings:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 }

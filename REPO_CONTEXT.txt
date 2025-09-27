@@ -53,16 +53,14 @@ public/next.svg
 public/vercel.svg
 public/window.svg
 README.md
-src/components/Layout.js
+src/components/Layout/Layout.js
 src/components/Maps/LocationMap.js
 src/components/Maps/LocationPicker.js
 src/components/Maps/SalonMap.js
 src/components/OwnerSidebar.js
+src/components/Salon/SalonCard.js
 src/components/Salon/SalonDashboard.js
 src/components/Salon/SalonRegisterForm.js
-src/components/Salon/SalonRegisterForm.js.bakdup
-src/components/SalonCard.js
-src/data/dummyData.js
 src/lib/auth.js
 src/lib/constants.js
 src/lib/maps.js
@@ -78,15 +76,9 @@ src/models/Service.js
 src/models/Staff.js
 src/models/User.js
 src/pages/_app.js
-src/pages/api/auth/login.js
-src/pages/api/auth/register.js
-src/pages/api/auth/salon-login.js
-src/pages/api/auth/salon-register.js
-src/pages/api/auth/salon-register.js.bakdup
 src/pages/api/auth/salon/login.js
 src/pages/api/auth/salon/register.js
 src/pages/api/auth/send-otp.js
-src/pages/api/auth/user-register.js
 src/pages/api/auth/user/login.js
 src/pages/api/auth/user/register.js
 src/pages/api/auth/verify-otp.js
@@ -345,31 +337,6 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 </file>
 
-<file path="src/components/Layout.js">
-import Link from "next/link";
-
-export default function Layout({ children }) {
-  return (
-    <div className={"layout"}>
-      <header className={"header"}>
-        <div className={"logo"}>
-          <h2>💈 SalonBook</h2>
-        </div>
-        <nav>
-          <Link href="/">Home</Link>
-          <Link href="/bookings">My Bookings</Link>
-          <Link href="/profile">Profile</Link>
-        </nav>
-      </header>
-      <main className={"main"}>{children}</main>
-      <footer className={"footer"}>
-        <p>&copy; 2024 SalonBook. All rights reserved.</p>
-      </footer>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/Salon/SalonDashboard.js">
 // components/salons/SalonDashboard.js
 import React, { useEffect, useState } from "react";
@@ -434,1448 +401,6 @@ export default function SalonDashboard() {
     </main>
   );
 }
-</file>
-
-<file path="src/components/Salon/SalonRegisterForm.js.bakdup">
-import React, { useState, useEffect } from "react";
-import {
-  MapPin,
-  Clock,
-  User,
-  Mail,
-  Phone,
-  Lock,
-  Store,
-  Scissors,
-  Star,
-} from "lucide-react";
-import dynamic from "next/dynamic";
-import Link from "next/link";
-
-// Dynamically import LocationPicker to avoid SSR issues with Leaflet
-const LocationPicker = dynamic(() => import("../Maps/LocationPicker"), {
-  ssr: false,
-  loading: () => (
-    <div className="animate-pulse bg-gray-300 h-64 rounded-xl"></div>
-  ),
-});
-
-const SalonRegisterForm = () => {
-  const [formData, setFormData] = useState({
-    // Owner Details
-    fullName: "",
-    mobileNumber: "",
-    email: "",
-    password: "",
-
-    // Salon Details
-    salonName: "",
-    address: "",
-    locationData: null, // Will store coordinates and formatted address
-    openingTime: "09:00",
-    closingTime: "21:00",
-
-    // Basic Services & Pricing
-    services: {
-      haircut: { enabled: false, price: "" },
-      shave: { enabled: false, price: "" },
-      hairWash: { enabled: false, price: "" },
-      hairStyling: { enabled: false, price: "" },
-      facial: { enabled: false, price: "" },
-      hairColor: { enabled: false, price: "" },
-    },
-  });
-
-  const [currentStep, setCurrentStep] = useState(1);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  const handleInputChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const handleServiceChange = (service, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      services: {
-        ...prev.services,
-        [service]: {
-          ...prev.services[service],
-          [field]: value,
-        },
-      },
-    }));
-  };
-
-  const handleLocationSelect = (locationData) => {
-    setFormData((prev) => ({
-      ...prev,
-      locationData: locationData,
-      address: locationData.address,
-    }));
-    setShowLocationPicker(false);
-  };
-
-  const handleSubmit = async () => {
-    // Validate required fields
-    if (
-      !formData.fullName ||
-      !formData.mobileNumber ||
-      !formData.email ||
-      !formData.password
-    ) {
-      alert("Please fill in all owner details");
-      return;
-    }
-
-    if (!formData.salonName || !formData.locationData) {
-      alert("Please fill in salon details and select location");
-      return;
-    }
-
-    // Check if at least one service is enabled
-    const enabledServices = Object.values(formData.services).some(
-      (service) => service.enabled
-    );
-    if (!enabledServices) {
-      alert("Please enable at least one service");
-      return;
-    }
-
-    try {
-      const registrationData = {
-        ...formData,
-        coordinates: formData.locationData?.coordinates || [0, 0],
-      };
-
-      console.log("Salon Registration Data:", registrationData);
-
-      // Here you would send data to your backend API
-      const response = await fetch("/api/api/auth/salons/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(registrationData),
-      });
-
-      if (response.ok) {
-        await response.json();
-        alert("Salon registered successfully! Welcome to the platform.");
-        // Redirect to dashboard or login
-        window.location.href = "/salons/dashboard";
-      } else {
-        const error = await response.json();
-        alert(`Registration failed: ${error.message}`);
-      }
-    } catch (error) {
-      console.error("Registration error:", error);
-      alert("Registration failed. Please try again.");
-    }
-  };
-
-  const services = [
-    { key: "haircut", label: "Haircut", icon: Scissors, defaultPrice: "200" },
-    { key: "shave", label: "Shave", icon: Scissors, defaultPrice: "100" },
-    {
-      key: "hairWash",
-      label: "Hair Wash",
-      icon: Scissors,
-      defaultPrice: "150",
-    },
-    {
-      key: "hairStyling",
-      label: "Hair Styling",
-      icon: Scissors,
-      defaultPrice: "300",
-    },
-    { key: "facial", label: "Facial", icon: Star, defaultPrice: "500" },
-    {
-      key: "hairColor",
-      label: "Hair Color",
-      icon: Scissors,
-      defaultPrice: "800",
-    },
-  ];
-
-  // Don't render until client-side to avoid hydration issues
-  if (!isClient) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-yellow-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div
-        className={`min-h-screen transition-all duration-500 ${
-          isDarkMode
-            ? "bg-gradient-to-br from-gray-900 via-gray-800 to-black"
-            : "bg-gradient-to-br from-amber-50 via-white to-yellow-100"
-        }`}
-      >
-        {/* Dark Mode Toggle */}
-        <div className="absolute top-4 right-4 z-50">
-          <button
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className={`p-3 rounded-full transition-all duration-300 ${
-              isDarkMode
-                ? "bg-yellow-500 text-gray-900 hover:bg-yellow-400"
-                : "bg-gray-800 text-white hover:bg-gray-700"
-            }`}
-          >
-            {isDarkMode ? "☀️" : "🌙"}
-          </button>
-        </div>
-
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="text-center mb-8 animate-fadeIn">
-              <div
-                className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
-                  isDarkMode
-                    ? "bg-gradient-to-r from-yellow-500 to-amber-500"
-                    : "bg-gradient-to-r from-amber-500 to-yellow-600"
-                }`}
-              >
-                <Store className="w-8 h-8 text-white" />
-              </div>
-              <h1
-                className={`text-4xl font-bold mb-2 ${
-                  isDarkMode
-                    ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-300"
-                    : "text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-yellow-700"
-                }`}
-              >
-                Register Your Salon
-              </h1>
-              <p
-                className={`text-lg ${
-                  isDarkMode ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
-                Join our platform and start getting more customers
-              </p>
-            </div>
-
-            {/* Progress Steps */}
-            <div className="flex items-center justify-center mb-8">
-              {[1, 2, 3].map((step) => (
-                <React.Fragment key={step}>
-                  <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${
-                      currentStep >= step
-                        ? isDarkMode
-                          ? "bg-yellow-500 text-gray-900"
-                          : "bg-amber-500 text-white"
-                        : isDarkMode
-                        ? "bg-gray-700 text-gray-400"
-                        : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    {step}
-                  </div>
-                  {step < 3 && (
-                    <div
-                      className={`w-12 h-1 mx-2 transition-all duration-300 ${
-                        currentStep > step
-                          ? isDarkMode
-                            ? "bg-yellow-500"
-                            : "bg-amber-500"
-                          : isDarkMode
-                          ? "bg-gray-700"
-                          : "bg-gray-200"
-                      }`}
-                    />
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
-
-            {/* Registration Form */}
-            <div
-              className={`rounded-3xl shadow-2xl p-8 backdrop-blur-sm transition-all duration-500 ${
-                isDarkMode
-                  ? "bg-gray-800/80 border border-gray-700"
-                  : "bg-white/90 border border-amber-200"
-              }`}
-            >
-              <div className="space-y-8">
-                {/* Step 1: Owner Details */}
-                {currentStep === 1 && (
-                  <div className="animate-slideIn">
-                    <h2
-                      className={`text-2xl font-bold mb-6 flex items-center ${
-                        isDarkMode ? "text-yellow-400" : "text-amber-600"
-                      }`}
-                    >
-                      <User className="w-6 h-6 mr-3" />
-                      Owner Details
-                    </h2>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label
-                          className={`text-sm font-medium ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Full Name
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Your full name"
-                          value={formData.fullName}
-                          onChange={(e) =>
-                            handleInputChange("fullName", e.target.value)
-                          }
-                          className={`w-full px-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                            isDarkMode
-                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                          }`}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className={`text-sm font-medium ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Mobile Number
-                        </label>
-                        <div className="relative">
-                          <Phone
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          />
-                          <input
-                            type="tel"
-                            placeholder="+91 9876543210"
-                            value={formData.mobileNumber}
-                            onChange={(e) =>
-                              handleInputChange("mobileNumber", e.target.value)
-                            }
-                            className={`w-full pl-11 pr-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                            }`}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className={`text-sm font-medium ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Email
-                        </label>
-                        <div className="relative">
-                          <Mail
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          />
-                          <input
-                            type="email"
-                            placeholder="your.email@example.com"
-                            value={formData.email}
-                            onChange={(e) =>
-                              handleInputChange("email", e.target.value)
-                            }
-                            className={`w-full pl-11 pr-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                            }`}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className={`text-sm font-medium ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Password
-                        </label>
-                        <div className="relative">
-                          <Lock
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          />
-                          <input
-                            type="password"
-                            placeholder="Create a strong password"
-                            value={formData.password}
-                            onChange={(e) =>
-                              handleInputChange("password", e.target.value)
-                            }
-                            className={`w-full pl-11 pr-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 2: Salon Details */}
-                {currentStep === 2 && (
-                  <div className="animate-slideIn">
-                    <h2
-                      className={`text-2xl font-bold mb-6 flex items-center ${
-                        isDarkMode ? "text-yellow-400" : "text-amber-600"
-                      }`}
-                    >
-                      <Store className="w-6 h-6 mr-3" />
-                      Salon Details
-                    </h2>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label
-                          className={`text-sm font-medium ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Salon Name
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Your salon name"
-                          value={formData.salonName}
-                          onChange={(e) =>
-                            handleInputChange("salonName", e.target.value)
-                          }
-                          className={`w-full px-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                            isDarkMode
-                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                          }`}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className={`text-sm font-medium ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Location Pin
-                        </label>
-                        <div className="relative">
-                          <MapPin
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          />
-                          <button
-                            type="button"
-                            className={`w-full pl-11 pr-4 py-3 rounded-xl border transition-all duration-300 text-left ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
-                                : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
-                            }`}
-                            onClick={() => setShowLocationPicker(true)}
-                          >
-                            {formData.locationData
-                              ? formData.locationData.address
-                              : "Set exact location on map"}
-                          </button>
-                          {showLocationPicker && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                              <div className="bg-white rounded-xl p-6 shadow-xl relative w-full max-w-2xl">
-                                <button
-                                  className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-                                  onClick={() => setShowLocationPicker(false)}
-                                >
-                                  ✕
-                                </button>
-                                <LocationPicker
-                                  onSelect={handleLocationSelect}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="md:col-span-2 space-y-2">
-                        <label
-                          className={`text-sm font-medium ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Address
-                        </label>
-                        <textarea
-                          placeholder="Complete address with landmarks"
-                          value={formData.address}
-                          onChange={(e) =>
-                            handleInputChange("address", e.target.value)
-                          }
-                          rows={3}
-                          className={`w-full px-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 resize-none ${
-                            isDarkMode
-                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                          }`}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className={`text-sm font-medium ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Opening Time
-                        </label>
-                        <div className="relative">
-                          <Clock
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          />
-                          <input
-                            type="time"
-                            value={formData.openingTime}
-                            onChange={(e) =>
-                              handleInputChange("openingTime", e.target.value)
-                            }
-                            className={`w-full pl-11 pr-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-white focus:border-yellow-500 focus:ring-yellow-500"
-                                : "bg-white border-gray-300 text-gray-900 focus:border-amber-500 focus:ring-amber-500"
-                            }`}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className={`text-sm font-medium ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Closing Time
-                        </label>
-                        <div className="relative">
-                          <Clock
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          />
-                          <input
-                            type="time"
-                            value={formData.closingTime}
-                            onChange={(e) =>
-                              handleInputChange("closingTime", e.target.value)
-                            }
-                            className={`w-full pl-11 pr-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-white focus:border-yellow-500 focus:ring-yellow-500"
-                                : "bg-white border-gray-300 text-gray-900 focus:border-amber-500 focus:ring-amber-500"
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {currentStep === 3 && (
-                  <div className="animate-slideIn">
-                    <h2
-                      className={`text-2xl font-bold mb-6 flex items-center ${
-                        isDarkMode ? "text-yellow-400" : "text-amber-600"
-                      }`}
-                    >
-                      <Scissors className="w-6 h-6 mr-3" />
-                      Basic Services & Pricing
-                    </h2>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {services.map((service) => {
-                        const Icon = service.icon;
-                        return (
-                          <div
-                            key={service.key}
-                            className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                              formData.services[service.key].enabled
-                                ? isDarkMode
-                                  ? "border-yellow-500 bg-yellow-500/10"
-                                  : "border-amber-500 bg-amber-50"
-                                : isDarkMode
-                                ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
-                                : "border-gray-200 bg-gray-50 hover:border-gray-300"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    formData.services[service.key].enabled
-                                  }
-                                  onChange={(e) =>
-                                    handleServiceChange(
-                                      service.key,
-                                      "enabled",
-                                      e.target.checked
-                                    )
-                                  }
-                                  className={`w-5 h-5 rounded transition-all duration-300 ${
-                                    isDarkMode
-                                      ? "text-yellow-500 focus:ring-yellow-500 bg-gray-700 border-gray-600"
-                                      : "text-amber-500 focus:ring-amber-500"
-                                  }`}
-                                />
-                                <Icon
-                                  className={`w-5 h-5 ml-3 ${
-                                    formData.services[service.key].enabled
-                                      ? isDarkMode
-                                        ? "text-yellow-400"
-                                        : "text-amber-600"
-                                      : isDarkMode
-                                      ? "text-gray-400"
-                                      : "text-gray-500"
-                                  }`}
-                                />
-                                <span
-                                  className={`ml-2 font-medium ${
-                                    formData.services[service.key].enabled
-                                      ? isDarkMode
-                                        ? "text-white"
-                                        : "text-gray-900"
-                                      : isDarkMode
-                                      ? "text-gray-400"
-                                      : "text-gray-600"
-                                  }`}
-                                >
-                                  {service.label}
-                                </span>
-                              </div>
-                            </div>
-
-                            {formData.services[service.key].enabled && (
-                              <div className="animate-slideIn">
-                                <div className="flex items-center">
-                                  <span
-                                    className={`text-sm font-medium mr-2 ${
-                                      isDarkMode
-                                        ? "text-gray-300"
-                                        : "text-gray-700"
-                                    }`}
-                                  >
-                                    ₹
-                                  </span>
-                                  <input
-                                    type="number"
-                                    placeholder={service.defaultPrice}
-                                    value={formData.services[service.key].price}
-                                    onChange={(e) =>
-                                      handleServiceChange(
-                                        service.key,
-                                        "price",
-                                        e.target.value
-                                      )
-                                    }
-                                    className={`flex-1 px-3 py-2 rounded-lg border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                                      isDarkMode
-                                        ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                                    }`}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Navigation Buttons */}
-                <div className="flex justify-between pt-8">
-                  {currentStep > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(currentStep - 1)}
-                      className={`px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
-                        isDarkMode
-                          ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                      }`}
-                    >
-                      Previous
-                    </button>
-                  )}
-
-                  {currentStep < 3 ? (
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(currentStep + 1)}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ml-auto ${
-                        isDarkMode
-                          ? "bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 hover:from-yellow-400 hover:to-amber-400"
-                          : "bg-gradient-to-r from-amber-500 to-yellow-600 text-white hover:from-amber-600 hover:to-yellow-700"
-                      }`}
-                    >
-                      Next Step
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleSubmit}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ml-auto ${
-                        isDarkMode
-                          ? "bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 hover:from-yellow-400 hover:to-amber-400"
-                          : "bg-gradient-to-r from-amber-500 to-yellow-600 text-white hover:from-amber-600 hover:to-yellow-700"
-                      }`}
-                    >
-                      Register My Salon
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Sign In Link */}
-              <div className="text-center mt-8 pt-6 border-t border-opacity-20">
-                <p
-                  className={`${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  <Link
-                    href="/salons/login"
-                    className={`font-medium transition-colors duration-300 ${
-                      isDarkMode
-                        ? "text-yellow-400 hover:text-yellow-300"
-                        : "text-amber-600 hover:text-amber-700"
-                    }`}
-                  >
-                    Sign In
-                  </Link>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <style jsx>{`
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-              transform: translateY(-20px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-
-          @keyframes slideIn {
-            from {
-              opacity: 0;
-              transform: translateX(-30px);
-            }
-            to {
-              opacity: 1;
-              transform: translateX(0);
-            }
-          }
-
-          .animate-fadeIn {
-            animation: fadeIn 0.8s ease-out;
-          }
-
-          .animate-slideIn {
-            animation: slideIn 0.6s ease-out;
-          }
-        `}</style>
-      </div>
-    </>
-  );
-};
-
-export default SalonRegisterForm;
-</file>
-
-<file path="src/components/SalonCard.js">
-import { useRouter } from "next/router";
-import styles from "../styles/SalonCard.module.css";
-import Image from "next/image";
-
-export default function SalonCard({ salon, gender }) {
-  const router = useRouter();
-  if (!salon) {
-    return null; // or return a loading/error placeholder
-  }
-
-  const handleBookNow = () => {
-    router.push(`/salons/${salon.id}`);
-  };
-
-  return (
-    <div className={styles.card}>
-      <div className={styles.imageContainer}>
-        <Image
-          src={salon.images?.front || "/salon-placeholder.jpg"}
-          alt={salon.name}
-        />
-        <div className={styles.popularityBadge}>
-          {salon.totalBookings > 100 && "🔥 Most Booked"}
-        </div>
-      </div>
-
-      <div className={styles.content}>
-        <h3>{salon.name}</h3>
-
-        <div className={styles.metrics}>
-          <span>⭐ {salon.rating}/5</span>
-          <span>📍 {salon.location?.distance || "1.2"} km</span>
-          <span>🎯 {salon.customerServiceScore}% satisfaction</span>
-        </div>
-
-        <div className={styles.services}>
-          <h4>Popular Services</h4>
-          <div className={styles.serviceList}>
-            {salon.topServices?.map((service, index) => (
-              <div key={index} className={styles.serviceItem}>
-                <span>{service.name}</span>
-                <span className={styles.price}>₹{service.price}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <button onClick={handleBookNow} className={styles.bookBtn}>
-          Book Now →
-        </button>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/data/dummyData.js">
-// data/dummyData.js - Sample data for testing the salon booking platform
-
-export const dummySalons = [
-  {
-    _id: "salon_001",
-    ownerDetails: {
-      name: "Rajesh Kumar",
-      mobile: "+91 9876543210",
-      email: "rajesh@luxurysalon.com",
-      password: "$2a$12$hashedPasswordHere", // bcrypt hashed
-    },
-    salonDetails: {
-      name: "Royal Hair Studio",
-      address:
-        "Shop No. 15, Linking Road, Bandra West, Mumbai, Maharashtra 400050",
-      location: {
-        type: "Point",
-        coordinates: [72.8261, 19.0596], // [longitude, latitude] - Bandra West
-      },
-      openingHours: {
-        open: "09:00",
-        close: "21:00",
-      },
-      images: [
-        "/images/salons/royal-hair-studio-1.jpg",
-        "/images/salons/royal-hair-studio-2.jpg",
-        "/images/salons/royal-hair-studio-3.jpg",
-      ],
-      description:
-        "Premium hair salon offering luxury services with experienced stylists and modern equipment.",
-    },
-    services: [
-      { name: "Haircut", price: 250, duration: 45, genderSpecific: "male" },
-      {
-        name: "Hair Styling",
-        price: 400,
-        duration: 60,
-        genderSpecific: "male",
-      },
-      { name: "Beard Trim", price: 150, duration: 30, genderSpecific: "male" },
-      {
-        name: "Hair Color",
-        price: 800,
-        duration: 90,
-        genderSpecific: "unisex",
-      },
-      { name: "Facial", price: 600, duration: 60, genderSpecific: "unisex" },
-    ],
-    barbers: [
-      {
-        name: "Amit Sharma",
-        image: "/images/barbers/amit-sharma.jpg",
-        specialization: ["Haircut", "Styling", "Beard"],
-        rating: 4.8,
-        totalBookings: 1250,
-      },
-      {
-        name: "Vikram Singh",
-        image: "/images/barbers/vikram-singh.jpg",
-        specialization: ["Hair Color", "Facial", "Styling"],
-        rating: 4.6,
-        totalBookings: 890,
-      },
-    ],
-    ratings: {
-      overall: 4.7,
-      totalReviews: 234,
-      serviceQuality: 4.8,
-      timing: 4.6,
-      cleanliness: 4.9,
-      ambience: 4.5,
-    },
-    stats: {
-      totalBookings: 2140,
-      repeatCustomers: 156,
-      averageWaitTime: 12,
-    },
-    isActive: true,
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-09-20"),
-  },
-  {
-    _id: "salon_002",
-    ownerDetails: {
-      name: "Priya Mehta",
-      mobile: "+91 9765432108",
-      email: "priya@glamourstudio.com",
-      password: "$2a$12$anotherHashedPasswordHere",
-    },
-    salonDetails: {
-      name: "Glamour Beauty Studio",
-      address:
-        "2nd Floor, Phoenix Mills, Lower Parel, Mumbai, Maharashtra 400013",
-      location: {
-        type: "Point",
-        coordinates: [72.8347, 19.0144], // Lower Parel
-      },
-      openingHours: {
-        open: "10:00",
-        close: "22:00",
-      },
-      images: [
-        "/images/salons/glamour-studio-1.jpg",
-        "/images/salons/glamour-studio-2.jpg",
-        "/images/salons/glamour-studio-3.jpg",
-      ],
-      description:
-        "Unisex beauty studio specializing in hair, skin, and nail treatments for both men and women.",
-    },
-    services: [
-      {
-        name: "Ladies Haircut",
-        price: 350,
-        duration: 60,
-        genderSpecific: "female",
-      },
-      {
-        name: "Hair Styling",
-        price: 500,
-        duration: 75,
-        genderSpecific: "female",
-      },
-      { name: "Facial", price: 800, duration: 90, genderSpecific: "female" },
-      {
-        name: "Hair Color",
-        price: 1200,
-        duration: 120,
-        genderSpecific: "female",
-      },
-      {
-        name: "Men's Haircut",
-        price: 200,
-        duration: 40,
-        genderSpecific: "male",
-      },
-      {
-        name: "Manicure & Pedicure",
-        price: 600,
-        duration: 60,
-        genderSpecific: "unisex",
-      },
-    ],
-    barbers: [
-      {
-        name: "Sneha Patel",
-        image: "/images/barbers/sneha-patel.jpg",
-        specialization: ["Ladies Cut", "Styling", "Color"],
-        rating: 4.9,
-        totalBookings: 1580,
-      },
-      {
-        name: "Rohit Joshi",
-        image: "/images/barbers/rohit-joshi.jpg",
-        specialization: ["Men's Cut", "Styling", "Facial"],
-        rating: 4.7,
-        totalBookings: 1120,
-      },
-    ],
-    ratings: {
-      overall: 4.8,
-      totalReviews: 189,
-      serviceQuality: 4.9,
-      timing: 4.7,
-      cleanliness: 4.8,
-      ambience: 4.8,
-    },
-    stats: {
-      totalBookings: 2700,
-      repeatCustomers: 203,
-      averageWaitTime: 8,
-    },
-    isActive: true,
-    createdAt: new Date("2024-02-01"),
-    updatedAt: new Date("2024-09-21"),
-  },
-  {
-    _id: "salon_003",
-    ownerDetails: {
-      name: "Arjun Reddy",
-      mobile: "+91 9654321097",
-      email: "arjun@moderncutsalon.com",
-      password: "$2a$12$yetAnotherHashedPassword",
-    },
-    salonDetails: {
-      name: "Modern Cut Salon",
-      address:
-        "Ground Floor, Palladium Mall, High Street Phoenix, Lower Parel, Mumbai 400013",
-      location: {
-        type: "Point",
-        coordinates: [72.8331, 19.0095],
-      },
-      openingHours: {
-        open: "11:00",
-        close: "23:00",
-      },
-      images: [
-        "/images/salons/modern-cut-1.jpg",
-        "/images/salons/modern-cut-2.jpg",
-      ],
-      description:
-        "Trendy salon focusing on modern cuts and contemporary styling for the urban crowd.",
-    },
-    services: [
-      {
-        name: "Trendy Haircut",
-        price: 300,
-        duration: 50,
-        genderSpecific: "male",
-      },
-      { name: "Buzz Cut", price: 150, duration: 25, genderSpecific: "male" },
-      { name: "Hair Wash", price: 100, duration: 20, genderSpecific: "male" },
-      {
-        name: "Beard Styling",
-        price: 200,
-        duration: 35,
-        genderSpecific: "male",
-      },
-      {
-        name: "Hair Gel Styling",
-        price: 250,
-        duration: 40,
-        genderSpecific: "male",
-      },
-    ],
-    barbers: [
-      {
-        name: "Kiran Kumar",
-        image: "/images/barbers/kiran-kumar.jpg",
-        specialization: ["Modern Cuts", "Styling", "Beard"],
-        rating: 4.5,
-        totalBookings: 950,
-      },
-    ],
-    ratings: {
-      overall: 4.5,
-      totalReviews: 127,
-      serviceQuality: 4.6,
-      timing: 4.4,
-      cleanliness: 4.7,
-      ambience: 4.3,
-    },
-    stats: {
-      totalBookings: 950,
-      repeatCustomers: 89,
-      averageWaitTime: 15,
-    },
-    isActive: true,
-    createdAt: new Date("2024-03-10"),
-    updatedAt: new Date("2024-09-19"),
-  },
-];
-
-export const dummyUsers = [
-  {
-    _id: "user_001",
-    name: "Rahul Sharma",
-    mobile: "+91 9876543211",
-    email: "rahul.sharma@email.com",
-    gender: "male",
-    location: {
-      coordinates: [72.8777, 19.076], // Andheri
-      address: "Andheri East, Mumbai, Maharashtra",
-    },
-    preferences: {
-      favoriteServices: ["Haircut", "Beard Trim"],
-      preferredPriceRange: { min: 100, max: 500 },
-    },
-    bookingHistory: ["booking_001", "booking_002"],
-    createdAt: new Date("2024-06-15"),
-    updatedAt: new Date("2024-09-20"),
-  },
-  {
-    _id: "user_002",
-    name: "Anita Desai",
-    mobile: "+91 9765432109",
-    email: "anita.desai@email.com",
-    gender: "female",
-    location: {
-      coordinates: [72.8261, 19.0596], // Bandra
-      address: "Bandra West, Mumbai, Maharashtra",
-    },
-    preferences: {
-      favoriteServices: ["Ladies Haircut", "Facial", "Hair Color"],
-      preferredPriceRange: { min: 300, max: 1500 },
-    },
-    bookingHistory: ["booking_003"],
-    createdAt: new Date("2024-07-22"),
-    updatedAt: new Date("2024-09-18"),
-  },
-];
-
-export const dummyBookings = [
-  {
-    _id: "booking_001",
-    userId: "user_001",
-    salonId: "salon_001",
-    barberName: "Amit Sharma",
-    service: {
-      name: "Haircut",
-      price: 250,
-      duration: 45,
-    },
-    scheduledTime: new Date("2024-09-25T14:30:00Z"),
-    status: "confirmed",
-    userDetails: {
-      name: "Rahul Sharma",
-      mobile: "+91 9876543211",
-      gender: "male",
-    },
-    paymentStatus: "paid",
-    feedback: {
-      submitted: false,
-      ratings: {},
-      comment: "",
-    },
-    createdAt: new Date("2024-09-20T10:15:00Z"),
-    updatedAt: new Date("2024-09-20T10:15:00Z"),
-  },
-  {
-    _id: "booking_002",
-    userId: "user_001",
-    salonId: "salon_001",
-    barberName: "Vikram Singh",
-    service: {
-      name: "Facial",
-      price: 600,
-      duration: 60,
-    },
-    scheduledTime: new Date("2024-08-15T16:00:00Z"),
-    status: "completed",
-    userDetails: {
-      name: "Rahul Sharma",
-      mobile: "+91 9876543211",
-      gender: "male",
-    },
-    paymentStatus: "paid",
-    feedback: {
-      submitted: true,
-      ratings: {
-        serviceQuality: 5,
-        timing: 4,
-        barberPerformance: 5,
-        salonAmbience: 4,
-        overall: 5,
-      },
-      comment:
-        "Excellent service! Very professional and relaxing facial. Will definitely come back.",
-    },
-    createdAt: new Date("2024-08-10T09:30:00Z"),
-    updatedAt: new Date("2024-08-15T17:15:00Z"),
-  },
-  {
-    _id: "booking_003",
-    userId: "user_002",
-    salonId: "salon_002",
-    barberName: "Sneha Patel",
-    service: {
-      name: "Ladies Haircut",
-      price: 350,
-      duration: 60,
-    },
-    scheduledTime: new Date("2024-09-28T11:00:00Z"),
-    status: "confirmed",
-    userDetails: {
-      name: "Anita Desai",
-      mobile: "+91 9765432109",
-      gender: "female",
-    },
-    paymentStatus: "pending",
-    feedback: {
-      submitted: false,
-      ratings: {},
-      comment: "",
-    },
-    createdAt: new Date("2024-09-21T14:22:00Z"),
-    updatedAt: new Date("2024-09-21T14:22:00Z"),
-  },
-];
-
-export const dummyFeedback = [
-  {
-    _id: "feedback_001",
-    bookingId: "booking_002",
-    userId: "user_001",
-    salonId: "salon_001",
-    ratings: {
-      serviceQuality: 5,
-      timing: 4,
-      barberPerformance: 5,
-      salonAmbience: 4,
-      overall: 5,
-    },
-    comment:
-      "Excellent service! Very professional and relaxing facial. Will definitely come back.",
-    createdAt: new Date("2024-08-15T17:15:00Z"),
-  },
-];
-
-// Popular services by gender
-export const popularServices = {
-  male: [
-    { name: "Haircut", avgPrice: 200, popularity: 95 },
-    { name: "Beard Trim", avgPrice: 125, popularity: 78 },
-    { name: "Hair Styling", avgPrice: 350, popularity: 65 },
-    { name: "Facial", avgPrice: 550, popularity: 45 },
-  ],
-  female: [
-    { name: "Ladies Haircut", avgPrice: 350, popularity: 92 },
-    { name: "Hair Color", avgPrice: 1000, popularity: 76 },
-    { name: "Facial", avgPrice: 700, popularity: 84 },
-    { name: "Hair Styling", avgPrice: 450, popularity: 88 },
-  ],
-  unisex: [
-    { name: "Hair Wash", avgPrice: 120, popularity: 70 },
-    { name: "Hair Treatment", avgPrice: 800, popularity: 55 },
-    { name: "Scalp Massage", avgPrice: 300, popularity: 62 },
-  ],
-};
-
-// Time slots for bookings (24-hour format)
-export const availableTimeSlots = [
-  "09:00",
-  "09:30",
-  "10:00",
-  "10:30",
-  "11:00",
-  "11:30",
-  "12:00",
-  "12:30",
-  "13:00",
-  "13:30",
-  "14:00",
-  "14:30",
-  "15:00",
-  "15:30",
-  "16:00",
-  "16:30",
-  "17:00",
-  "17:30",
-  "18:00",
-  "18:30",
-  "19:00",
-  "19:30",
-  "20:00",
-  "20:30",
-  "21:00",
-  "21:30",
-];
-
-// Mumbai area coordinates for testing nearby functionality
-export const mumbaiAreas = [
-  { name: "Bandra West", coordinates: [72.8261, 19.0596] },
-  { name: "Andheri East", coordinates: [72.8777, 19.076] },
-  { name: "Lower Parel", coordinates: [72.8347, 19.0144] },
-  { name: "Powai", coordinates: [72.905, 19.1176] },
-  { name: "Juhu", coordinates: [72.8261, 19.1075] },
-  { name: "Worli", coordinates: [72.817, 19.0176] },
-  { name: "Colaba", coordinates: [72.8342, 18.9067] },
-  { name: "Malad West", coordinates: [72.8405, 19.1864] },
-];
-
-// Admin user for testing
-export const dummyAdmin = {
-  _id: "admin_001",
-  username: "admin",
-  email: "admin@luxurysalon.com",
-  password: "$2a$12$adminHashedPasswordHere", // bcrypt hashed "admin123"
-  role: "super_admin",
-  permissions: [
-    "manage_salons",
-    "manage_users",
-    "view_analytics",
-    "manage_bookings",
-  ],
-  createdAt: new Date("2024-01-01"),
-  lastLogin: new Date("2024-09-21"),
-};
-
-// Sample analytics data for dashboard
-export const analyticsData = {
-  totalSalons: 156,
-  totalUsers: 2847,
-  totalBookings: 12459,
-  monthlyBookings: [
-    { month: "Jan", bookings: 890 },
-    { month: "Feb", bookings: 1205 },
-    { month: "Mar", bookings: 1156 },
-    { month: "Apr", bookings: 1389 },
-    { month: "May", bookings: 1547 },
-    { month: "Jun", bookings: 1678 },
-    { month: "Jul", bookings: 1456 },
-    { month: "Aug", bookings: 1789 },
-    { month: "Sep", bookings: 1349 },
-  ],
-  topServices: [
-    { service: "Haircut", count: 4567, revenue: 913400 },
-    { service: "Hair Styling", count: 2134, revenue: 853600 },
-    { service: "Facial", count: 1876, revenue: 1313200 },
-    { service: "Hair Color", count: 1234, revenue: 1234000 },
-    { service: "Beard Trim", count: 2345, revenue: 293125 },
-  ],
-  revenueByMonth: [
-    { month: "Jan", revenue: 234000 },
-    { month: "Feb", revenue: 312000 },
-    { month: "Mar", revenue: 289000 },
-    { month: "Apr", revenue: 387000 },
-    { month: "May", revenue: 445000 },
-    { month: "Jun", revenue: 523000 },
-    { month: "Jul", revenue: 467000 },
-    { month: "Aug", revenue: 589000 },
-    { month: "Sep", revenue: 445000 },
-  ],
-};
-
-// Helper function to seed database (for testing)
-export const seedDatabase = async () => {
-  try {
-    console.log("🌱 Seeding database with dummy data...");
-
-    // This would be used in your API routes to populate initial data
-    const seedData = {
-      salons: dummySalons,
-      users: dummyUsers,
-      bookings: dummyBookings,
-      feedback: dummyFeedback,
-      admin: dummyAdmin,
-    };
-
-    console.log("✅ Database seeded successfully!");
-    return seedData;
-  } catch (error) {
-    console.error("❌ Error seeding database:", error);
-    throw error;
-  }
-};
-
-// Utility function to generate random booking data
-export const generateRandomBooking = (userId, salonId, barberName) => {
-  const services = [
-    "Haircut",
-    "Facial",
-    "Hair Styling",
-    "Beard Trim",
-    "Hair Color",
-  ];
-  const prices = [200, 500, 400, 150, 800];
-  const durations = [45, 60, 75, 30, 90];
-
-  const randomService = Math.floor(Math.random() * services.length);
-  const futureDate = new Date();
-  futureDate.setDate(futureDate.getDate() + Math.floor(Math.random() * 30) + 1);
-
-  return {
-    _id: `booking_${Date.now()}`,
-    userId,
-    salonId,
-    barberName,
-    service: {
-      name: services[randomService],
-      price: prices[randomService],
-      duration: durations[randomService],
-    },
-    scheduledTime: futureDate,
-    status: "confirmed",
-    userDetails: {
-      name: "New User",
-      mobile: "+91 9999999999",
-      gender: "male",
-    },
-    paymentStatus: "pending",
-    feedback: {
-      submitted: false,
-      ratings: {},
-      comment: "",
-    },
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-};
-
-// Export all data as default
-const dummyData = {
-  salons: dummySalons,
-  users: dummyUsers,
-  bookings: dummyBookings,
-  feedback: dummyFeedback,
-  admin: dummyAdmin,
-  popularServices,
-  availableTimeSlots,
-  mumbaiAreas,
-  analyticsData,
-  seedDatabase,
-  generateRandomBooking,
-};
-
-export default dummyData;
 </file>
 
 <file path="src/lib/auth.js">
@@ -2614,115 +1139,6 @@ function MyApp({ Component, pageProps }) {
 export default MyApp;
 </file>
 
-<file path="src/pages/api/auth/salon-login.js">
-// pages/api/auth/salon-login.js
-import { connectToDatabase } from "../../../lib/mongodb";
-import { generateToken } from "../../../lib/auth";
-import { ObjectId } from "mongodb";
-
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
-    }
-
-    const { db } = await connectToDatabase();
-
-    const salon = await db.collection("salons").findOne({
-      "ownerDetails.email": email,
-    });
-
-    if (!salon) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    const isPasswordValid = awaitomparePassword(
-      password,
-      salon.ownerDetails.password
-    );
-    if (!isPasswordValid) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    if (!salon.isActive) {
-      return res.status(403).json({ error: "Salon account is deactivated" });
-    }
-
-    const token = generateToken({
-      id: salon._id,
-      email: salon.ownerDetails.email,
-      role: "salon_owner",
-    });
-
-    res.status(200).json({
-      success: true,
-      token,
-      salon: {
-        id: salon._id,
-        name: salon.salonDetails.name,
-        email: salon.ownerDetails.email,
-        address: salon.salonDetails.address,
-      },
-    });
-  } catch (error) {
-    console.error("Salon login error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-}
-</file>
-
-<file path="src/pages/api/auth/salon-register.js">
-// pages/api/auth/salons/register.js
-// Proxy to canonical route /api/auth/salons/register
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).end("Method Not Allowed");
-  }
-  try {
-    const base = process.env.NEXT_PUBLIC_BASE_URL || "";
-    const url = base + "/api/auth/salons/register";
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
-    });
-    const data = await r.json();
-    return res.status(r.status).json(data);
-  } catch (e) {
-    console.error("proxy error", e);
-    return res.status(500).json({ message: "Proxy error", error: String(e) });
-  }
-}
-</file>
-
-<file path="src/pages/api/auth/salon-register.js.bakdup">
-// pages/api/api/auth/salons/register.js
-// Proxy to canonical route /api/api/auth/salons/register
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).end('Method Not Allowed');
-  }
-  try {
-    const base = process.env.NEXT_PUBLIC_BASE_URL || '';
-    const url = base + '/api/api/auth/salons/register';
-    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body) });
-    const data = await r.json();
-    return res.status(r.status).json(data);
-  } catch (e) {
-    console.error('proxy error', e);
-    return res.status(500).json({ message: 'Proxy error', error: String(e) });
-  }
-}
-</file>
-
 <file path="src/pages/api/auth/salon/login.js">
 import { connectToDatabase } from "../../../../lib/mongodb";
 import { ObjectId } from "mongodb";
@@ -2823,118 +1239,6 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error(e);
     return res.status(500).json({ message: e.message });
-  }
-}
-</file>
-
-<file path="src/pages/api/auth/user-register.js">
-// pages/api/auth/user-register.js
-import { connectToDatabase } from "../../../lib/mongodb";
-import { generateToken } from "../../../lib/auth";
-import { validateMobile, validateEmail } from "../../../lib/validators";
-
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  try {
-    const { name, mobile, email, gender, location, bookingData } = req.body;
-
-    // Basic validation
-    if (!name || name.trim().length < 2) {
-      return res.status(400).json({ error: "Valid name is required" });
-    }
-
-    if (!validateMobile(mobile)) {
-      return res.status(400).json({ error: "Valid mobile number is required" });
-    }
-
-    const { db } = await connectToDatabase();
-
-    // Check if user already exists
-    const existingUser = await db.collection("users").findOne({
-      $or: [{ mobile }, { email }],
-    });
-
-    if (existingUser) {
-      // User exists, just return token
-      const token = generateToken({
-        id: existingUser._id,
-        mobile: existingUser.mobile,
-        role: "user",
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: "Welcome back!",
-        token,
-        user: {
-          id: existingUser._id,
-          name: existingUser.name,
-          mobile: existingUser.mobile,
-        },
-      });
-    }
-
-    // Create new user
-    const userData = {
-      name: name.trim(),
-      mobile,
-      email: email || null,
-      gender: gender || "male",
-      location: location || null,
-      preferences: {
-        favoriteServices: [],
-        preferredPriceRange: { min: 0, max: 2000 },
-      },
-      bookingHistory: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const result = await db.collection("users").insertOne(userData);
-
-    // If there's booking data from service completion, associate it with user
-    if (bookingData && bookingData.bookingId) {
-      await db.collection("bookings").updateOne(
-        { _id: new ObjectId(bookingData.bookingId) },
-        {
-          $set: {
-            userId: result.insertedId,
-            updatedAt: new Date(),
-          },
-        }
-      );
-
-      // Add booking to user's history
-      await db.collection("users").updateOne(
-        { _id: result.insertedId },
-        {
-          $push: { bookingHistory: bookingData.bookingId },
-        }
-      );
-    }
-
-    const token = generateToken({
-      id: result.insertedId,
-      mobile,
-      role: "user",
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "User registered successfully!",
-      token,
-      user: {
-        id: result.insertedId,
-        name,
-        mobile,
-      },
-    });
-  } catch (error) {
-    console.error("User registration error:", error);
-    res.status(500).json({ error: "Internal server error" });
   }
 }
 </file>
@@ -4634,601 +2938,6 @@ export default function UserRegisterPage() {
         </form>
       </div>
     </div>
-  );
-}
-</file>
-
-<file path="src/pages/salons/barbers/index.js">
-// pages/salons/barbers/index.js
-import { useEffect, useState } from "react";
-import { useRouter } from "next/router";
-import axios from "axios";
-import Link from "next/link";
-
-export default function SalonBarbersPage() {
-  const router = useRouter();
-  const [barbers, setBarbers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [salonId, setSalonId] = useState(null);
-  const [newBarber, setNewBarber] = useState({
-    name: "",
-    experience: 0,
-    skills: [],
-    bio: "",
-    photo: "",
-  });
-
-  const availableSkills = [
-    "Haircut",
-    "Shaving",
-    "Hair Styling",
-    "Beard Trim",
-    "Hair Color",
-    "Facial",
-  ];
-
-  // Get salonId from localStorage (salon session)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      console.log("Checking localStorage for salon session...");
-
-      // Check all possible keys
-      const salonSession = localStorage.getItem("salonSession");
-      const salonToken = localStorage.getItem("salonToken");
-
-      console.log("Raw salonSession:", salonSession);
-      console.log("Raw salonToken:", salonToken);
-
-      if (salonSession) {
-        try {
-          const salonData = JSON.parse(salonSession);
-          console.log("Parsed salon data:", salonData);
-
-          // Try multiple possible id fields
-          const id = salonData.id || salonData._id || salonData.salonId;
-
-          if (id) {
-            setSalonId(id);
-            console.log("Salon ID loaded from session:", id);
-          } else {
-            console.error("No ID found in salon session data");
-            setError("Invalid salon session data");
-          }
-        } catch (err) {
-          console.error("Failed to parse salon session:", err);
-          setError("Failed to parse salon session");
-        }
-      } else {
-        console.error("No salon session found in localStorage");
-        setError("No salon session found. Please login first.");
-        setTimeout(() => {
-          router.push("/auth/salon-login");
-        }, 2000);
-      }
-    }
-  }, [router]);
-
-  useEffect(() => {
-    if (!salonId) {
-      console.log("No salonId yet, waiting...");
-      return;
-    }
-
-    console.log("Fetching barbers for salon:", salonId);
-    const fetchBarbers = async () => {
-      setLoading(true);
-      try {
-        // Use the correct API endpoint
-        const res = await axios.get(`/api/salons/barbers?salonId=${salonId}`);
-        console.log("Barbers API response:", res.data);
-        setBarbers(res.data);
-        setError("");
-      } catch (err) {
-        console.error("Fetch barbers error:", err);
-        console.error("Error response:", err.response?.data);
-        setError(
-          `Failed to fetch barbers: ${err.response?.data?.error || err.message}`
-        );
-      }
-      setLoading(false);
-    };
-
-    fetchBarbers();
-  }, [salonId]);
-
-  // Rest of your component remains the same...
-  const handleCreate = async () => {
-    if (!newBarber.name) return alert("Name is required");
-    if (!salonId) return alert("No salon session found");
-
-    try {
-      console.log("Creating barber:", { ...newBarber, salonId });
-      const res = await axios.post("/api/salons/barbers", {
-        ...newBarber,
-        salonId,
-      });
-      console.log("Create response:", res.data);
-      setBarbers([...barbers, res.data]);
-      setNewBarber({ name: "", experience: 0, skills: [], bio: "", photo: "" });
-      setShowForm(false);
-      setError("");
-    } catch (err) {
-      console.error("Create barber error:", err);
-      setError(
-        `Failed to create barber: ${err.response?.data?.error || err.message}`
-      );
-    }
-  };
-
-  const handleSkillToggle = (skill) => {
-    setNewBarber((prev) => ({
-      ...prev,
-      skills: prev.skills.includes(skill)
-        ? prev.skills.filter((s) => s !== skill)
-        : [...prev.skills, skill],
-    }));
-  };
-
-  const toggleAvailability = async (barberId, currentStatus) => {
-    try {
-      await axios.put(`/api/salons/barbers/${barberId}`, {
-        isAvailable: !currentStatus,
-      });
-      setBarbers(
-        barbers.map((b) =>
-          b._id === barberId ? { ...b, isAvailable: !currentStatus } : b
-        )
-      );
-    } catch (err) {
-      console.error("Toggle availability error:", err);
-      setError("Failed to update barber status");
-    }
-  };
-
-  // Show debug info while loading
-  if (loading || !salonId) {
-    return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
-          <h3 className="font-semibold text-blue-800 mb-2">
-            Loading Barbers...
-          </h3>
-          <div className="text-sm space-y-1">
-            <p>
-              <strong>Salon ID:</strong> {salonId || "Loading..."}
-            </p>
-            <p>
-              <strong>Loading:</strong> {loading.toString()}
-            </p>
-            <p>
-              <strong>Error:</strong> {error || "None"}
-            </p>
-            <p>
-              <strong>LocalStorage Keys:</strong>{" "}
-              {typeof window !== "undefined"
-                ? Object.keys(localStorage).join(", ")
-                : "Not available"}
-            </p>
-            {typeof window !== "undefined" &&
-              localStorage.getItem("salonSession") && (
-                <p>
-                  <strong>Session Data:</strong>{" "}
-                  {localStorage.getItem("salonSession")}
-                </p>
-              )}
-          </div>
-        </div>
-        {error && error.includes("No salon session") && (
-          <div className="text-center py-8">
-            <p className="text-red-600 mb-4">{error}</p>
-            <button
-              onClick={() => router.push("/auth/salon-login")}
-              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-            >
-              Go to Login
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Barber Management</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700"
-        >
-          {showForm ? "Cancel" : "Add New Barber"}
-        </button>
-      </div>
-
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-
-      {/* Add Barber Form */}
-      {showForm && (
-        <div className="mb-8 p-6 border rounded-lg shadow bg-gray-50">
-          <h2 className="text-xl font-semibold mb-4">Add New Barber</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <input
-              type="text"
-              placeholder="Barber Name"
-              value={newBarber.name}
-              onChange={(e) =>
-                setNewBarber({ ...newBarber, name: e.target.value })
-              }
-              className="border rounded px-3 py-2 w-full"
-            />
-            <input
-              type="number"
-              placeholder="Years of Experience"
-              value={newBarber.experience}
-              onChange={(e) =>
-                setNewBarber({
-                  ...newBarber,
-                  experience: parseInt(e.target.value) || 0,
-                })
-              }
-              className="border rounded px-3 py-2 w-full"
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block font-medium mb-2">
-              Skills & Specializations
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {availableSkills.map((skill) => (
-                <label key={skill} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={newBarber.skills.includes(skill)}
-                    onChange={() => handleSkillToggle(skill)}
-                    className="mr-2"
-                  />
-                  {skill}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <label className="block font-medium mb-2">
-              Bio/Accomplishments
-            </label>
-            <textarea
-              placeholder="Describe achievements, awards, specialties..."
-              value={newBarber.bio}
-              onChange={(e) =>
-                setNewBarber({ ...newBarber, bio: e.target.value })
-              }
-              rows={3}
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-
-          <button
-            onClick={handleCreate}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          >
-            Add Barber
-          </button>
-        </div>
-      )}
-
-      {/* Barbers List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {barbers.map((barber) => (
-          <div
-            key={barber._id}
-            className="bg-white border rounded-lg shadow-md p-6"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-semibold">{barber.name}</h3>
-                <p className="text-gray-600">
-                  {barber.experience} years experience
-                </p>
-                <div className="flex items-center mt-1">
-                  <span className="text-yellow-500">⭐</span>
-                  <span className="ml-1">{barber.rating}/5</span>
-                  <span className="text-gray-500 ml-2">
-                    ({barber.totalBookings} bookings)
-                  </span>
-                </div>
-              </div>
-
-              <button
-                onClick={() =>
-                  toggleAvailability(barber._id, barber.isAvailable)
-                }
-                className={`px-3 py-1 rounded text-sm ${
-                  barber.isAvailable
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                }`}
-              >
-                {barber.isAvailable ? "Available" : "Unavailable"}
-              </button>
-            </div>
-
-            {/* Skills */}
-            <div className="mb-3">
-              <p className="font-medium text-sm mb-2">Specializations:</p>
-              <div className="flex flex-wrap gap-1">
-                {barber.skills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Bio */}
-            {barber.bio && (
-              <div className="mb-3">
-                <p className="text-gray-700 text-sm">{barber.bio}</p>
-              </div>
-            )}
-
-            <div className="flex gap-2 mt-4">
-              <Link href={`/salons/barbers/${barber._id}`} className="flex-1">
-                <button className="w-full bg-blue-600 text-white py-2 rounded text-sm hover:bg-blue-700">
-                  Edit Details
-                </button>
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {barbers.length === 0 && !loading && (
-        <div className="text-center py-12">
-          <p className="text-gray-500 mb-4">No barbers found for this salon.</p>
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-amber-600 text-white px-6 py-3 rounded hover:bg-amber-700"
-          >
-            Add Your First Barber
-          </button>
-        </div>
-      )}
-
-      {/* Debug Info */}
-      <div className="mt-8 p-4 bg-gray-100 rounded">
-        <h3 className="font-semibold mb-2">Debug Info:</h3>
-        <p>Salon ID: {salonId || "Not loaded"}</p>
-        <p>Barbers Count: {barbers.length}</p>
-        <p>Loading: {loading.toString()}</p>
-        <p>Error: {error || "None"}</p>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/pages/salons/book.js">
-// pages/salons/book.js
-import { useRouter } from "next/router";
-import { useState, useEffect } from "react";
-import styles from "../../styles/Booking.module.css";
-import Layout from "../../components/Layout";
-
-export default function BookingPage() {
-  const router = useRouter();
-  const { salonId, serviceId, serviceName, price } = router.query;
-
-  const [mobile, setMobile] = useState("");
-  const [barbers, setBarbers] = useState([]);
-  const [selectedBarber, setSelectedBarber] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedSlot, setSelectedSlot] = useState("");
-  const [slots, setSlots] = useState([]);
-  const [userInfo, setUserInfo] = useState(null);
-
-  useEffect(() => {
-    // Get user info from session
-    const sessionData = sessionStorage.getItem("userSession");
-    if (sessionData) {
-      const userData = JSON.parse(sessionData);
-      setUserInfo(userData);
-    }
-
-    // Fetch barbers
-    fetchBarbers();
-  }, []);
-
-  useEffect(() => {
-    if (selectedBarber && selectedDate) {
-      fetchAvailableSlots();
-    }
-  }, [selectedBarber, selectedDate]);
-
-  const fetchBarbers = async () => {
-    // Mock data - in production, fetch from API
-    setBarbers([
-      {
-        id: "1",
-        name: "Raj Kumar",
-        rating: 4.5,
-        specialization: "Hair Styling",
-        bookings: 1250,
-      },
-      {
-        id: "2",
-        name: "Amit Singh",
-        rating: 4.8,
-        specialization: "Beard Expert",
-        bookings: 980,
-      },
-      {
-        id: "3",
-        name: "Priya Sharma",
-        rating: 4.7,
-        specialization: "Color Specialist",
-        bookings: 850,
-      },
-    ]);
-  };
-
-  const fetchAvailableSlots = async () => {
-    // Generate time slots
-    const allSlots = [];
-    for (let hour = 9; hour < 21; hour++) {
-      for (let min = 0; min < 60; min += 30) {
-        const time = `${hour.toString().padStart(2, "0")}:${min
-          .toString()
-          .padStart(2, "0")}`;
-        allSlots.push({
-          time,
-          available: Math.random() > 0.3, // Mock availability
-          waitTime: Math.floor(Math.random() * 15),
-        });
-      }
-    }
-    setSlots(allSlots);
-  };
-
-  const handleBooking = async () => {
-    if (!mobile || !selectedBarber || !selectedDate || !selectedSlot) {
-      alert("Please fill all required fields");
-      return;
-    }
-
-    const bookingData = {
-      salonId,
-      serviceId,
-      barberId: selectedBarber,
-      date: selectedDate,
-      timeSlot: selectedSlot,
-      userDetails: {
-        name: userInfo?.name || "Guest",
-        mobile,
-        gender: userInfo?.gender || "other",
-      },
-    };
-
-    try {
-      const response = await fetch("/api/bookings/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bookingData),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        // Show success and redirect to confirmation
-        alert("Booking Confirmed!");
-        const bookingId = result?.booking?.id || result?.bookingId;
-        if (bookingId) router.push(`/bookings?id=${bookingId}`);
-        else router.push("/bookings");
-      } else {
-        alert("Booking failed. Please try again.");
-      }
-    } catch (error) {
-      console.error("Booking error:", error);
-      alert("Something went wrong. Please try again.");
-    }
-  };
-
-  return (
-    <Layout>
-      <div className={styles.container}>
-        <h1>Book Appointment</h1>
-        <div className={styles.serviceInfo}>
-          <h2>{serviceName}</h2>
-          <span className={styles.price}>₹{price}</span>
-        </div>
-
-        <div className={styles.form}>
-          <div className={styles.formGroup}>
-            <label>📱 Mobile Number</label>
-            <input
-              type="tel"
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
-              placeholder="Enter your mobile number"
-              maxLength="10"
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>👨‍🦱 Select Barber</label>
-            <div className={styles.barberGrid}>
-              {barbers.map((barber) => (
-                <div
-                  key={barber.id}
-                  className={`${styles.barberCard} ${
-                    selectedBarber === barber.id ? styles.selected : ""
-                  }`}
-                  onClick={() => setSelectedBarber(barber.id)}
-                >
-                  <div className={styles.barberInfo}>
-                    <h3>{barber.name}</h3>
-                    <p>
-                      ⭐ {barber.rating} | {barber.specialization}
-                    </p>
-                    <p>{barber.bookings} bookings</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>📅 Select Date</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              min={new Date().toISOString().split("T")[0]}
-            />
-          </div>
-
-          {slots.length > 0 && (
-            <div className={styles.formGroup}>
-              <label>⏰ Select Time Slot</label>
-              <div className={styles.slotGrid}>
-                {slots.map((slot) => (
-                  <button
-                    key={slot.time}
-                    className={`${styles.slotBtn} 
-                      ${!slot.available ? styles.unavailable : ""} 
-                      ${selectedSlot === slot.time ? styles.selected : ""}`}
-                    onClick={() => slot.available && setSelectedSlot(slot.time)}
-                    disabled={!slot.available}
-                  >
-                    {slot.time}
-                    {slot.available && slot.waitTime > 0 && (
-                      <span className={styles.waitTime}>
-                        ~{slot.waitTime}min wait
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className={styles.userDetails}>
-            <p>Booking for: {userInfo?.name || "Guest"}</p>
-            <p>Gender: {userInfo?.gender || "Not specified"}</p>
-          </div>
-
-          <button className={styles.confirmBtn} onClick={handleBooking}>
-            Confirm Booking
-          </button>
-        </div>
-      </div>
-    </Layout>
   );
 }
 </file>
@@ -10363,6 +8072,31 @@ body {
 }
 </file>
 
+<file path="src/components/Layout/Layout.js">
+import Link from "next/link";
+
+export default function Layout({ children }) {
+  return (
+    <div className={"layout"}>
+      <header className={"header"}>
+        <div className={"logo"}>
+          <h2>💈 SalonBook</h2>
+        </div>
+        <nav>
+          <Link href="/">Home</Link>
+          <Link href="/bookings">My Bookings</Link>
+          <Link href="/profile">Profile</Link>
+        </nav>
+      </header>
+      <main className={"main"}>{children}</main>
+      <footer className={"footer"}>
+        <p>&copy; 2024 SalonBook. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/Maps/LocationMap.js">
 // techtrims/src/components/Maps/LocationMap.js
 import React, { useEffect, useState } from "react";
@@ -10864,6 +8598,63 @@ const LocationPicker = ({
 export default LocationPicker;
 </file>
 
+<file path="src/components/Salon/SalonCard.js">
+import { useRouter } from "next/router";
+import styles from "../styles/SalonCard.module.css";
+import Image from "next/image";
+
+export default function SalonCard({ salon, gender }) {
+  const router = useRouter();
+  if (!salon) {
+    return null; // or return a loading/error placeholder
+  }
+
+  const handleBookNow = () => {
+    router.push(`/salons/${salon.id}`);
+  };
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.imageContainer}>
+        <Image
+          src={salon.images?.front || "/salon-placeholder.jpg"}
+          alt={salon.name}
+        />
+        <div className={styles.popularityBadge}>
+          {salon.totalBookings > 100 && "🔥 Most Booked"}
+        </div>
+      </div>
+
+      <div className={styles.content}>
+        <h3>{salon.name}</h3>
+
+        <div className={styles.metrics}>
+          <span>⭐ {salon.rating}/5</span>
+          <span>📍 {salon.location?.distance || "1.2"} km</span>
+          <span>🎯 {salon.customerServiceScore}% satisfaction</span>
+        </div>
+
+        <div className={styles.services}>
+          <h4>Popular Services</h4>
+          <div className={styles.serviceList}>
+            {salon.topServices?.map((service, index) => (
+              <div key={index} className={styles.serviceItem}>
+                <span>{service.name}</span>
+                <span className={styles.price}>₹{service.price}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <button onClick={handleBookNow} className={styles.bookBtn}>
+          Book Now →
+        </button>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/lib/mongodb.js">
 // lib/mongodb.js
 import { MongoClient, ServerApiVersion } from "mongodb";
@@ -11010,121 +8801,6 @@ const BookingSchema = new mongoose.Schema(
 
 export default mongoose.models.Booking ||
   mongoose.model("Booking", BookingSchema);
-</file>
-
-<file path="src/pages/api/auth/login.js">
-import clientPromise from "../../../lib/mongodb";
-import { verifyPassword } from "../../../lib/auth";
-
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
-
-  const { email, password, userType } = req.body;
-
-  try {
-    const client = await clientPromise;
-    const db = client.db("techtrims");
-
-    const collection = userType === "owner" ? "salons" : "users";
-
-    const user = await db.collection(collection).findOne({ email });
-
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const isValid = await verifyPassword(password, user.password);
-
-    if (!isValid) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    res.status(200).json({
-      message: "Login successful",
-      token,
-      userType,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
-    });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-}
-</file>
-
-<file path="src/pages/api/auth/register.js">
-import clientPromise from "../../../lib/mongodb";
-import { hashPassword } from "../../../lib/auth";
-
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
-
-  const { userType, ...userData } = req.body;
-
-  try {
-    const client = await clientPromise;
-    const db = client.db("techtrims");
-
-    // Hash password
-    const hashedPassword = await hashPassword(userData.password);
-
-    // Determine collection based on user type
-    const collection = userType === "owner" ? "salons" : "users";
-
-    // Check if user already exists
-    const existingUser = await db.collection(collection).findOne({
-      $or: [{ email: userData.email }, { mobile: userData.mobile }],
-    });
-
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    // Create user
-    const newUser = {
-      ...userData,
-      password: hashedPassword,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    // Add default fields for salon owners
-    if (userType === "owner") {
-      newUser.rating = 0;
-      newUser.totalBookings = 0;
-      newUser.customerServiceScore = 0;
-      newUser.services = [];
-      newUser.staff = [];
-      newUser.achievements = [];
-      newUser.metrics = {
-        avgWaitingTime: 0,
-        cleanliness: 0,
-        staffPoliteness: 0,
-      };
-    }
-
-    const result = await db.collection(collection).insertOne(newUser);
-
-    // Create token
-
-    res.status(201).json({
-      message: "Registration successful",
-      token,
-      userType,
-    });
-  } catch (error) {
-    console.error("Registration error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-}
 </file>
 
 <file path="src/pages/api/maps/reverse.js">
@@ -13263,6 +10939,601 @@ export default function SalonDetailsPage() {
         </div>
       )}
     </div>
+  );
+}
+</file>
+
+<file path="src/pages/salons/barbers/index.js">
+// pages/salons/barbers/index.js
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import axios from "axios";
+import Link from "next/link";
+
+export default function SalonBarbersPage() {
+  const router = useRouter();
+  const [barbers, setBarbers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [salonId, setSalonId] = useState(null);
+  const [newBarber, setNewBarber] = useState({
+    name: "",
+    experience: 0,
+    skills: [],
+    bio: "",
+    photo: "",
+  });
+
+  const availableSkills = [
+    "Haircut",
+    "Shaving",
+    "Hair Styling",
+    "Beard Trim",
+    "Hair Color",
+    "Facial",
+  ];
+
+  // Get salonId from localStorage (salon session)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      console.log("Checking localStorage for salon session...");
+
+      // Check all possible keys
+      const salonSession = localStorage.getItem("salonSession");
+      const salonToken = localStorage.getItem("salonToken");
+
+      console.log("Raw salonSession:", salonSession);
+      console.log("Raw salonToken:", salonToken);
+
+      if (salonSession) {
+        try {
+          const salonData = JSON.parse(salonSession);
+          console.log("Parsed salon data:", salonData);
+
+          // Try multiple possible id fields
+          const id = salonData.id || salonData._id || salonData.salonId;
+
+          if (id) {
+            setSalonId(id);
+            console.log("Salon ID loaded from session:", id);
+          } else {
+            console.error("No ID found in salon session data");
+            setError("Invalid salon session data");
+          }
+        } catch (err) {
+          console.error("Failed to parse salon session:", err);
+          setError("Failed to parse salon session");
+        }
+      } else {
+        console.error("No salon session found in localStorage");
+        setError("No salon session found. Please login first.");
+        setTimeout(() => {
+          router.push("/auth/salon/login");
+        }, 2000);
+      }
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (!salonId) {
+      console.log("No salonId yet, waiting...");
+      return;
+    }
+
+    console.log("Fetching barbers for salon:", salonId);
+    const fetchBarbers = async () => {
+      setLoading(true);
+      try {
+        // Use the correct API endpoint
+        const res = await axios.get(`/api/salons/barbers?salonId=${salonId}`);
+        console.log("Barbers API response:", res.data);
+        setBarbers(res.data);
+        setError("");
+      } catch (err) {
+        console.error("Fetch barbers error:", err);
+        console.error("Error response:", err.response?.data);
+        setError(
+          `Failed to fetch barbers: ${err.response?.data?.error || err.message}`
+        );
+      }
+      setLoading(false);
+    };
+
+    fetchBarbers();
+  }, [salonId]);
+
+  // Rest of your component remains the same...
+  const handleCreate = async () => {
+    if (!newBarber.name) return alert("Name is required");
+    if (!salonId) return alert("No salon session found");
+
+    try {
+      console.log("Creating barber:", { ...newBarber, salonId });
+      const res = await axios.post("/api/salons/barbers", {
+        ...newBarber,
+        salonId,
+      });
+      console.log("Create response:", res.data);
+      setBarbers([...barbers, res.data]);
+      setNewBarber({ name: "", experience: 0, skills: [], bio: "", photo: "" });
+      setShowForm(false);
+      setError("");
+    } catch (err) {
+      console.error("Create barber error:", err);
+      setError(
+        `Failed to create barber: ${err.response?.data?.error || err.message}`
+      );
+    }
+  };
+
+  const handleSkillToggle = (skill) => {
+    setNewBarber((prev) => ({
+      ...prev,
+      skills: prev.skills.includes(skill)
+        ? prev.skills.filter((s) => s !== skill)
+        : [...prev.skills, skill],
+    }));
+  };
+
+  const toggleAvailability = async (barberId, currentStatus) => {
+    try {
+      await axios.put(`/api/salons/barbers/${barberId}`, {
+        isAvailable: !currentStatus,
+      });
+      setBarbers(
+        barbers.map((b) =>
+          b._id === barberId ? { ...b, isAvailable: !currentStatus } : b
+        )
+      );
+    } catch (err) {
+      console.error("Toggle availability error:", err);
+      setError("Failed to update barber status");
+    }
+  };
+
+  // Show debug info while loading
+  if (loading || !salonId) {
+    return (
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
+          <h3 className="font-semibold text-blue-800 mb-2">
+            Loading Barbers...
+          </h3>
+          <div className="text-sm space-y-1">
+            <p>
+              <strong>Salon ID:</strong> {salonId || "Loading..."}
+            </p>
+            <p>
+              <strong>Loading:</strong> {loading.toString()}
+            </p>
+            <p>
+              <strong>Error:</strong> {error || "None"}
+            </p>
+            <p>
+              <strong>LocalStorage Keys:</strong>{" "}
+              {typeof window !== "undefined"
+                ? Object.keys(localStorage).join(", ")
+                : "Not available"}
+            </p>
+            {typeof window !== "undefined" &&
+              localStorage.getItem("salonSession") && (
+                <p>
+                  <strong>Session Data:</strong>{" "}
+                  {localStorage.getItem("salonSession")}
+                </p>
+              )}
+          </div>
+        </div>
+        {error && error.includes("No salon session") && (
+          <div className="text-center py-8">
+            <p className="text-red-600 mb-4">{error}</p>
+            <button
+              onClick={() => router.push("/auth/salon/login")}
+              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+            >
+              Go to Login
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Barber Management</h1>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700"
+        >
+          {showForm ? "Cancel" : "Add New Barber"}
+        </button>
+      </div>
+
+      {error && <p className="text-red-500 mb-4">{error}</p>}
+
+      {/* Add Barber Form */}
+      {showForm && (
+        <div className="mb-8 p-6 border rounded-lg shadow bg-gray-50">
+          <h2 className="text-xl font-semibold mb-4">Add New Barber</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <input
+              type="text"
+              placeholder="Barber Name"
+              value={newBarber.name}
+              onChange={(e) =>
+                setNewBarber({ ...newBarber, name: e.target.value })
+              }
+              className="border rounded px-3 py-2 w-full"
+            />
+            <input
+              type="number"
+              placeholder="Years of Experience"
+              value={newBarber.experience}
+              onChange={(e) =>
+                setNewBarber({
+                  ...newBarber,
+                  experience: parseInt(e.target.value) || 0,
+                })
+              }
+              className="border rounded px-3 py-2 w-full"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block font-medium mb-2">
+              Skills & Specializations
+            </label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {availableSkills.map((skill) => (
+                <label key={skill} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={newBarber.skills.includes(skill)}
+                    onChange={() => handleSkillToggle(skill)}
+                    className="mr-2"
+                  />
+                  {skill}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="block font-medium mb-2">
+              Bio/Accomplishments
+            </label>
+            <textarea
+              placeholder="Describe achievements, awards, specialties..."
+              value={newBarber.bio}
+              onChange={(e) =>
+                setNewBarber({ ...newBarber, bio: e.target.value })
+              }
+              rows={3}
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <button
+            onClick={handleCreate}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            Add Barber
+          </button>
+        </div>
+      )}
+
+      {/* Barbers List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {barbers.map((barber) => (
+          <div
+            key={barber._id}
+            className="bg-white border rounded-lg shadow-md p-6"
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">{barber.name}</h3>
+                <p className="text-gray-600">
+                  {barber.experience} years experience
+                </p>
+                <div className="flex items-center mt-1">
+                  <span className="text-yellow-500">⭐</span>
+                  <span className="ml-1">{barber.rating}/5</span>
+                  <span className="text-gray-500 ml-2">
+                    ({barber.totalBookings} bookings)
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() =>
+                  toggleAvailability(barber._id, barber.isAvailable)
+                }
+                className={`px-3 py-1 rounded text-sm ${
+                  barber.isAvailable
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                }`}
+              >
+                {barber.isAvailable ? "Available" : "Unavailable"}
+              </button>
+            </div>
+
+            {/* Skills */}
+            <div className="mb-3">
+              <p className="font-medium text-sm mb-2">Specializations:</p>
+              <div className="flex flex-wrap gap-1">
+                {barber.skills.map((skill) => (
+                  <span
+                    key={skill}
+                    className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Bio */}
+            {barber.bio && (
+              <div className="mb-3">
+                <p className="text-gray-700 text-sm">{barber.bio}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2 mt-4">
+              <Link href={`/salons/barbers/${barber._id}`} className="flex-1">
+                <button className="w-full bg-blue-600 text-white py-2 rounded text-sm hover:bg-blue-700">
+                  Edit Details
+                </button>
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {barbers.length === 0 && !loading && (
+        <div className="text-center py-12">
+          <p className="text-gray-500 mb-4">No barbers found for this salon.</p>
+          <button
+            onClick={() => setShowForm(true)}
+            className="bg-amber-600 text-white px-6 py-3 rounded hover:bg-amber-700"
+          >
+            Add Your First Barber
+          </button>
+        </div>
+      )}
+
+      {/* Debug Info */}
+      <div className="mt-8 p-4 bg-gray-100 rounded">
+        <h3 className="font-semibold mb-2">Debug Info:</h3>
+        <p>Salon ID: {salonId || "Not loaded"}</p>
+        <p>Barbers Count: {barbers.length}</p>
+        <p>Loading: {loading.toString()}</p>
+        <p>Error: {error || "None"}</p>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/pages/salons/book.js">
+// pages/salons/book.js
+import { useRouter } from "next/router";
+import { useState, useEffect } from "react";
+import styles from "../../styles/Booking.module.css";
+import Layout from "../../components/Layout/Layout";
+
+export default function BookingPage() {
+  const router = useRouter();
+  const { salonId, serviceId, serviceName, price } = router.query;
+
+  const [mobile, setMobile] = useState("");
+  const [barbers, setBarbers] = useState([]);
+  const [selectedBarber, setSelectedBarber] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const [slots, setSlots] = useState([]);
+  const [userInfo, setUserInfo] = useState(null);
+
+  useEffect(() => {
+    // Get user info from session
+    const sessionData = sessionStorage.getItem("userSession");
+    if (sessionData) {
+      const userData = JSON.parse(sessionData);
+      setUserInfo(userData);
+    }
+
+    // Fetch barbers
+    fetchBarbers();
+  }, []);
+
+  useEffect(() => {
+    if (selectedBarber && selectedDate) {
+      fetchAvailableSlots();
+    }
+  }, [selectedBarber, selectedDate]);
+
+  const fetchBarbers = async () => {
+    // Mock data - in production, fetch from API
+    setBarbers([
+      {
+        id: "1",
+        name: "Raj Kumar",
+        rating: 4.5,
+        specialization: "Hair Styling",
+        bookings: 1250,
+      },
+      {
+        id: "2",
+        name: "Amit Singh",
+        rating: 4.8,
+        specialization: "Beard Expert",
+        bookings: 980,
+      },
+      {
+        id: "3",
+        name: "Priya Sharma",
+        rating: 4.7,
+        specialization: "Color Specialist",
+        bookings: 850,
+      },
+    ]);
+  };
+
+  const fetchAvailableSlots = async () => {
+    // Generate time slots
+    const allSlots = [];
+    for (let hour = 9; hour < 21; hour++) {
+      for (let min = 0; min < 60; min += 30) {
+        const time = `${hour.toString().padStart(2, "0")}:${min
+          .toString()
+          .padStart(2, "0")}`;
+        allSlots.push({
+          time,
+          available: Math.random() > 0.3, // Mock availability
+          waitTime: Math.floor(Math.random() * 15),
+        });
+      }
+    }
+    setSlots(allSlots);
+  };
+
+  const handleBooking = async () => {
+    if (!mobile || !selectedBarber || !selectedDate || !selectedSlot) {
+      alert("Please fill all required fields");
+      return;
+    }
+
+    const bookingData = {
+      salonId,
+      serviceId,
+      barberId: selectedBarber,
+      date: selectedDate,
+      timeSlot: selectedSlot,
+      userDetails: {
+        name: userInfo?.name || "Guest",
+        mobile,
+        gender: userInfo?.gender || "other",
+      },
+    };
+
+    try {
+      const response = await fetch("/api/bookings/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bookingData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // Show success and redirect to confirmation
+        alert("Booking Confirmed!");
+        const bookingId = result?.booking?.id || result?.bookingId;
+        if (bookingId) router.push(`/bookings?id=${bookingId}`);
+        else router.push("/bookings");
+      } else {
+        alert("Booking failed. Please try again.");
+      }
+    } catch (error) {
+      console.error("Booking error:", error);
+      alert("Something went wrong. Please try again.");
+    }
+  };
+
+  return (
+    <Layout>
+      <div className={styles.container}>
+        <h1>Book Appointment</h1>
+        <div className={styles.serviceInfo}>
+          <h2>{serviceName}</h2>
+          <span className={styles.price}>₹{price}</span>
+        </div>
+
+        <div className={styles.form}>
+          <div className={styles.formGroup}>
+            <label>📱 Mobile Number</label>
+            <input
+              type="tel"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
+              placeholder="Enter your mobile number"
+              maxLength="10"
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>👨‍🦱 Select Barber</label>
+            <div className={styles.barberGrid}>
+              {barbers.map((barber) => (
+                <div
+                  key={barber.id}
+                  className={`${styles.barberCard} ${
+                    selectedBarber === barber.id ? styles.selected : ""
+                  }`}
+                  onClick={() => setSelectedBarber(barber.id)}
+                >
+                  <div className={styles.barberInfo}>
+                    <h3>{barber.name}</h3>
+                    <p>
+                      ⭐ {barber.rating} | {barber.specialization}
+                    </p>
+                    <p>{barber.bookings} bookings</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>📅 Select Date</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              min={new Date().toISOString().split("T")[0]}
+            />
+          </div>
+
+          {slots.length > 0 && (
+            <div className={styles.formGroup}>
+              <label>⏰ Select Time Slot</label>
+              <div className={styles.slotGrid}>
+                {slots.map((slot) => (
+                  <button
+                    key={slot.time}
+                    className={`${styles.slotBtn} 
+                      ${!slot.available ? styles.unavailable : ""} 
+                      ${selectedSlot === slot.time ? styles.selected : ""}`}
+                    onClick={() => slot.available && setSelectedSlot(slot.time)}
+                    disabled={!slot.available}
+                  >
+                    {slot.time}
+                    {slot.available && slot.waitTime > 0 && (
+                      <span className={styles.waitTime}>
+                        ~{slot.waitTime}min wait
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className={styles.userDetails}>
+            <p>Booking for: {userInfo?.name || "Guest"}</p>
+            <p>Gender: {userInfo?.gender || "Not specified"}</p>
+          </div>
+
+          <button className={styles.confirmBtn} onClick={handleBooking}>
+            Confirm Booking
+          </button>
+        </div>
+      </div>
+    </Layout>
   );
 }
 </file>
@@ -16961,7 +15232,7 @@ export async function getServerSideProps(context) {
 <file path="src/pages/salons/dashboard.js">
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
-import Layout from "../../components/Layout";
+import Layout from "../../components/Layout/Layout";
 import OwnerSidebar from "../../components/OwnerSidebar";
 
 export default function DashboardPage() {

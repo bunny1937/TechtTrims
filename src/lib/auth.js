@@ -18,8 +18,11 @@ export const generateToken = (userId, role, email) => {
 
 export const verifyToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("Token decoded successfully:", decoded);
+    return decoded;
   } catch (error) {
+    console.error("Token verification failed:", error.message);
     return null;
   }
 };

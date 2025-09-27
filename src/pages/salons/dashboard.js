@@ -9,18 +9,46 @@ export default function DashboardPage() {
   const [salon, setSalon] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // <-- control mobile sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState("today"); // New state for date filtering
 
-  const loadTodayBookings = useCallback(async (salonId) => {
+  const loadBookings = useCallback(async (salonId, filter = "today") => {
     try {
       setLoading(true);
       const now = new Date();
       const istOffset = 5.5 * 60 * 60 * 1000;
       const istDate = new Date(now.getTime() + istOffset);
-      const today = istDate.toISOString().split("T")[0];
+
+      let dateParam = "";
+
+      switch (filter) {
+        case "yesterday":
+          const yesterday = new Date(istDate);
+          yesterday.setDate(yesterday.getDate() - 1);
+          dateParam = `&date=${yesterday.toISOString().split("T")[0]}`;
+          break;
+        case "today":
+          dateParam = `&date=${istDate.toISOString().split("T")[0]}`;
+          break;
+        case "tomorrow":
+          const tomorrow = new Date(istDate);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          dateParam = `&date=${tomorrow.toISOString().split("T")[0]}`;
+          break;
+        case "fromTomorrow":
+          const fromTomorrow = new Date(istDate);
+          fromTomorrow.setDate(fromTomorrow.getDate() + 1);
+          dateParam = `&from=${fromTomorrow.toISOString().split("T")[0]}`;
+          break;
+        case "all":
+          dateParam = "";
+          break;
+        default:
+          dateParam = `&date=${istDate.toISOString().split("T")[0]}`;
+      }
 
       const response = await fetch(
-        `/api/salons/bookings?salonId=${salonId}&date=${today}`,
+        `/api/salons/bookings?salonId=${salonId}${dateParam}`,
         { cache: "no-store", headers: { "Content-Type": "application/json" } }
       );
 
@@ -45,8 +73,80 @@ export default function DashboardPage() {
     }
     const salonData = JSON.parse(salonSession);
     setSalon(salonData);
-    loadTodayBookings(salonData._id);
-  }, [router, router.isReady, loadTodayBookings]);
+    loadBookings(salonData._id, dateFilter);
+  }, [router, router.isReady, loadBookings, dateFilter]);
+
+  // Handle date filter change
+  const handleDateFilterChange = (newFilter) => {
+    setDateFilter(newFilter);
+    if (salon) {
+      loadBookings(salon._id, newFilter);
+    }
+  };
+
+  // Get display text for current filter
+  const getFilterDisplayText = () => {
+    switch (dateFilter) {
+      case "yesterday":
+        return "Yesterday's Bookings";
+      case "today":
+        return "Today's Bookings";
+      case "tomorrow":
+        return "Tomorrow's Bookings";
+      case "fromTomorrow":
+        return "Upcoming Bookings (From Tomorrow)";
+      case "all":
+        return "All Bookings";
+      default:
+        return "Today's Bookings";
+    }
+  };
+
+  // Get current date display
+  const getCurrentDateDisplay = () => {
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(now.getTime() + istOffset);
+
+    switch (dateFilter) {
+      case "yesterday":
+        const yesterday = new Date(istDate);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return yesterday.toLocaleDateString("en-IN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      case "today":
+        return istDate.toLocaleDateString("en-IN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      case "tomorrow":
+        const tomorrow = new Date(istDate);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toLocaleDateString("en-IN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      case "fromTomorrow":
+        return "From Tomorrow Onwards";
+      case "all":
+        return "All Time";
+      default:
+        return istDate.toLocaleDateString("en-IN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+    }
+  };
 
   const updateBookingStatus = async (bookingId, status) => {
     try {
@@ -135,15 +235,56 @@ export default function DashboardPage() {
               <p className="text-text-secondary">Owner: {salon?.ownerName}</p>
             </div>
 
+            {/* Date Filter Controls */}
+            <div className="card">
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <h2 className="text-lg font-semibold">Filter Bookings</h2>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "yesterday", label: "Yesterday", emoji: "⏮️" },
+                    { value: "today", label: "Today", emoji: "📅" },
+                    { value: "tomorrow", label: "Tomorrow", emoji: "⏭️" },
+                    {
+                      value: "fromTomorrow",
+                      label: "From Tomorrow",
+                      emoji: "🔜",
+                    },
+                    { value: "all", label: "All Bookings", emoji: "📊" },
+                  ].map((filter) => (
+                    <button
+                      key={filter.value}
+                      onClick={() => handleDateFilterChange(filter.value)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        dateFilter === filter.value
+                          ? "bg-primary text-white shadow-lg transform scale-105"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md"
+                      }`}
+                    >
+                      {filter.emoji} {filter.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* Bookings */}
             <div className="card">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">
-                  Today’s Bookings ({bookings.length})
-                </h2>
-                <span className="text-sm text-text-secondary">
-                  {getCurrentDate()}
-                </span>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-semibold mb-1">
+                    {getFilterDisplayText()} ({bookings.length})
+                  </h2>
+                  <span className="text-sm text-text-secondary">
+                    {getCurrentDateDisplay()}
+                  </span>
+                </div>
+                <button
+                  onClick={() => loadBookings(salon._id, dateFilter)}
+                  className="mt-2 sm:mt-0 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
+                  disabled={loading}
+                >
+                  🔄 {loading ? "Refreshing..." : "Refresh"}
+                </button>
               </div>
 
               {error && (
@@ -153,7 +294,27 @@ export default function DashboardPage() {
               )}
 
               {bookings.length === 0 ? (
-                <p className="text-text-secondary">No bookings today</p>
+                <div className="text-center py-8">
+                  <div className="text-6xl mb-4">📅</div>
+                  <p className="text-text-secondary text-lg">
+                    No bookings found for{" "}
+                    {dateFilter === "today"
+                      ? "today"
+                      : dateFilter === "yesterday"
+                      ? "yesterday"
+                      : dateFilter === "tomorrow"
+                      ? "tomorrow"
+                      : dateFilter === "fromTomorrow"
+                      ? "upcoming dates"
+                      : "selected period"}
+                  </p>
+                  <button
+                    onClick={() => handleDateFilterChange("all")}
+                    className="mt-3 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark transition-colors"
+                  >
+                    View All Bookings
+                  </button>
+                </div>
               ) : (
                 <div className="grid gap-4">
                   {bookings.map((b) => (

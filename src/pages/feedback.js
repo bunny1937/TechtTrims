@@ -6,7 +6,7 @@ export default function FeedbackPage() {
   const router = useRouter();
   const { bookingId } = router.query;
 
-  const [booking, setBooking] = useState(null);
+  const [bookings, setBooking] = useState(null);
   const [ratings, setRatings] = useState({
     serviceQuality: 0,
     timing: 0,
@@ -22,7 +22,9 @@ export default function FeedbackPage() {
       const response = await fetch(`/api/bookings/${bookingId}`);
       if (response.ok) {
         const data = await response.json();
-        setBooking(data);
+        setBooking(data.booking); // Fix: access booking from response
+      } else {
+        console.error("Failed to fetch booking:", response.status);
       }
     } catch (error) {
       console.error("Error fetching booking:", error);
@@ -125,15 +127,15 @@ export default function FeedbackPage() {
         alert("Thank you for your feedback!");
 
         // Store booking data in localStorage for registration prefill
-        if (booking) {
+        if (bookings) {
           const prefillData = {
-            name: booking.customerName,
-            phone: booking.customerPhone,
-            lastBooking: {
-              salonId: booking.salonId,
-              service: booking.service,
-              date: booking.date,
-              time: booking.time,
+            name: bookings.customerName,
+            phone: bookings.customerPhone,
+            lastbookings: {
+              salonId: bookings.salonId,
+              service: bookings.service,
+              date: bookings.date,
+              time: bookings.time,
             },
             timestamp: new Date().getTime(),
           };
@@ -142,7 +144,7 @@ export default function FeedbackPage() {
           localStorage.setItem("userPrefillData", JSON.stringify(prefillData));
         }
 
-        router.push("/auth/user-register");
+        router.push("/auth/user/register");
       } else {
         alert("Failed to submit feedback");
       }
@@ -154,7 +156,7 @@ export default function FeedbackPage() {
     }
   };
 
-  if (!booking) {
+  if (!bookings) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -174,7 +176,7 @@ export default function FeedbackPage() {
               Rate Your Experience
             </h1>
             <p className="text-gray-600">
-              How was your visit to {booking.salonName || "the salon"}?
+              How was your visit to {bookings.salonName || "the salon"}?
             </p>
           </div>
 
@@ -182,18 +184,18 @@ export default function FeedbackPage() {
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <h3 className="font-semibold mb-2">Booking Summary</h3>
             <p>
-              <strong>Service:</strong> {booking.service}
+              <strong>Service:</strong> {bookings.service}
             </p>
-            {booking.barber && (
+            {bookings.barber && (
               <p>
-                <strong>Barber:</strong> {booking.barber}
+                <strong>Barber:</strong> {bookings.barber}
               </p>
             )}
             <p>
-              <strong>Date:</strong> {booking.date} at {booking.time}
+              <strong>Date:</strong> {bookings.date} at {bookings.time}
             </p>
             <p>
-              <strong>Amount:</strong> ₹{booking.price}
+              <strong>Amount:</strong> ₹{bookings.price}
             </p>
           </div>
 

@@ -817,7 +817,8 @@ export default function SalonDetail({ initialSalon }) {
                     );
                     // optionally navigate to confirmation page
                     router.push(
-                      "/booking/confirmed?id=" + (data.bookingId || data.id)
+                      "user/bookings/confirmed?id=" +
+                        (data.bookingId || data.id)
                     );
                   } catch (e) {
                     console.error(e);
