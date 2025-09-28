@@ -9,15 +9,31 @@ export class UserDataManager {
       if (userToken) {
         const storedUserData = localStorage.getItem("authenticatedUserData");
         if (storedUserData) {
-          return JSON.parse(storedUserData);
+          const userData = JSON.parse(storedUserData);
+          // Always preserve onboarding location data for authenticated users
+          const onboardingData = localStorage.getItem("userOnboardingData");
+          if (onboardingData) {
+            try {
+              const onboarding = JSON.parse(onboardingData);
+              return {
+                ...userData,
+                location: onboarding.location || userData.location,
+                preferences: {
+                  ...userData.preferences,
+                  ...onboarding.preferences,
+                },
+              };
+            } catch (e) {
+              return userData;
+            }
+          }
+          return userData;
         }
       }
 
       // Fallback to onboarding data
       const onboardingData = localStorage.getItem("userOnboardingData");
-      if (onboardingData) {
-        return JSON.parse(onboardingData);
-      }
+      if (onboardingData) return JSON.parse(onboardingData);
 
       return null;
     } catch (error) {
@@ -30,9 +46,7 @@ export class UserDataManager {
     if (typeof window === "undefined") return null;
 
     const userToken = localStorage.getItem("userToken");
-    if (!userToken) {
-      return this.getStoredUserData();
-    }
+    if (!userToken) return this.getStoredUserData();
 
     try {
       const response = await fetch("/api/user/profile", {
@@ -48,24 +62,22 @@ export class UserDataManager {
         console.log("Raw onboarding data:", onboardingData);
 
         let mergedData = userData;
-
         if (onboardingData) {
           try {
             const onboarding = JSON.parse(onboardingData);
             console.log("Parsed onboarding data:", onboarding);
 
-            // Start with API data, then carefully add onboarding fields that are missing
+            // Merge onboarding data with user data properly
             mergedData = {
               ...userData,
-              // Only override if API data doesn't have these fields or they're undefined/null
-              ...(onboarding.location &&
-                !userData.location && { location: onboarding.location }),
-              ...(onboarding.gender &&
-                !userData.gender && { gender: onboarding.gender }),
-              // Always preserve onboarding location if it exists (API likely doesn't have coordinates)
+              // Always preserve onboarding location and other critical data
               location: onboarding.location || userData.location,
+              gender: userData.gender || onboarding.gender,
+              preferences: {
+                ...userData.preferences,
+                ...onboarding.preferences,
+              },
             };
-
             console.log("Merged data result:", mergedData);
           } catch (parseError) {
             console.error("Error parsing onboarding data:", parseError);
@@ -78,6 +90,10 @@ export class UserDataManager {
           "authenticatedUserData",
           JSON.stringify(mergedData)
         );
+
+        // Update booking history after login
+        await this.syncBookingHistory();
+
         return mergedData;
       } else {
         // If API fails, return stored data
@@ -89,12 +105,53 @@ export class UserDataManager {
     }
   }
 
+  static async syncBookingHistory() {
+    const userToken = localStorage.getItem("userToken");
+    if (!userToken) return;
+
+    try {
+      await fetch("/api/user/sync-booking-history", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+    } catch (error) {
+      console.error("Error syncing booking history:", error);
+    }
+  }
+
   static clearUserData() {
     if (typeof window === "undefined") return;
-
     localStorage.removeItem("userToken");
     localStorage.removeItem("authenticatedUserData");
+    localStorage.removeItem("userPrefillData");
     // Keep onboarding data for future use
+  }
+
+  static isUserLoggedIn() {
+    if (typeof window === "undefined") return false;
+    const userToken = localStorage.getItem("userToken");
+    const authenticatedUserData = localStorage.getItem("authenticatedUserData");
+    return !!(userToken && authenticatedUserData);
+  }
+
+  static preserveUserInfoForBooking(bookingData) {
+    if (typeof window === "undefined") return;
+    const currentUser = this.getStoredUserData();
+    if (currentUser) {
+      // Store prefill data with user info for feedback
+      const prefillData = {
+        name: currentUser.name || "Anonymous",
+        phone: currentUser.phone || "",
+        lastBookings: {
+          salonId: bookingData.salonId,
+          service: bookingData.service,
+          date: bookingData.date,
+          time: bookingData.time,
+        },
+        timestamp: Date.now(),
+      };
+      localStorage.setItem("userPrefillData", JSON.stringify(prefillData));
+    }
   }
 
   static isLoggedIn() {

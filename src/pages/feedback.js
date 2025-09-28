@@ -115,37 +115,46 @@ export default function FeedbackPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookingId,
-          feedback: {
-            ratings,
-            comment,
-            submittedAt: new Date(),
-          },
+          feedback: { ratings, comment },
+          submittedAt: new Date(),
         }),
       });
 
       if (response.ok) {
         alert("Thank you for your feedback!");
 
-        // Store booking data in localStorage for registration prefill
-        if (bookings) {
-          const prefillData = {
-            name: bookings.customerName,
-            phone: bookings.customerPhone,
-            gender: bookings.customerGender,
-            lastbookings: {
-              salonId: bookings.salonId,
-              service: bookings.service,
-              date: bookings.date,
-              time: bookings.time,
-            },
-            timestamp: new Date().getTime(),
-          };
+        // Check if user is logged in
+        const userToken = localStorage.getItem("userToken");
+        const authenticatedUserData = localStorage.getItem(
+          "authenticatedUserData"
+        );
 
-          console.log("Storing prefill data:", prefillData);
-          localStorage.setItem("userPrefillData", JSON.stringify(prefillData));
+        if (userToken && authenticatedUserData) {
+          // User is logged in - redirect to dashboard
+          router.push("/user/dashboard");
+        } else {
+          // User is not logged in - store prefill data and redirect to register
+          if (bookings) {
+            const prefillData = {
+              name: bookings.customerName,
+              phone: bookings.customerPhone,
+              gender: bookings.customerGender,
+              lastbookings: {
+                salonId: bookings.salonId,
+                service: bookings.service,
+                date: bookings.date,
+                time: bookings.time,
+              },
+              timestamp: new Date().getTime(),
+            };
+            console.log("Storing prefill data:", prefillData);
+            localStorage.setItem(
+              "userPrefillData",
+              JSON.stringify(prefillData)
+            );
+          }
+          router.push("/auth/user/register");
         }
-
-        router.push("/auth/user/register");
       } else {
         alert("Failed to submit feedback");
       }

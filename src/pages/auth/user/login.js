@@ -22,13 +22,17 @@ export default function UserLoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-
       if (response.ok) {
         const result = await response.json();
-
         // Store token and user info
         localStorage.setItem("userToken", result.token);
-        localStorage.setItem("userData", JSON.stringify(result.user));
+        localStorage.setItem(
+          "authenticatedUserData",
+          JSON.stringify(result.user)
+        );
+
+        // Trigger user data sync
+        await UserDataManager.fetchAndStoreUserData();
 
         alert(`Welcome back, ${result.user.name}!`);
         router.push("/user/dashboard");
