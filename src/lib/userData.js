@@ -121,10 +121,45 @@ export class UserDataManager {
 
   static clearUserData() {
     if (typeof window === "undefined") return;
+    // Clear user-specific data
     localStorage.removeItem("userToken");
     localStorage.removeItem("authenticatedUserData");
     localStorage.removeItem("userPrefillData");
+    localStorage.removeItem("userData");
+
+    // Clear society/member data if exists
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("authUser");
+    localStorage.removeItem("selectedSocietyId");
+
     // Keep onboarding data for future use
+    console.log("User data cleared successfully");
+  }
+
+  static clearSalonData() {
+    if (typeof window === "undefined") return;
+    // Clear salon-specific data
+    localStorage.removeItem("salonToken");
+    localStorage.removeItem("salonSession");
+    localStorage.removeItem("ownerToken");
+
+    console.log("Salon data cleared successfully");
+  }
+
+  static clearAllData() {
+    if (typeof window === "undefined") return;
+    // Nuclear option - clear everything except hasOnboarded
+    const hasOnboarded = localStorage.getItem("hasOnboarded");
+    const userOnboardingData = localStorage.getItem("userOnboardingData");
+
+    localStorage.clear();
+
+    // Restore onboarding data
+    if (hasOnboarded) localStorage.setItem("hasOnboarded", hasOnboarded);
+    if (userOnboardingData)
+      localStorage.setItem("userOnboardingData", userOnboardingData);
+
+    console.log("All data cleared except onboarding");
   }
 
   static isUserLoggedIn() {

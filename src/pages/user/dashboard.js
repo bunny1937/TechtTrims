@@ -80,8 +80,12 @@ export default function UserDashboard() {
   }, [router]);
 
   const handleLogout = () => {
-    UserDataManager.clearUserData();
-    router.push("/");
+    // Confirm logout
+    if (window.confirm("Are you sure you want to logout?")) {
+      UserDataManager.clearUserData();
+      alert("Logged out successfully!");
+      router.push("/");
+    }
   };
 
   if (isLoading) {

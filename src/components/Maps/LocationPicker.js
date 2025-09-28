@@ -58,9 +58,7 @@ function LocationMarker({ position, setPosition, setAddress, isDarkMode }) {
 }
 
 const LocationPicker = ({
-  onLocationSelect = () => {
-    console.log("Location selected");
-  },
+  onLocationSelect = () => {},
   initialPosition = [19.076, 72.8777], // Mumbai center
   isDarkMode = false,
 }) => {
@@ -125,18 +123,12 @@ const LocationPicker = ({
 
   const handleConfirm = () => {
     if (position && address && onLocationSelect) {
-      console.log("Confirming location:", {
-        lat: position[0],
-        lng: position[1],
-        address: address,
-      });
       onLocationSelect({
         lat: position[0],
         lng: position[1],
         address: address,
       });
     } else {
-      console.log("Missing data:", { position, address, onLocationSelect });
     }
   };
 

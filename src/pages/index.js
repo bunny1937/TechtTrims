@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import styles from "../styles/Home.module.css";
 import Image from "next/image";
 import { UserDataManager } from "../lib/userData";
+import OnboardingLogoutButton from "../components/OnBoardingLogout";
 
 export default function Home() {
   const router = useRouter();
@@ -226,6 +227,8 @@ export default function Home() {
           {/* Desktop Navigation */}
           <nav className={styles.desktopNav}>
             <div className={styles.navLinks}>
+              <OnboardingLogoutButton />
+
               <button className={styles.navLink}>Services</button>
               <button className={styles.navLink}>Salons</button>
               <button className={styles.navLink}>About</button>
@@ -254,7 +257,7 @@ export default function Home() {
                   onClick={() => router.push("/user/dashboard")}
                 >
                   <span className={styles.buttonIcon}>📅</span>
-                  My Bookings
+                  Dashboard
                 </motion.button>
               )}
 
@@ -339,6 +342,8 @@ export default function Home() {
               transition={{ duration: 0.3 }}
             >
               <div className={styles.mobileNavLinks}>
+                <OnboardingLogoutButton />
+
                 <button className={styles.mobileNavLink}>Services</button>
                 <button className={styles.mobileNavLink}>Salons</button>
                 <button className={styles.mobileNavLink}>About</button>
@@ -351,7 +356,7 @@ export default function Home() {
                       setIsMobileMenuOpen(false);
                     }}
                   >
-                    📅 My Bookings
+                    Dashboard
                   </button>
                 )}
                 <button
