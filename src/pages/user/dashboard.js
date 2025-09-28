@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../styles/User.module.css";
 import Link from "next/link";
+import { UserDataManager } from "../../lib/userData";
 
 export default function UserDashboard() {
   const router = useRouter();
@@ -79,7 +80,7 @@ export default function UserDashboard() {
   }, [router]);
 
   const handleLogout = () => {
-    localStorage.removeItem("userToken");
+    UserDataManager.clearUserData();
     router.push("/");
   };
 

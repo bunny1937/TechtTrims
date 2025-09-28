@@ -131,6 +131,7 @@ export default function FeedbackPage() {
           const prefillData = {
             name: bookings.customerName,
             phone: bookings.customerPhone,
+            gender: bookings.customerGender,
             lastbookings: {
               salonId: bookings.salonId,
               service: bookings.service,

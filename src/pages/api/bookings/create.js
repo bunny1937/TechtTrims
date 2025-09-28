@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       price: price || 0,
       paymentStatus: "pending",
       status: "confirmed",
-      userId: user?.id || null,
+      userId: user?._id || user?.id || null,
       createdAt: new Date(),
       updatedAt: new Date(),
       feedback: {
