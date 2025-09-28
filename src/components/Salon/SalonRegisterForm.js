@@ -290,23 +290,23 @@ const SalonRegisterForm = () => {
   };
 
   const services = [
-    { key: "haircut", label: "Haircut", icon: Scissors, defaultPrice: "200" },
-    { key: "shave", label: "Shave", icon: Scissors, defaultPrice: "100" },
+    { key: "Haircut", label: "Haircut", icon: Scissors, defaultPrice: "200" },
+    { key: "Shave", label: "Shave", icon: Scissors, defaultPrice: "100" },
     {
-      key: "hairWash",
+      key: "Hair Wash",
       label: "Hair Wash",
       icon: Scissors,
       defaultPrice: "150",
     },
     {
-      key: "hairStyling",
+      key: "Hair Styling",
       label: "Hair Styling",
       icon: Scissors,
       defaultPrice: "300",
     },
-    { key: "facial", label: "Facial", icon: Star, defaultPrice: "500" },
+    { key: "Facial", label: "Facial", icon: Star, defaultPrice: "500" },
     {
-      key: "hairColor",
+      key: "Hair Color",
       label: "Hair Color",
       icon: Scissors,
       defaultPrice: "800",

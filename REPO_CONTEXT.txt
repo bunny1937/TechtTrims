@@ -105,10 +105,15 @@ src/pages/api/salons/services/[id].js
 src/pages/api/salons/services/index.js
 src/pages/api/salons/staff/[id].js
 src/pages/api/salons/staff/index.js
-src/pages/api/users/register.js
+src/pages/api/user/bookings.js
+src/pages/api/user/payments.js
+src/pages/api/user/profile.js
+src/pages/api/user/register.js
+src/pages/api/user/sync-booking-history.js
 src/pages/auth/salon/login.js
 src/pages/auth/salon/register.js
-src/pages/auth/user-register.js
+src/pages/auth/user/login.js
+src/pages/auth/user/register.js
 src/pages/booking/confirmed.js
 src/pages/feedback.js
 src/pages/index.js
@@ -130,6 +135,7 @@ src/pages/styles/globals.css
 src/pages/styles/Home.module.css
 src/pages/styles/Onboarding.module.css
 src/pages/styles/Owner.module.css
+src/pages/user/dashboard.js
 src/styles/Auth.module.css
 src/styles/Booking.module.css
 src/styles/globals.css
@@ -139,6 +145,7 @@ src/styles/Owner.module.css
 src/styles/SalonDetail.module.css
 src/styles/SalonDetails.module.css
 src/styles/SalonMap.module.css
+src/styles/User.module.css
 test.js
 </directory_structure>
 
@@ -401,54 +408,6 @@ export default function SalonDashboard() {
     </main>
   );
 }
-</file>
-
-<file path="src/lib/auth.js">
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-
-export const hashPassword = async (password) => {
-  const saltRounds = 12;
-  return await bcrypt.hash(password, saltRounds);
-};
-
-export const verifyPassword = async (password, hashedPassword) => {
-  return await bcrypt.compare(password, hashedPassword);
-};
-
-export const generateToken = (userId, role, email) => {
-  return jwt.sign({ userId, role, email }, process.env.JWT_SECRET, {
-    expiresIn: "7d",
-  });
-};
-
-export const verifyToken = (token) => {
-  try {
-    return jwt.verify(token, process.env.JWT_SECRET);
-  } catch (error) {
-    return null;
-  }
-};
-
-export const getLocationFromCoordinates = async (lat, lng) => {
-  try {
-    // Using reverse geocoding - you might want to use a proper service like Google Maps API
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-    );
-    const data = await response.json();
-    return {
-      address: data.display_name,
-      city: data.address?.city || data.address?.town || data.address?.village,
-      state: data.address?.state,
-      country: data.address?.country,
-      postcode: data.address?.postcode,
-    };
-  } catch (error) {
-    console.error("Error getting location:", error);
-    return null;
-  }
-};
 </file>
 
 <file path="src/lib/constants.js">
@@ -1239,183 +1198,6 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error(e);
     return res.status(500).json({ message: e.message });
-  }
-}
-</file>
-
-<file path="src/pages/api/auth/user/login.js">
-import clientPromise from "../../../../lib/mongodb";
-import { verifyPassword, generateToken } from "../../../../lib/auth";
-
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
-
-  try {
-    const { emailOrPhone, password } = req.body;
-
-    // Validate required fields
-    if (!emailOrPhone || !password) {
-      return res.status(400).json({
-        message: "Email/Phone and password are required",
-      });
-    }
-
-    const client = await clientPromise;
-    const db = client.db("techtrims");
-    const users = db.collection("users");
-
-    // Find user by email or phone
-    const user = await users.findOne({
-      $or: [{ email: emailOrPhone.toLowerCase() }, { phone: emailOrPhone }],
-    });
-
-    if (!user) {
-      return res.status(401).json({
-        message: "Invalid credentials",
-      });
-    }
-
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({
-        message: "Account has been deactivated. Please contact support.",
-      });
-    }
-
-    // Verify password
-    const isPasswordValid = await verifyPassword(password, user.hashedPassword);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        message: "Invalid credentials",
-      });
-    }
-
-    // Update last login
-    await users.updateOne(
-      { _id: user._id },
-      {
-        $set: {
-          lastLogin: new Date(),
-          updatedAt: new Date(),
-        },
-      }
-    );
-
-    // Generate JWT token
-    const token = generateToken(user._id, user.role, user.email);
-
-    // Remove sensitive data from response
-    const { hashedPassword, ...userResponse } = user;
-
-    res.status(200).json({
-      message: "Login successful",
-      user: userResponse,
-      token,
-    });
-  } catch (error) {
-    console.error("User login error:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-}
-</file>
-
-<file path="src/pages/api/auth/user/register.js">
-import clientPromise from "../../../../lib/mongodb";
-import { hashPassword, generateToken } from "../../../../lib/auth";
-
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
-
-  try {
-    const { name, email, phone, gender, password } = req.body;
-
-    // Validate required fields
-    if (!name || !email || !phone || !gender || !password) {
-      return res.status(400).json({
-        message: "All fields are required",
-        required: ["name", "email", "phone", "gender", "password"],
-      });
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: "Invalid email format" });
-    }
-
-    // Validate phone format (Indian format)
-    const phoneRegex = /^[6-9]\d{9}$/;
-    if (!phoneRegex.test(phone)) {
-      return res
-        .status(400)
-        .json({ message: "Invalid phone number. Use 10-digit Indian format" });
-    }
-
-    // Validate password strength
-    if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters long" });
-    }
-
-    const client = await clientPromise;
-    const db = client.db("techtrims");
-    const users = db.collection("users");
-
-    // Check if user already exists
-    const existingUser = await users.findOne({
-      $or: [{ email: email.toLowerCase() }, { phone: phone }],
-    });
-
-    if (existingUser) {
-      return res.status(409).json({
-        message: "User already exists with this email or phone number",
-      });
-    }
-
-    // Hash password
-    const hashedPassword = await hashPassword(password);
-
-    // Create new user
-    const newUser = {
-      name: name.trim(),
-      email: email.toLowerCase(),
-      phone: phone,
-      gender: gender,
-      role: "user",
-      hashedPassword,
-      bookingHistory: [],
-      preferences: {
-        favoriteServices: [],
-        preferredSalons: [],
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isActive: true,
-    };
-
-    const result = await users.insertOne(newUser);
-
-    // Generate JWT token
-    const token = generateToken(result.insertedId, "user", email);
-
-    // Remove password from response
-    const { hashedPassword: _, ...userResponse } = newUser;
-    userResponse._id = result.insertedId;
-
-    res.status(201).json({
-      message: "User registered successfully",
-      user: userResponse,
-      token,
-    });
-  } catch (error) {
-    console.error("User registration error:", error);
-    res.status(500).json({ message: "Internal server error" });
   }
 }
 </file>
@@ -2253,74 +2035,6 @@ export default async function handler(req, res) {
 }
 </file>
 
-<file path="src/pages/api/salons/bookings.js">
-// src/pages/api/salons/bookings.js
-import { connectToDatabase } from "../../../lib/mongodb";
-import { ObjectId } from "mongodb";
-
-export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  const { salonId, date, status, from, to } = req.query;
-
-  if (!salonId) {
-    return res.status(400).json({ error: "salonId is required" });
-  }
-
-  try {
-    const { client, db } = await connectToDatabase(); // Note: destructure both client and db
-
-    // Build filter object
-    const filter = {};
-
-    // Handle salonId - could be string or ObjectId
-    if (ObjectId.isValid(salonId)) {
-      filter.salonId = new ObjectId(salonId);
-    } else {
-      filter.salonId = salonId;
-    }
-
-    // Add status filter
-    if (status) {
-      filter.status = status;
-    }
-
-    // Add date filter
-    if (date) {
-      // For specific date, match the date string exactly
-      filter.date = date;
-    } else if (from || to) {
-      // For date range, use appointmentAt if it exists
-      filter.appointmentAt = {};
-      if (from) filter.appointmentAt.$gte = new Date(from);
-      if (to) filter.appointmentAt.$lte = new Date(to);
-    }
-
-    console.log("Booking query filter:", JSON.stringify(filter, null, 2));
-
-    // Query bookings
-    const bookings = await db
-      .collection("bookings")
-      .find(filter)
-      .sort({ date: 1, time: 1 })
-      .limit(100)
-      .toArray();
-
-    console.log(`Found ${bookings.length} bookings for salon ${salonId}`);
-
-    return res.status(200).json(bookings);
-  } catch (error) {
-    console.error("Bookings API error:", error);
-    return res.status(500).json({
-      error: "Internal server error",
-      message: error.message,
-    });
-  }
-}
-</file>
-
 <file path="src/pages/api/salons/bookings/today.js">
 import { connectToDatabase } from "../../../../lib/mongodb";
 import { ObjectId } from "mongodb";
@@ -2577,7 +2291,257 @@ export default async function handler(req, res) {
 }
 </file>
 
-<file path="src/pages/api/users/register.js">
+<file path="src/pages/api/user/bookings.js">
+import clientPromise from "../../../lib/mongodb";
+import { verifyToken } from "../../../lib/auth";
+import { ObjectId } from "mongodb";
+
+export default async function handler(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    console.log("User bookings API - Token received:", token ? "YES" : "NO");
+
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    const decoded = verifyToken(token);
+    console.log("User bookings API - Decoded token:", decoded);
+
+    if (!decoded || !decoded.userId) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+    const client = await clientPromise;
+    const db = client.db("techtrims");
+
+    const user = await db
+      .collection("users")
+      .findOne({ _id: new ObjectId(decoded.userId) });
+    console.log("User bookings API - Found user:", user ? "YES" : "NO");
+    console.log("User phone:", user?.phone);
+    console.log("User name:", user?.name);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Debug: Check all bookings first
+    const allBookings = await db.collection("bookings").find({}).toArray();
+    console.log("Total bookings in database:", allBookings.length);
+    console.log("Sample booking:", allBookings[0]);
+
+    // Try multiple search strategies
+    const searchQueries = [
+      { userId: new ObjectId(decoded.userId) },
+      { customerPhone: user.phone },
+      { customerName: user.name },
+    ];
+
+    console.log("Search queries:", searchQueries);
+
+    // Get bookings by phone number or userId
+    const bookings = await db
+      .collection("bookings")
+      .find({
+        $or: searchQueries,
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    console.log("Found bookings for user:", bookings.length);
+    console.log("Bookings:", bookings);
+
+    // Get salon names for bookings
+    // If no bookings found, try fallback searches
+    let finalBookings = bookings;
+
+    if (bookings.length === 0) {
+      console.log(
+        "No bookings found with standard search, trying fallback searches..."
+      );
+
+      // Try searching by partial phone match
+      const phoneSearch = await db
+        .collection("bookings")
+        .find({ customerPhone: { $regex: user.phone.slice(-10) } })
+        .toArray();
+      console.log("Phone fallback search found:", phoneSearch.length);
+
+      // Try searching by partial name match
+      const nameSearch = await db
+        .collection("bookings")
+        .find({ customerName: { $regex: user.name, $options: "i" } })
+        .toArray();
+      console.log("Name fallback search found:", nameSearch.length);
+
+      finalBookings = [...phoneSearch, ...nameSearch];
+
+      // Remove duplicates
+      finalBookings = finalBookings.filter(
+        (booking, index, self) =>
+          index ===
+          self.findIndex((b) => b._id.toString() === booking._id.toString())
+      );
+    }
+
+    // Get salon names for bookings
+    const bookingsWithSalons = await Promise.all(
+      finalBookings.map(async (booking) => {
+        let salonName = "Unknown Salon";
+        if (booking.salonId) {
+          try {
+            const salonObjectId =
+              typeof booking.salonId === "string"
+                ? new ObjectId(booking.salonId)
+                : booking.salonId;
+
+            const salon = await db
+              .collection("salons")
+              .findOne(
+                { _id: salonObjectId },
+                { projection: { salonName: 1, "salonDetails.name": 1 } }
+              );
+            salonName =
+              salon?.salonName || salon?.salonDetails?.name || "Unknown Salon";
+          } catch (error) {
+            console.error(
+              "Error fetching salon for booking:",
+              booking._id,
+              error
+            );
+          }
+        }
+
+        return {
+          ...booking,
+          _id: booking._id.toString(),
+          salonName,
+        };
+      })
+    );
+
+    console.log("Final bookings with salon names:", bookingsWithSalons.length);
+    res.status(200).json(bookingsWithSalons);
+  } catch (error) {
+    console.error("User bookings API error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+</file>
+
+<file path="src/pages/api/user/payments.js">
+import clientPromise from "../../../lib/mongodb";
+import { verifyToken } from "../../../lib/auth";
+import { ObjectId } from "mongodb";
+
+export default async function handler(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    const decoded = verifyToken(token);
+    if (!decoded || !decoded.userId) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+    const client = await clientPromise;
+    const db = client.db("techtrims");
+
+    // Get user's bookings first
+    const user = await db
+      .collection("users")
+      .findOne({ _id: new ObjectId(decoded.userId) });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Get payments from bookings (since payment data is stored in bookings)
+    const bookings = await db
+      .collection("bookings")
+      .find({
+        $or: [
+          { userId: new ObjectId(decoded.userId) },
+          { customerPhone: user.phone },
+        ],
+        price: { $gt: 0 }, // Only bookings with payment
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // Transform bookings to payment format
+    const payments = bookings.map((booking) => ({
+      _id: booking._id,
+      amount: booking.price || 0,
+      bookingId: booking._id,
+      status: booking.paymentStatus || "pending",
+      createdAt: booking.createdAt,
+      service: booking.service,
+      date: booking.date,
+    }));
+
+    res.status(200).json(payments);
+  } catch (error) {
+    console.error("User payments API error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+</file>
+
+<file path="src/pages/api/user/profile.js">
+import clientPromise from "../../../lib/mongodb";
+import { verifyToken } from "../../../lib/auth";
+import { ObjectId } from "mongodb";
+
+export default async function handler(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    const decoded = verifyToken(token);
+    if (!decoded || !decoded.userId) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+    const client = await clientPromise;
+    const db = client.db("techtrims");
+
+    const user = await db
+      .collection("users")
+      .findOne(
+        { _id: new ObjectId(decoded.userId) },
+        { projection: { hashedPassword: 0 } }
+      );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Profile API error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+</file>
+
+<file path="src/pages/api/user/register.js">
 // pages/api/users/register.js
 import { connectToDatabase } from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
@@ -2610,6 +2574,84 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error(e);
     return res.status(500).json({ message: e.message });
+  }
+}
+</file>
+
+<file path="src/pages/api/user/sync-booking-history.js">
+import clientPromise from "../../../lib/mongodb";
+import { verifyToken } from "../../../lib/auth";
+import { ObjectId } from "mongodb";
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    const decoded = verifyToken(token);
+    if (!decoded || !decoded.userId) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+    const client = await clientPromise;
+    const db = client.db("techtrims");
+
+    const user = await db
+      .collection("users")
+      .findOne({ _id: new ObjectId(decoded.userId) });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Find all bookings for this user
+    const allBookings = await db
+      .collection("bookings")
+      .find({
+        $or: [
+          { userId: new ObjectId(decoded.userId) },
+          { customerPhone: user.phone },
+          { customerName: { $regex: user.name, $options: "i" } },
+        ],
+      })
+      .toArray();
+
+    // Update bookings with userId if not set
+    const bookingsToUpdate = allBookings.filter((b) => !b.userId);
+    if (bookingsToUpdate.length > 0) {
+      await db
+        .collection("bookings")
+        .updateMany(
+          { _id: { $in: bookingsToUpdate.map((b) => b._id) } },
+          { $set: { userId: new ObjectId(decoded.userId) } }
+        );
+    }
+
+    // Update user's booking history
+    const bookingIds = allBookings.map((b) => b._id);
+    await db.collection("users").updateOne(
+      { _id: new ObjectId(decoded.userId) },
+      {
+        $set: {
+          bookingHistory: bookingIds,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    res.status(200).json({
+      message: "Booking history synced successfully",
+      totalBookings: allBookings.length,
+      newlyLinked: bookingsToUpdate.length,
+    });
+  } catch (error) {
+    console.error("Sync booking history error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 }
 </file>
@@ -2708,10 +2750,163 @@ export default function SalonRegisterPage() {
 }
 </file>
 
-<file path="src/pages/auth/user-register.js">
-// src/pages/auth/user-register.js - Add prefill functionality
+<file path="src/pages/auth/user/login.js">
+import { useState } from "react";
+import { useRouter } from "next/router";
+import styles from "../../../styles/Auth.module.css";
+
+export default function UserLoginPage() {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/auth/user/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        // Store token and user info
+        localStorage.setItem("userToken", result.token);
+        localStorage.setItem("userData", JSON.stringify(result.user));
+
+        alert(`Welcome back, ${result.user.name}!`);
+        router.push("/user/dashboard");
+      } else {
+        const error = await response.json();
+        setError(error.message || "Login failed");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.authCard}>
+        <div className={styles.header}>
+          <button
+            onClick={() => router.push("/")}
+            className={styles.backButton}
+          >
+            ← Back to Home
+          </button>
+        </div>
+
+        <h1 className={styles.title}>Welcome Back</h1>
+        <p className={styles.subtitle}>Login to your TechTrims account</p>
+
+        {error && (
+          <div className={styles.error}>
+            <span>⚠️ {error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.formGroup}>
+            <label htmlFor="email">Email Address</label>
+            <input
+              id="email"
+              type="email"
+              placeholder="Enter your email"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+              required
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              placeholder="Enter your password"
+              value={formData.password}
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            className={styles.submitButton}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <span className={styles.spinner}></span>
+                Logging in...
+              </>
+            ) : (
+              "Login"
+            )}
+          </button>
+        </form>
+
+        <div className={styles.authLinks}>
+          <p className={styles.authLink}>
+            Don&#39;t have an account?{" "}
+            <button
+              type="button"
+              onClick={() => router.push("/auth/user/register")}
+              className={styles.linkButton}
+            >
+              Create Account
+            </button>
+          </p>
+
+          <div className={styles.divider}>
+            <span>or</span>
+          </div>
+
+          <p className={styles.authLink}>
+            Are you a salon owner?{" "}
+            <button
+              type="button"
+              onClick={() => router.push("/auth/salon/login")}
+              className={styles.linkButton}
+            >
+              Login as Salon
+            </button>
+          </p>
+        </div>
+
+        {/* Demo credentials for testing */}
+        <div className={styles.demoInfo}>
+          <h4>Demo Account:</h4>
+          <p>Email: demo@gmail.com</p>
+          <p>Password: demo123</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/pages/auth/user/register.js">
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import styles from "../../../styles/Auth.module.css";
 
 export default function UserRegisterPage() {
   const router = useRouter();
@@ -2723,20 +2918,42 @@ export default function UserRegisterPage() {
     password: "",
   });
   const [prefillData, setPrefillData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Load prefill data on component mount
-  // src/pages/auth/user-register.js - Use existing userOnboardingData
   useEffect(() => {
-    // First check for userOnboardingData (from booking flow)
+    // Check for prefill data from feedback or onboarding
     const onboardingData = localStorage.getItem("userOnboardingData");
     const savedPrefillData = localStorage.getItem("userPrefillData");
 
-    let prefillInfo = null;
+    console.log("Checking localStorage data:");
+    console.log("onboardingData:", onboardingData);
+    console.log("savedPrefillData:", savedPrefillData);
 
-    if (onboardingData) {
+    let prefillInfo = null;
+    if (savedPrefillData) {
+      try {
+        const data = JSON.parse(savedPrefillData);
+        console.log("Parsed prefill data:", data);
+
+        prefillInfo = {
+          name: data.name || "",
+          phone: data.phone || "",
+          gender: data.gender || "",
+          lastBooking: data.lastBooking || {},
+          source: "feedback",
+        };
+        setPrefillData(prefillInfo);
+        setFormData((prev) => ({
+          ...prev,
+          name: data.name || prev.name,
+          phone: data.phone || prev.phone,
+        }));
+      } catch (error) {
+        console.error("Error parsing prefill data:", error);
+      }
+    } else if (onboardingData) {
       try {
         const data = JSON.parse(onboardingData);
-
         prefillInfo = {
           name: data.name || "",
           gender: data.gender || "",
@@ -2745,33 +2962,6 @@ export default function UserRegisterPage() {
         };
 
         setPrefillData(prefillInfo);
-
-        // Prefill form with onboarding data
-        setFormData((prev) => ({
-          ...prev,
-          name: data.name || prev.name,
-          gender: data.gender?.toLowerCase() || prev.gender,
-          // Could also prefill location if you have address field
-        }));
-
-        console.log("Form prefilled from onboarding data");
-      } catch (error) {
-        console.error("Error parsing onboarding data:", error);
-      }
-    } else if (savedPrefillData) {
-      // Fallback to feedback prefill data
-      try {
-        const data = JSON.parse(savedPrefillData);
-
-        prefillInfo = {
-          name: data.name || "",
-          phone: data.phone || "",
-          lastBooking: data.lastBooking || null,
-          source: "feedback",
-        };
-
-        setPrefillData(prefillInfo);
-
         setFormData((prev) => ({
           ...prev,
           name: data.name || prev.name,
@@ -2783,12 +2973,12 @@ export default function UserRegisterPage() {
     }
   }, []);
 
-  // src/pages/auth/user-register.js - Clear both data sources
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
 
     try {
-      const response = await fetch("/api/auth/user-register", {
+      const response = await fetch("/api/auth/user/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -2796,16 +2986,11 @@ export default function UserRegisterPage() {
 
       if (response.ok) {
         const result = await response.json();
-
-        // Store auth token
         localStorage.setItem("userToken", result.token);
-
-        // Clear both prefill data sources after successful registration
         localStorage.removeItem("userPrefillData");
         localStorage.removeItem("userOnboardingData");
-
         alert("Registration successful! Welcome to TechTrims!");
-        router.push("/user/dashboard"); // or wherever you want to redirect
+        router.push("/user/dashboard");
       } else {
         const error = await response.json();
         alert(`Registration failed: ${error.message}`);
@@ -2813,97 +2998,74 @@ export default function UserRegisterPage() {
     } catch (error) {
       console.error("Registration error:", error);
       alert("Registration failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-bold text-center mb-6">Create Account</h1>
+    <div className={styles.container}>
+      <div className={styles.authCard}>
+        <h1 className={styles.title}>Create Account</h1>
 
-        {/* Show prefill info if available */}
         {prefillData && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <h3 className="font-semibold text-green-900 mb-2">
-              ✅ Complete your registration
-            </h3>
-            {prefillData.source === "onboarding" ? (
-              <div className="text-sm text-green-700">
-                <p>
-                  Welcome back, <strong>{prefillData.name}</strong>!
-                </p>
-                <p>Gender: {prefillData.gender}</p>
-                {prefillData.location && (
-                  <p className="text-xs text-green-600 mt-1">
-                    📍 Location: {prefillData.location.address}
-                  </p>
-                )}
-              </div>
-            ) : prefillData.source === "feedback" ? (
-              <p className="text-sm text-green-700">
-                Based on your recent booking: {prefillData.lastBooking?.service}
-                {prefillData.lastBooking?.date &&
-                  ` on ${prefillData.lastBooking.date}`}
-              </p>
-            ) : null}
+          <div className={styles.prefillInfo}>
+            <h3>Complete your registration</h3>
+            <p>
+              {prefillData.source === "onboarding"
+                ? "Based on your preferences"
+                : `From your recent booking${
+                    prefillData.lastBooking
+                      ? ` on ${prefillData.lastBooking}`
+                      : ""
+                  }`}
+            </p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name *
-            </label>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.formGroup}>
             <input
               type="text"
+              placeholder="Full Name"
               value={formData.name}
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number *
-            </label>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) =>
-                setFormData({ ...formData, phone: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
+          <div className={styles.formGroup}>
             <input
               type="email"
+              placeholder="Email Address"
               value={formData.email}
               onChange={(e) =>
                 setFormData({ ...formData, email: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Gender *
-            </label>
+          <div className={styles.formGroup}>
+            <input
+              type="tel"
+              placeholder="Phone Number"
+              value={formData.phone}
+              onChange={(e) =>
+                setFormData({ ...formData, phone: e.target.value })
+              }
+              required
+            />
+          </div>
+
+          <div className={styles.formGroup}>
             <select
               value={formData.gender}
               onChange={(e) =>
                 setFormData({ ...formData, gender: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             >
               <option value="">Select Gender</option>
@@ -2913,29 +3075,37 @@ export default function UserRegisterPage() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password *
-            </label>
+          <div className={styles.formGroup}>
             <input
               type="password"
+              placeholder="Password (min 6 characters)"
               value={formData.password}
               onChange={(e) =>
                 setFormData({ ...formData, password: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
-              minLength="6"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            className={styles.submitButton}
+            disabled={isLoading}
           >
-            Create Account
+            {isLoading ? "Creating Account..." : "Create Account"}
           </button>
         </form>
+
+        <p className={styles.authLink}>
+          Already have an account?{" "}
+          <button
+            type="button"
+            onClick={() => router.push("/auth/user/login")}
+            className={styles.linkButton}
+          >
+            Login here
+          </button>
+        </p>
       </div>
     </div>
   );
@@ -5635,6 +5805,421 @@ body {
 }
 </file>
 
+<file path="src/pages/user/dashboard.js">
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import styles from "../../styles/User.module.css";
+import Link from "next/link";
+
+export default function UserDashboard() {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [bookings, setBookings] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const token = localStorage.getItem("userToken");
+
+        if (!token) {
+          router.push("/auth/user/login");
+          return;
+        }
+
+        setIsLoading(true);
+
+        // Simple profile load
+        try {
+          const userRes = await fetch("/api/user/profile", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            setUser(userData);
+          }
+        } catch (err) {
+          console.error("Profile error:", err);
+        }
+
+        // Simple bookings load
+        try {
+          const bookingsRes = await fetch("/api/user/bookings", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (bookingsRes.ok) {
+            const bookingsData = await bookingsRes.json();
+            setBookings(Array.isArray(bookingsData) ? bookingsData : []);
+          }
+        } catch (err) {
+          console.error("Bookings error:", err);
+          setBookings([]);
+        }
+
+        // Simple payments load
+        try {
+          const paymentsRes = await fetch("/api/user/payments", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (paymentsRes.ok) {
+            const paymentsData = await paymentsRes.json();
+            setPayments(Array.isArray(paymentsData) ? paymentsData : []);
+          }
+        } catch (err) {
+          console.error("Payments error:", err);
+          setPayments([]);
+        }
+      } catch (error) {
+        console.error("Overall error:", error);
+        setError(error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("userToken");
+    router.push("/");
+  };
+
+  if (isLoading) {
+    return (
+      <div className={styles.loading}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+        <p>Loading dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.error}>
+        <p>Error: {error}</p>
+        <button onClick={() => window.location.reload()}>Retry</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.dashboard}>
+      <div className={styles.sidebar}>
+        <div className={styles.userProfile}>
+          <h2>Welcome, {user?.name || "User"}</h2>
+          <p>{user?.email || "No email"}</p>
+        </div>
+
+        <nav className={styles.nav}>
+          <button
+            className={`${styles.navItem} ${
+              activeTab === "overview" ? styles.active : ""
+            }`}
+            onClick={() => setActiveTab("overview")}
+          >
+            📊 Overview
+          </button>
+          <button
+            className={`${styles.navItem} ${
+              activeTab === "bookings" ? styles.active : ""
+            }`}
+            onClick={() => setActiveTab("bookings")}
+          >
+            📅 My Bookings
+          </button>
+          <button
+            className={`${styles.navItem} ${
+              activeTab === "payments" ? styles.active : ""
+            }`}
+            onClick={() => setActiveTab("payments")}
+          >
+            💳 Payments
+          </button>
+          <button
+            className={`${styles.navItem} ${
+              activeTab === "feedback" ? styles.active : ""
+            }`}
+            onClick={() => setActiveTab("feedback")}
+          >
+            ⭐ My Reviews
+          </button>
+          <button
+            className={`${styles.navItem} ${
+              activeTab === "profile" ? styles.active : ""
+            }`}
+            onClick={() => setActiveTab("profile")}
+          >
+            👤 Profile
+          </button>
+        </nav>
+
+        <button className={styles.logoutButton} onClick={handleLogout}>
+          🚪 Logout
+        </button>
+      </div>
+
+      <div className={styles.content}>
+        {activeTab === "overview" && (
+          <div>
+            <div className={styles.overview}>
+              <Link href="/" className={styles.backLink}>
+                Home
+              </Link>
+              <h1>Dashboard Overview</h1>
+            </div>
+            <div className={styles.stats}>
+              <div className={styles.statCard}>
+                <h3>Total Bookings</h3>
+                <p>{bookings.length}</p>
+              </div>
+              <div className={styles.statCard}>
+                <h3>Upcoming</h3>
+                <p>{bookings.filter((b) => b.status === "confirmed").length}</p>
+              </div>
+              <div className={styles.statCard}>
+                <h3>Completed</h3>
+                <p>{bookings.filter((b) => b.status === "completed").length}</p>
+              </div>
+              <div className={styles.statCard}>
+                <h3>Total Spent</h3>
+                <p>
+                  ₹{payments.reduce((total, p) => total + (p.amount || 0), 0)}
+                </p>
+              </div>
+            </div>
+
+            {/* Recent Bookings */}
+            <div className={styles.recentSection}>
+              <h2>Recent Bookings</h2>
+              {bookings.slice(0, 3).map((booking) => (
+                <div key={booking._id} className={styles.bookingCard}>
+                  <h3>{booking.service}</h3>
+                  <p>
+                    📅 {booking.date} at {booking.time}
+                  </p>
+                  <p>🏪 {booking.salonName}</p>
+                  <p>
+                    Status:{" "}
+                    <span className={`status-${booking.status}`}>
+                      {booking.status}
+                    </span>
+                  </p>
+                </div>
+              ))}
+              {bookings.length === 0 && (
+                <p className={styles.noData}>
+                  No bookings yet.{" "}
+                  <Link href="/">Book your first service!</Link>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "bookings" && (
+          <div className={styles.bookings}>
+            <h1>My Bookings ({bookings.length})</h1>
+            <div className={styles.bookingsList}>
+              {bookings.map((booking) => (
+                <div key={booking._id} className={styles.bookingCard}>
+                  <div className={styles.bookingHeader}>
+                    <h3>{booking.service}</h3>
+                    <span
+                      className={`${styles.statusBadge} ${
+                        styles[booking.status]
+                      }`}
+                    >
+                      {booking.status}
+                    </span>
+                  </div>
+                  <div className={styles.bookingDetails}>
+                    <p>
+                      📅 <strong>Date:</strong> {booking.date}
+                    </p>
+                    <p>
+                      🕐 <strong>Time:</strong> {booking.time}
+                    </p>
+                    <p>
+                      🏪 <strong>Salon:</strong> {booking.salonName}
+                    </p>
+                    {booking.barber && (
+                      <p>
+                        👤 <strong>Barber:</strong> {booking.barber}
+                      </p>
+                    )}
+                    <p>
+                      💰 <strong>Price:</strong> ₹{booking.price || 0}
+                    </p>
+                    {booking.feedback?.submitted && (
+                      <p>
+                        ⭐ <strong>Your Rating:</strong>{" "}
+                        {booking.feedback.ratings?.overall}/5
+                      </p>
+                    )}
+                  </div>
+                  {booking.status === "completed" &&
+                    !booking.feedback?.submitted && (
+                      <button
+                        className={styles.feedbackButton}
+                        onClick={() =>
+                          router.push(`/feedback?bookingId=${booking._id}`)
+                        }
+                      >
+                        📝 Give Feedback
+                      </button>
+                    )}
+                </div>
+              ))}
+              {bookings.length === 0 && (
+                <div className={styles.emptyState}>
+                  <p>📅 No bookings found</p>
+                  <button
+                    onClick={() => router.push("/")}
+                    className={styles.bookNowButton}
+                  >
+                    Book Your First Service
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "payments" && (
+          <div className={styles.payments}>
+            <h1>Payment History ({payments.length})</h1>
+            <div className={styles.paymentsList}>
+              {payments.map((payment) => (
+                <div key={payment._id} className={styles.paymentCard}>
+                  <div className={styles.paymentHeader}>
+                    <h3>₹{payment.amount}</h3>
+                    <span
+                      className={`${styles.statusBadge} ${
+                        styles[payment.status]
+                      }`}
+                    >
+                      {payment.status}
+                    </span>
+                  </div>
+                  <div className={styles.paymentDetails}>
+                    <p>
+                      <strong>Service:</strong> {payment.service}
+                    </p>
+                    <p>
+                      <strong>Date:</strong> {payment.date}
+                    </p>
+                    <p>
+                      <strong>Payment Date:</strong>{" "}
+                      {new Date(payment.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {payments.length === 0 && (
+                <div className={styles.emptyState}>
+                  <p>💳 No payments found</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "feedback" && (
+          <div className={styles.feedback}>
+            <h1>My Reviews</h1>
+            <div className={styles.feedbackList}>
+              {bookings
+                .filter((b) => b.feedback?.submitted)
+                .map((booking) => (
+                  <div key={booking._id} className={styles.feedbackCard}>
+                    <div className={styles.feedbackHeader}>
+                      <h3>{booking.service}</h3>
+                      <div className={styles.rating}>
+                        <span>⭐ {booking.feedback.ratings?.overall}/5</span>
+                      </div>
+                    </div>
+                    <div className={styles.feedbackDetails}>
+                      <p>
+                        <strong>Salon:</strong> {booking.salonName}
+                      </p>
+                      <p>
+                        <strong>Date:</strong> {booking.date}
+                      </p>
+                      {booking.feedback.comment && (
+                        <div className={styles.comment}>
+                          <p>
+                            <strong>Your Review:</strong>
+                          </p>
+                          <p>&quot;{booking.feedback.comment}&quot;</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              {bookings.filter((b) => b.feedback?.submitted).length === 0 && (
+                <div className={styles.emptyState}>
+                  <p>⭐ No reviews submitted yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "profile" && (
+          <div className={styles.profile}>
+            <h1>Profile Settings</h1>
+            <div className={styles.profileCard}>
+              <div className={styles.profileForm}>
+                <div className={styles.formGroup}>
+                  <label>Name</label>
+                  <input type="text" value={user?.name || ""} readOnly />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Email</label>
+                  <input type="email" value={user?.email || ""} readOnly />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Phone</label>
+                  <input type="tel" value={user?.phone || ""} readOnly />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Gender</label>
+                  <input type="text" value={user?.gender || ""} readOnly />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Member Since</label>
+                  <input
+                    type="text"
+                    value={
+                      user?.createdAt
+                        ? new Date(user.createdAt).toLocaleDateString()
+                        : ""
+                    }
+                    readOnly
+                  />
+                </div>
+              </div>
+              <div className={styles.profileActions}>
+                <p className={styles.note}>
+                  📝 Profile editing will be available in future updates
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/styles/Auth.module.css">
 .container {
   min-height: 100vh;
@@ -6092,690 +6677,6 @@ body {
   .form-input,
   .form-select {
     font-size: 18px; /* Prevents zoom on iOS */
-  }
-}
-</file>
-
-<file path="src/styles/Home.module.css">
-.container {
-  min-height: 100vh;
-  background: linear-gradient(
-    135deg,
-    var(--background-primary) 0%,
-    var(--background-secondary) 100%
-  );
-}
-
-.loadingContainer {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid var(--border-color);
-  border-top: 4px solid var(--gold-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-/* Header */
-.header {
-  background: var(--background-primary);
-  border-bottom: 1px solid var(--border-color);
-  padding: 16px 0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  backdrop-filter: blur(10px);
-}
-
-.headerContent {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logo {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.goldText {
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-}
-
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.themeToggle {
-  padding: 8px;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 20px;
-  transition: all 0.3s ease;
-}
-
-.themeToggle:hover {
-  background: var(--background-secondary);
-}
-
-.ownerButton {
-  padding: 10px 20px;
-  background: transparent;
-  color: var(--gold-primary);
-  border: 2px solid var(--gold-primary);
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.ownerButton:hover {
-  background: var(--gold-primary);
-  color: var(--contrast-dark);
-}
-
-.loginButton {
-  padding: 10px 20px;
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  color: var(--contrast-dark);
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.loginButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
-}
-
-/* Welcome Section */
-.welcomeSection {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 60px 20px 40px;
-  text-align: center;
-}
-
-.welcomeContent {
-  margin-bottom: 40px;
-}
-
-.welcomeTitle {
-  font-size: 48px;
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: var(--text-primary);
-  line-height: 1.2;
-}
-
-.welcomeSubtitle {
-  font-size: 18px;
-  color: var(--text-secondary);
-  margin-bottom: 0;
-}
-
-.quickStats {
-  display: flex;
-  justify-content: center;
-  gap: 60px;
-  margin-top: 40px;
-}
-
-.stat {
-  text-align: center;
-}
-
-.statNumber {
-  display: block;
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--gold-primary);
-  margin-bottom: 4px;
-}
-
-.statLabel {
-  font-size: 14px;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-/* Search Section */
-.searchSection {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 0 20px 40px;
-}
-
-.searchContainer {
-  text-align: center;
-}
-
-.searchBox {
-  position: relative;
-  margin-bottom: 24px;
-}
-
-.searchInput {
-  width: 100%;
-  padding: 16px 60px 16px 20px;
-  border: 2px solid var(--border-color);
-  border-radius: 50px;
-  font-size: 16px;
-  background: var(--background-primary);
-  color: var(--text-primary);
-  transition: all 0.3s ease;
-}
-
-.searchInput:focus {
-  outline: none;
-  border-color: var(--gold-primary);
-  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
-}
-
-.searchButton {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 44px;
-  height: 44px;
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 18px;
-  transition: all 0.3s ease;
-}
-
-.searchButton:hover {
-  transform: translateY(-50%) scale(1.05);
-}
-
-.quickFilters {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.filterChip {
-  padding: 8px 16px;
-  background: var(--background-primary);
-  border: 2px solid var(--border-color);
-  border-radius: 25px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.filterChip:hover {
-  border-color: var(--gold-primary);
-  background: var(--gold-primary);
-  color: var(--contrast-dark);
-}
-
-/* Services Section */
-.servicesSection {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 60px 20px;
-}
-
-.sectionTitle {
-  font-size: 32px;
-  font-weight: 700;
-  text-align: center;
-  margin-bottom: 40px;
-  color: var(--text-primary);
-}
-
-.servicesGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 24px;
-}
-
-.serviceCard {
-  background: var(--background-primary);
-  border-radius: 16px;
-  padding: 32px 24px;
-  text-align: center;
-  border: 1px solid var(--border-color);
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.serviceCard:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  border-color: var(--gold-primary);
-}
-
-.serviceIcon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.serviceName {
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--text-primary);
-}
-
-.servicePrice {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--gold-primary);
-  margin-bottom: 4px;
-}
-
-.serviceDuration {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-/* Salons Section */
-.salonsSection {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 60px 20px;
-}
-
-.sectionHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 40px;
-}
-.viewOptions {
-  display: flex;
-  gap: 8px;
-}
-
-.viewToggle {
-  padding: 8px 16px;
-  border: 2px solid #f59e0b;
-  background: transparent;
-  color: #f59e0b;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.viewToggle:hover {
-  background: #f59e0b;
-  color: white;
-  transform: translateY(-2px);
-}
-
-.viewToggle.active {
-  background: #f59e0b;
-  color: white;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-}
-
-.mapLoading {
-  height: 600px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(45deg, #f3f4f6, #e5e7eb);
-  border-radius: 20px;
-  font-size: 18px;
-  color: #6b7280;
-}
-.viewAllButton {
-  padding: 10px 20px;
-  background: transparent;
-  color: var(--gold-primary);
-  border: 2px solid var(--gold-primary);
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.viewAllButton:hover {
-  background: var(--gold-primary);
-  color: var(--contrast-dark);
-}
-
-.salonsCarousel {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 24px;
-}
-
-.salonCard {
-  background: var(--background-primary);
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid var(--border-color);
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.salonCard:hover {
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-  border-color: var(--gold-primary);
-}
-
-.salonImage {
-  position: relative;
-  height: 200px;
-  overflow: hidden;
-}
-
-.salonImage img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.salonCard:hover .salonImage img {
-  transform: scale(1.05);
-}
-
-.salonBadge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  color: var(--contrast-dark);
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.salonInfo {
-  padding: 20px;
-}
-
-.salonName {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 4px;
-  color: var(--text-primary);
-}
-
-.salonLocation {
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin-bottom: 12px;
-}
-
-.salonStats {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.rating,
-.bookings {
-  font-size: 14px;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.rating {
-  color: var(--gold-primary);
-  font-weight: 600;
-}
-
-.salonServices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.serviceTag {
-  background: var(--background-secondary);
-  color: var(--text-secondary);
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.bookButton {
-  width: 100%;
-  padding: 12px;
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  color: var(--contrast-dark);
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.bookButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
-}
-
-/* Footer */
-.footer {
-  background: var(--contrast-dark);
-  color: var(--background-primary);
-  padding: 60px 0 20px;
-  margin-top: 80px;
-}
-
-.footerContent {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 40px;
-}
-
-.footerSection h4 {
-  color: var(--gold-primary);
-  font-size: 24px;
-  margin-bottom: 16px;
-}
-
-.footerSection h5 {
-  color: var(--background-primary);
-  font-size: 18px;
-  margin-bottom: 12px;
-}
-
-.footerSection ul {
-  list-style: none;
-  padding: 0;
-}
-
-.footerSection ul li {
-  margin-bottom: 8px;
-}
-
-.footerSection ul li a {
-  color: var(--contrast-light);
-  text-decoration: none;
-  transition: color 0.3s ease;
-}
-
-.footerSection ul li a:hover {
-  color: var(--gold-primary);
-}
-
-.footerBottom {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-  text-align: center;
-  border-top: 1px solid var(--contrast-medium);
-  margin-top: 40px;
-}
-
-.loadingSalons {
-  text-align: center;
-  padding: 60px 20px;
-}
-
-.loadingSalons p {
-  margin-top: 16px;
-  color: var(--text-secondary);
-}
-
-.noSalons {
-  text-align: center;
-  padding: 60px 20px;
-  background: var(--background-secondary);
-  border-radius: 16px;
-}
-
-.noSalons p {
-  color: var(--text-secondary);
-  font-size: 16px;
-  margin-bottom: 24px;
-}
-
-.registerSalonButton {
-  padding: 12px 24px;
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  color: var(--contrast-dark);
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.registerSalonButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
-}
-
-.distanceBadge {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 10px;
-  font-weight: 600;
-}
-
-/* Mobile Optimizations */
-@media (max-width: 768px) {
-  .headerContent {
-    padding: 0 16px;
-  }
-
-  .headerActions {
-    gap: 8px;
-  }
-
-  .ownerButton,
-  .loginButton {
-    padding: 8px 12px;
-    font-size: 14px;
-  }
-
-  .welcomeTitle {
-    font-size: 32px;
-  }
-
-  .quickStats {
-    gap: 30px;
-  }
-
-  .statNumber {
-    font-size: 24px;
-  }
-
-  .servicesGrid {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-  }
-
-  .serviceCard {
-    padding: 24px 16px;
-  }
-
-  .salonsCarousel {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .sectionHeader {
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
-  }
-
-  .footerContent {
-    grid-template-columns: 1fr;
-    gap: 30px;
-    text-align: center;
-  }
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
   }
 }
 </file>
@@ -8028,6 +7929,371 @@ body {
 }
 </file>
 
+<file path="src/styles/User.module.css">
+.dashboard {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.sidebar {
+  width: 280px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 2rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.userProfile {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.userProfile h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+}
+
+.userProfile p {
+  margin: 0;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.navItem {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  text-align: left;
+  border: none;
+  background: none;
+  color: white;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
+
+.navItem:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.navItem.active {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: translateX(4px);
+}
+
+.logoutButton {
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  background-color: rgba(220, 53, 69, 0.8);
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+}
+
+.logoutButton:hover {
+  background-color: rgba(200, 35, 51, 0.9);
+}
+
+.content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.1rem;
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  color: #dc3545;
+}
+
+.overview h1,
+.bookings h1,
+.payments h1,
+.feedback h1,
+.profile h1 {
+  margin: 0 0 2rem 0;
+  color: #1a202c;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.statCard {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  border-left: 4px solid #667eea;
+}
+
+.statCard h3 {
+  margin: 0 0 1rem 0;
+  color: #718096;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.statCard p {
+  margin: 0;
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #667eea;
+}
+
+.recentSection {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.recentSection h2 {
+  margin: 0 0 1rem 0;
+  color: #2d3748;
+  font-size: 1.25rem;
+}
+
+.bookingsList,
+.paymentsList,
+.feedbackList {
+  display: grid;
+  gap: 1rem;
+}
+
+.bookingCard,
+.paymentCard,
+.feedbackCard {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.bookingCard:hover,
+.paymentCard:hover,
+.feedbackCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.bookingHeader,
+.paymentHeader,
+.feedbackHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.bookingHeader h3,
+.paymentHeader h3,
+.feedbackHeader h3 {
+  margin: 0;
+  color: #2d3748;
+  font-size: 1.1rem;
+}
+
+.statusBadge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.statusBadge.confirmed {
+  background-color: #bee3f8;
+  color: #2b6cb0;
+}
+
+.statusBadge.completed {
+  background-color: #c6f6d5;
+  color: #2f855a;
+}
+
+.statusBadge.cancelled {
+  background-color: #fed7d7;
+  color: #c53030;
+}
+
+.statusBadge.pending {
+  background-color: #fef5e7;
+  color: #d69e2e;
+}
+
+.bookingDetails,
+.paymentDetails,
+.feedbackDetails {
+  color: #4a5568;
+  line-height: 1.6;
+}
+
+.bookingDetails p,
+.paymentDetails p,
+.feedbackDetails p {
+  margin: 0.5rem 0;
+}
+
+.feedbackButton,
+.bookNowButton {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.feedbackButton:hover,
+.bookNowButton:hover {
+  background-color: #5a67d8;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem;
+  color: #718096;
+}
+
+.emptyState p {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.profileCard {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.profileForm {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.formGroup label {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 0.9rem;
+}
+
+.formGroup input {
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background-color: #f7fafc;
+  color: #4a5568;
+}
+
+.profileActions {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.note {
+  color: #718096;
+  font-style: italic;
+  text-align: center;
+}
+
+.comment {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #f7fafc;
+  border-radius: 6px;
+}
+
+.rating {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: #f6ad55;
+}
+
+.noData {
+  text-align: center;
+  color: #718096;
+  font-style: italic;
+}
+
+.noData a {
+  color: #667eea;
+  text-decoration: none;
+}
+
+.noData a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+</file>
+
 <file path="package.json">
 {
   "name": "techtrims",
@@ -8655,6 +8921,57 @@ export default function SalonCard({ salon, gender }) {
 }
 </file>
 
+<file path="src/lib/auth.js">
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+export const hashPassword = async (password) => {
+  const saltRounds = 12;
+  return await bcrypt.hash(password, saltRounds);
+};
+
+export const verifyPassword = async (password, hashedPassword) => {
+  return await bcrypt.compare(password, hashedPassword);
+};
+
+export const generateToken = (userId, role, email) => {
+  return jwt.sign({ userId, role, email }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
+};
+
+export const verifyToken = (token) => {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("Token decoded successfully:", decoded);
+    return decoded;
+  } catch (error) {
+    console.error("Token verification failed:", error.message);
+    return null;
+  }
+};
+
+export const getLocationFromCoordinates = async (lat, lng) => {
+  try {
+    // Using reverse geocoding - you might want to use a proper service like Google Maps API
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+    );
+    const data = await response.json();
+    return {
+      address: data.display_name,
+      city: data.address?.city || data.address?.town || data.address?.village,
+      state: data.address?.state,
+      country: data.address?.country,
+      postcode: data.address?.postcode,
+    };
+  } catch (error) {
+    console.error("Error getting location:", error);
+    return null;
+  }
+};
+</file>
+
 <file path="src/lib/mongodb.js">
 // lib/mongodb.js
 import { MongoClient, ServerApiVersion } from "mongodb";
@@ -8803,6 +9120,221 @@ export default mongoose.models.Booking ||
   mongoose.model("Booking", BookingSchema);
 </file>
 
+<file path="src/pages/api/auth/user/login.js">
+import clientPromise from "../../../../lib/mongodb";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
+    }
+
+    const client = await clientPromise;
+    const db = client.db("techtrims");
+
+    // Find user by email
+    const user = await db.collection("users").findOne({
+      email: email.toLowerCase(),
+      role: "user",
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Check if account is active
+    if (!user.isActive) {
+      return res.status(401).json({ message: "Account is deactivated" });
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.hashedPassword);
+    if (!isValidPassword) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Update last login
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          lastLogin: new Date(),
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    // Create JWT token
+    const token = jwt.sign(
+      {
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Return user data without sensitive info
+    const userResponse = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      gender: user.gender,
+      role: user.role,
+      bookingHistory: user.bookingHistory || [],
+      preferences: user.preferences || {},
+      createdAt: user.createdAt,
+      lastLogin: new Date(),
+    };
+
+    res.status(200).json({
+      message: "Login successful",
+      token,
+      user: userResponse,
+    });
+  } catch (error) {
+    console.error("User login error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+</file>
+
+<file path="src/pages/api/auth/user/register.js">
+import clientPromise from "../../../../lib/mongodb";
+import { hashPassword, generateToken } from "../../../../lib/auth";
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  try {
+    const { name, email, phone, gender, password } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !phone || !gender || !password) {
+      return res.status(400).json({
+        message: "All fields are required",
+        required: ["name", "email", "phone", "gender", "password"],
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    // Validate phone format (Indian format)
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(phone)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid phone number. Use 10-digit Indian format" });
+    }
+
+    // Validate password strength
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters long" });
+    }
+
+    const client = await clientPromise;
+    const db = client.db("techtrims");
+    const users = db.collection("users");
+
+    // Check if user already exists
+    const existingUser = await users.findOne({
+      $or: [{ email: email.toLowerCase() }, { phone: phone }],
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        message: "User already exists with this email or phone number",
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
+    // Create new user
+    // Check for existing bookings by phone/name before creating user
+    const existingBookings = await db
+      .collection("bookings")
+      .find({
+        $or: [
+          { customerPhone: phone },
+          { customerName: { $regex: name, $options: "i" } },
+        ],
+      })
+      .toArray();
+
+    console.log(
+      `Found ${existingBookings.length} existing bookings for this user`
+    );
+
+    const newUser = {
+      name,
+      email,
+      phone,
+      gender,
+      role: "user",
+      hashedPassword,
+      bookingHistory: existingBookings.map((booking) => booking._id), // Store booking IDs
+      preferences: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isActive: true,
+    };
+
+    const result = await db.collection("users").insertOne(newUser);
+
+    // Update existing bookings with userId
+    if (existingBookings.length > 0) {
+      await db
+        .collection("bookings")
+        .updateMany(
+          { _id: { $in: existingBookings.map((b) => b._id) } },
+          { $set: { userId: result.insertedId } }
+        );
+      console.log(
+        `Updated ${existingBookings.length} bookings with new userId`
+      );
+    }
+
+    // Generate JWT token
+    const token = generateToken(result.insertedId, "user", email);
+
+    // Remove password from response
+    const { hashedPassword: _, ...userResponse } = newUser;
+    userResponse._id = result.insertedId;
+
+    res.status(201).json({
+      message: "User registered successfully",
+      user: userResponse,
+      token,
+    });
+  } catch (error) {
+    console.error("User registration error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+</file>
+
 <file path="src/pages/api/maps/reverse.js">
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -8845,6 +9377,58 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("Reverse geocoding error:", err);
     return res.status(500).json({ error: "Internal server error" });
+  }
+}
+</file>
+
+<file path="src/pages/api/salons/bookings.js">
+import clientPromise from "../../../lib/mongodb";
+import { ObjectId } from "mongodb";
+
+export default async function handler(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  try {
+    const { salonId, date, from } = req.query;
+
+    if (!salonId) {
+      return res.status(400).json({ message: "Salon ID is required" });
+    }
+
+    const client = await clientPromise;
+    const db = client.db("techtrims");
+
+    let query = { salonId: new ObjectId(salonId) };
+
+    // Add date filtering
+    if (date) {
+      // Specific date
+      query.date = date;
+    } else if (from) {
+      // From a specific date onwards
+      query.date = { $gte: from };
+    }
+
+    const bookings = await db
+      .collection("bookings")
+      .find(query)
+      .sort({ date: 1, time: 1 }) // Sort by date and time
+      .toArray();
+
+    // Format bookings with additional info
+    const formattedBookings = bookings.map((booking) => ({
+      ...booking,
+      _id: booking._id.toString(),
+      salonId: booking.salonId.toString(),
+      userId: booking.userId?.toString(),
+    }));
+
+    res.status(200).json(formattedBookings);
+  } catch (error) {
+    console.error("Error fetching salon bookings:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 }
 </file>
@@ -9108,759 +9692,6 @@ function getStatusMessage(status) {
       return "Service completed! Please provide feedback.";
     default:
       return "Unknown status";
-  }
-}
-</file>
-
-<file path="src/pages/feedback.js">
-// src/pages/feedback.js - Enhanced feedback with star ratings
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/router";
-
-export default function FeedbackPage() {
-  const router = useRouter();
-  const { bookingId } = router.query;
-
-  const [booking, setBooking] = useState(null);
-  const [ratings, setRatings] = useState({
-    serviceQuality: 0,
-    timing: 0,
-    barberPerformance: 0,
-    ambience: 0,
-    overall: 0,
-  });
-  const [comment, setComment] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const fetchBookingDetails = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/bookings/${bookingId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setBooking(data);
-      }
-    } catch (error) {
-      console.error("Error fetching booking:", error);
-    }
-  }, [bookingId]);
-
-  useEffect(() => {
-    if (bookingId) {
-      fetchBookingDetails();
-    }
-  }, [bookingId, fetchBookingDetails]);
-
-  // StarRating component - fixed version
-  const StarRating = ({ value, onChange, label, required = true }) => {
-    return (
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {label} {required && <span className="text-red-500">*</span>}
-        </label>
-        <div className="flex space-x-1 items-center">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              type="button"
-              onClick={() => onChange(star)}
-              className={`text-3xl transition-all duration-200 hover:scale-110 ${
-                star <= value
-                  ? "text-yellow-400 drop-shadow-sm"
-                  : "text-gray-300 hover:text-yellow-200"
-              }`}
-            >
-              {star <= value ? "⭐" : "☆"}
-            </button>
-          ))}
-          <div className="ml-3">
-            {value === 0 ? (
-              <span className="text-sm text-gray-400">Tap to rate</span>
-            ) : (
-              <span className="text-sm text-gray-600 font-medium">
-                {value}/5 {getRatingLabel(value)}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Add rating labels
-  const getRatingLabel = (rating) => {
-    switch (rating) {
-      case 1:
-        return "Poor";
-      case 2:
-        return "Fair";
-      case 3:
-        return "Good";
-      case 4:
-        return "Very Good";
-      case 5:
-        return "Excellent";
-      default:
-        return "";
-    }
-  };
-
-  // Add validation before submission
-  const submitFeedback = async () => {
-    if (!bookingId) {
-      alert("Invalid booking ID");
-      return;
-    }
-
-    // Validate that all ratings are provided
-    const unratedFields = Object.entries(ratings)
-      .filter(([key, value]) => value === 0)
-      .map(([key]) => key.replace(/([A-Z])/g, " $1").toLowerCase());
-
-    if (unratedFields.length > 0) {
-      alert(`Please rate: ${unratedFields.join(", ")}`);
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const response = await fetch("/api/bookings/update", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingId,
-          feedback: {
-            ratings,
-            comment,
-            submittedAt: new Date(),
-          },
-        }),
-      });
-
-      if (response.ok) {
-        alert("Thank you for your feedback!");
-
-        // Store booking data in localStorage for registration prefill
-        if (booking) {
-          const prefillData = {
-            name: booking.customerName,
-            phone: booking.customerPhone,
-            lastBooking: {
-              salonId: booking.salonId,
-              service: booking.service,
-              date: booking.date,
-              time: booking.time,
-            },
-            timestamp: new Date().getTime(),
-          };
-
-          console.log("Storing prefill data:", prefillData);
-          localStorage.setItem("userPrefillData", JSON.stringify(prefillData));
-        }
-
-        router.push("/auth/user-register");
-      } else {
-        alert("Failed to submit feedback");
-      }
-    } catch (error) {
-      console.error("Feedback submission error:", error);
-      alert("Error submitting feedback");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (!booking) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading booking details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-2xl mx-auto px-4">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Rate Your Experience
-            </h1>
-            <p className="text-gray-600">
-              How was your visit to {booking.salonName || "the salon"}?
-            </p>
-          </div>
-
-          {/* Booking Summary */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <h3 className="font-semibold mb-2">Booking Summary</h3>
-            <p>
-              <strong>Service:</strong> {booking.service}
-            </p>
-            {booking.barber && (
-              <p>
-                <strong>Barber:</strong> {booking.barber}
-              </p>
-            )}
-            <p>
-              <strong>Date:</strong> {booking.date} at {booking.time}
-            </p>
-            <p>
-              <strong>Amount:</strong> ₹{booking.price}
-            </p>
-          </div>
-
-          {/* Rating Form */}
-          <div className="space-y-4">
-            <StarRating
-              label="Service Quality"
-              value={ratings.serviceQuality}
-              onChange={(value) =>
-                setRatings({ ...ratings, serviceQuality: value })
-              }
-            />
-
-            <StarRating
-              label="Timing/Punctuality"
-              value={ratings.timing}
-              onChange={(value) => setRatings({ ...ratings, timing: value })}
-            />
-
-            <StarRating
-              label="Barber Performance"
-              value={ratings.barberPerformance}
-              onChange={(value) =>
-                setRatings({ ...ratings, barberPerformance: value })
-              }
-            />
-
-            <StarRating
-              label="Salon Ambience / Cleanliness"
-              value={ratings.ambience}
-              onChange={(value) => setRatings({ ...ratings, ambience: value })}
-            />
-
-            <StarRating
-              label="Overall Experience"
-              value={ratings.overall}
-              onChange={(value) => setRatings({ ...ratings, overall: value })}
-            />
-
-            {/* Text Feedback */}
-            <div className="mt-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Additional Comments (Optional)
-              </label>
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Share your experience in detail..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                rows="4"
-              />
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <div className="mt-8 text-center">
-            <button
-              onClick={submitFeedback}
-              disabled={submitting}
-              className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {submitting ? "Submitting..." : "✅ Submit Feedback"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/pages/index.js">
-// pages/index.js
-import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
-import { motion } from "framer-motion";
-import dynamic from "next/dynamic";
-import styles from "../styles/Home.module.css";
-import Image from "next/image";
-
-export default function Home() {
-  const router = useRouter();
-  const [userOnboarding, setUserOnboarding] = useState(null);
-  const [nearbySalons, setNearbySalons] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingSalons, setIsLoadingSalons] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [showMapView, setShowMapView] = useState(false);
-  const [selectedSalon, setSelectedSalon] = useState(null);
-
-  // Dynamic import for map component
-  const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
-    ssr: false,
-    loading: () => <div className={styles.mapLoading}>Loading map...</div>,
-  });
-
-  useEffect(() => {
-    // Check if user has completed onboarding
-    const hasOnboarded = localStorage.getItem("hasOnboarded");
-    const onboardingData = localStorage.getItem("userOnboardingData");
-
-    if (!hasOnboarded) {
-      router.push("/onboarding");
-      return;
-    }
-
-    if (onboardingData) {
-      const userData = JSON.parse(onboardingData);
-      setUserOnboarding(userData);
-
-      // Load nearby salons based on user location
-      if (
-        userData.location &&
-        userData.location.latitude &&
-        userData.location.longitude
-      ) {
-        loadNearbySalons(
-          userData.location.latitude,
-          userData.location.longitude,
-          userData.gender
-        );
-      }
-    }
-
-    // Check theme preference
-    const darkMode = localStorage.getItem("darkMode") === "true";
-    setIsDarkMode(darkMode);
-    if (darkMode) {
-      document.documentElement.setAttribute("data-theme", "dark");
-    }
-
-    setIsLoading(false);
-  }, [router]);
-
-  const loadNearbySalons = async (latitude, longitude, gender) => {
-    setIsLoadingSalons(true);
-    try {
-      console.log("Loading salons for coordinates:", latitude, longitude);
-
-      const response = await fetch(
-        `/api/salons/nearby?latitude=${latitude}&longitude=${longitude}&radius=40&gender=${gender}`
-      );
-
-      const data = await response.json();
-      console.log("Salon API response:", data);
-
-      if (response.ok) {
-        setNearbySalons(data.salons || []);
-        console.log("Set nearby salons:", data.salons?.length || 0);
-      } else {
-        console.error("Error loading salons:", data.message);
-        setNearbySalons([]);
-      }
-    } catch (error) {
-      console.error("Error loading salons:", error);
-      setNearbySalons([]);
-    } finally {
-      setIsLoadingSalons(false);
-    }
-  };
-
-  const toggleDarkMode = () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    localStorage.setItem("darkMode", newMode.toString());
-
-    if (newMode) {
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-    }
-  };
-
-  const navigateToAuth = (type, role) => {
-    router.push(`/auth/${role}/${type}`);
-  };
-
-  const handleSalonCardClick = (salonId) => {
-    router.push(`/salons/${salonId}`);
-  };
-
-  if (isLoading) {
-    return (
-      <div className={styles.loadingContainer}>
-        <div className={styles.spinner}></div>
-        <p>Loading your personalized experience...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.container}>
-      {/* Header */}
-      <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <motion.h1
-            className={styles.logo}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <span className={styles.goldText}>Luxe</span>Salon
-          </motion.h1>
-
-          <div className={styles.headerActions}>
-            <button
-              className={styles.themeToggle}
-              onClick={toggleDarkMode}
-              title={
-                isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
-              }
-            >
-              {isDarkMode ? "☀️" : "🌙"}
-            </button>
-
-            <button
-              className={styles.ownerButton}
-              onClick={() => navigateToAuth("register", "salon")}
-            >
-              Register as Owner
-            </button>
-
-            <button
-              className={styles.loginButton}
-              onClick={() => navigateToAuth("login", "salon")}
-            >
-              Login
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Welcome Section */}
-      <motion.section
-        className={styles.welcomeSection}
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-      >
-        <div className={styles.welcomeContent}>
-          <h2 className={styles.welcomeTitle}>
-            Welcome back,{" "}
-            <span className={styles.goldText}>{userOnboarding?.name}</span>! 👋
-          </h2>
-          <p className={styles.welcomeSubtitle}>
-            Discover luxury salon experiences near{" "}
-            {userOnboarding?.location?.address || "you"}
-          </p>
-        </div>
-
-        <div className={styles.quickStats}>
-          <div className={styles.stat}>
-            <span className={styles.statNumber}>{nearbySalons.length}</span>
-            <span className={styles.statLabel}>Nearby Salons</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statNumber}>
-              {nearbySalons.reduce(
-                (total, salon) => total + (salon.topServices?.length || 0),
-                0
-              )}
-            </span>
-            <span className={styles.statLabel}>Available Services</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statNumber}>
-              {nearbySalons.reduce(
-                (total, salon) => total + (salon.stats?.totalBookings || 0),
-                0
-              )}
-            </span>
-            <span className={styles.statLabel}>Happy Bookings</span>
-          </div>
-        </div>
-      </motion.section>
-
-      {/* Search Section */}
-      <motion.section
-        className={styles.searchSection}
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.2 }}
-      >
-        <div className={styles.searchContainer}>
-          <div className={styles.searchBox}>
-            <input
-              type="text"
-              placeholder="Search for services or salons..."
-              className={styles.searchInput}
-            />
-            <button className={styles.searchButton}>🔍</button>
-          </div>
-
-          <div className={styles.quickFilters}>
-            <button className={styles.filterChip}>💇 Haircut</button>
-            <button className={styles.filterChip}>🧔 Beard Trim</button>
-            <button className={styles.filterChip}>💅 Manicure</button>
-            <button className={styles.filterChip}>✨ Facial</button>
-          </div>
-        </div>
-      </motion.section>
-
-      {/* Popular Services for Gender */}
-      <motion.section
-        className={styles.servicesSection}
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.4 }}
-      >
-        <h3 className={styles.sectionTitle}>
-          Popular Services for {userOnboarding?.gender}s
-        </h3>
-
-        <div className={styles.servicesGrid}>
-          {getGenderBasedServices(userOnboarding?.gender).map(
-            (service, index) => (
-              <motion.div
-                key={service.name}
-                className={styles.serviceCard}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.1 * index }}
-              >
-                <div className={styles.serviceIcon}>{service.icon}</div>
-                <h4 className={styles.serviceName}>{service.name}</h4>
-                <p className={styles.servicePrice}>₹{service.price}</p>
-                <p className={styles.serviceDuration}>{service.duration} min</p>
-              </motion.div>
-            )
-          )}
-        </div>
-      </motion.section>
-
-      {/* Nearby Salons - Dynamic */}
-      <motion.section
-        className={styles.salonsSection}
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.6 }}
-      >
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Nearby Luxury Salons</h3>
-          <div className={styles.viewOptions}>
-            <button
-              className={`${styles.viewToggle} ${
-                !showMapView ? styles.active : ""
-              }`}
-              onClick={() => setShowMapView(false)}
-            >
-              Grid View
-            </button>
-            <button
-              className={`${styles.viewToggle} ${
-                showMapView ? styles.active : ""
-              }`}
-              onClick={() => setShowMapView(true)}
-            >
-              Map View
-            </button>
-          </div>
-        </div>
-
-        {isLoadingSalons ? (
-          <div className={styles.loadingSalons}>
-            <div className={styles.spinner}></div>
-            <p>Finding salons near you...</p>
-          </div>
-        ) : nearbySalons.length > 0 ? (
-          showMapView ? (
-            <SalonMap
-              salons={nearbySalons}
-              userLocation={{
-                lat: userOnboarding?.location?.latitude,
-                lng: userOnboarding?.location?.longitude,
-              }}
-              selectedSalon={selectedSalon}
-              onSalonSelect={setSelectedSalon}
-              onBookNow={handleSalonCardClick}
-              userGender={userOnboarding?.gender}
-            />
-          ) : (
-            <div className={styles.salonsCarousel}>
-              {nearbySalons.map((salon, index) => {
-                return (
-                  <motion.div
-                    key={salon._id?.$oid || salon._id?.toString() || index}
-                    className={styles.salonCard}
-                    initial={{ opacity: 0, x: 50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.6, delay: 0.1 * index }}
-                    whileHover={{ y: -8 }}
-                    onClick={() =>
-                      handleSalonCardClick(salon._id?.$oid || salon._id)
-                    }
-                  >
-                    <div className={styles.salonImage}>
-                      <img
-                        src={
-                          typeof salon.salonImages?.[0] === "string"
-                            ? salon.salonImages[0]
-                            : salon.salonImages?.[0]?.url ||
-                              "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&h=200&fit=crop"
-                        }
-                        alt={salon.salonName || "Salon image"}
-                        width={300}
-                        height={200}
-                        style={{ objectFit: "cover" }}
-                      />
-
-                      <div className={styles.salonBadge}>
-                        {salon.distance < 2
-                          ? "Very Close"
-                          : salon.isVerified
-                          ? "Verified"
-                          : "Popular"}
-                      </div>
-                      <div className={styles.distanceBadge}>
-                        {salon.distance}km away
-                      </div>
-                    </div>
-                    <div className={styles.salonInfo}>
-                      <h4 className={styles.salonName}>{salon.salonName}</h4>
-                      <p className={styles.salonLocation}>
-                        {salon.location.address}
-                      </p>
-
-                      <div className={styles.salonStats}>
-                        <div className={styles.rating}>
-                          ⭐{" "}
-                          {(
-                            salon.ratings?.overall ??
-                            salon.rating ??
-                            0
-                          ).toFixed(1)}
-                        </div>
-                        <div className={styles.bookings}>
-                          {salon.stats.totalBookings} bookings
-                        </div>
-                      </div>
-
-                      <div className={styles.salonServices}>
-                        {salon.topServices?.map((service, idx) => (
-                          <span key={idx} className={styles.serviceTag}>
-                            {String(service?.name)} ₹{String(service?.price)}
-                          </span>
-                        ))}
-                      </div>
-
-                      <button
-                        className={styles.bookButton}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSalonCardClick(salon._id);
-                        }}
-                      >
-                        Book Now
-                      </button>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )
-        ) : (
-          <div className={styles.noSalons}>
-            <p>
-              No salons found near your location. Try expanding the search
-              radius or register a salon in your area!
-            </p>
-            <button
-              className={styles.registerSalonButton}
-              onClick={() => navigateToAuth("register", "salon")}
-            >
-              Register Your Salon
-            </button>
-          </div>
-        )}
-      </motion.section>
-
-      {/* Footer */}
-      <footer className={styles.footer}>
-        <div className={styles.footerContent}>
-          <div className={styles.footerSection}>
-            <h4>LuxeSalon</h4>
-            <p>Premium salon booking experience</p>
-          </div>
-
-          <div className={styles.footerSection}>
-            <h5>Quick Links</h5>
-            <ul>
-              <li>
-                <a href="#about">About</a>
-              </li>
-              <li>
-                <a href="#services">Services</a>
-              </li>
-              <li>
-                <a href="#contact">Contact</a>
-              </li>
-            </ul>
-          </div>
-
-          <div className={styles.footerSection}>
-            <h5>For Business</h5>
-            <ul>
-              <li>
-                <a href="#register-salon">Register Your Salon</a>
-              </li>
-              <li>
-                <a href="#partner">Partner with Us</a>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div className={styles.footerBottom}>
-          <p>&copy; 2025 LuxeSalon. All rights reserved.</p>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function getGenderBasedServices(gender) {
-  const maleServices = [
-    { name: "Haircut", price: 200, duration: 30, icon: "✂️" },
-    { name: "Beard Trim", price: 150, duration: 20, icon: "🧔" },
-    { name: "Hair Styling", price: 250, duration: 25, icon: "💇‍♂️" },
-    { name: "Face Cleanup", price: 300, duration: 45, icon: "🧴" },
-  ];
-
-  const femaleServices = [
-    { name: "Haircut & Style", price: 400, duration: 60, icon: "💇‍♀️" },
-    { name: "Hair Coloring", price: 800, duration: 120, icon: "🎨" },
-    { name: "Facial Treatment", price: 600, duration: 75, icon: "✨" },
-    { name: "Manicure", price: 350, duration: 45, icon: "💅" },
-  ];
-
-  const otherServices = [
-    { name: "Hair Treatment", price: 500, duration: 60, icon: "🌿" },
-    { name: "Scalp Massage", price: 300, duration: 30, icon: "💆" },
-    { name: "Hair Wash", price: 150, duration: 20, icon: "🚿" },
-    { name: "Styling", price: 350, duration: 40, icon: "💫" },
-  ];
-
-  switch (gender) {
-    case "Male":
-      return maleServices;
-    case "Female":
-      return femaleServices;
-    default:
-      return otherServices;
   }
 }
 </file>
@@ -11535,6 +11366,805 @@ export default function BookingPage() {
       </div>
     </Layout>
   );
+}
+</file>
+
+<file path="src/styles/Home.module.css">
+.container {
+  min-height: 100vh;
+  background: linear-gradient(
+    135deg,
+    var(--background-primary) 0%,
+    var(--background-secondary) 100%
+  );
+}
+
+.loadingContainer {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top: 4px solid var(--gold-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Header */
+.header {
+  background: var(--background-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 16px 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+.headerContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.goldText {
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.themeToggle {
+  padding: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 20px;
+  transition: all 0.3s ease;
+}
+
+.themeToggle:hover {
+  background: var(--background-secondary);
+}
+
+.ownerButton {
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--gold-primary);
+  border: 2px solid var(--gold-primary);
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.ownerButton:hover {
+  background: var(--gold-primary);
+  color: var(--contrast-dark);
+}
+
+.loginButton {
+  padding: 10px 20px;
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  color: var(--contrast-dark);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.loginButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
+}
+
+/* Welcome Section */
+.welcomeSection {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 20px 40px;
+  text-align: center;
+}
+
+.welcomeContent {
+  margin-bottom: 40px;
+}
+
+.welcomeTitle {
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.welcomeSubtitle {
+  font-size: 18px;
+  color: var(--text-secondary);
+  margin-bottom: 0;
+}
+
+.quickStats {
+  display: flex;
+  justify-content: center;
+  gap: 60px;
+  margin-top: 40px;
+}
+
+.stat {
+  text-align: center;
+}
+
+.statNumber {
+  display: block;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gold-primary);
+  margin-bottom: 4px;
+}
+
+.statLabel {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Search Section */
+.searchSection {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+}
+
+.searchContainer {
+  text-align: center;
+}
+
+.searchBox {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 16px 60px 16px 20px;
+  border: 2px solid var(--border-color);
+  border-radius: 50px;
+  font-size: 16px;
+  background: var(--background-primary);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
+}
+
+.searchButton {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.3s ease;
+}
+
+.searchButton:hover {
+  transform: translateY(-50%) scale(1.05);
+}
+
+.quickFilters {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.filterChip {
+  padding: 8px 16px;
+  background: var(--background-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 25px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.filterChip:hover {
+  border-color: var(--gold-primary);
+  background: var(--gold-primary);
+  color: var(--contrast-dark);
+}
+
+/* Services Section */
+.servicesSection {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 20px;
+}
+
+.sectionTitle {
+  font-size: 32px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 40px;
+  color: var(--text-primary);
+}
+
+.servicesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+}
+
+.serviceCard {
+  background: var(--background-primary);
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.serviceCard:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  border-color: var(--gold-primary);
+}
+
+.serviceIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.serviceName {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.servicePrice {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gold-primary);
+  margin-bottom: 4px;
+}
+
+.serviceDuration {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.loginDropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.loginMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  z-index: 1000;
+  margin-top: 4px;
+}
+
+.loginMenu button {
+  width: 100%;
+  padding: 12px 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.loginMenu button:hover {
+  background-color: #f8f9fa;
+}
+
+.loginMenu button:first-child {
+  border-radius: 8px 8px 0 0;
+}
+
+.loginMenu button:last-child {
+  border-radius: 0 0 8px 8px;
+  border-bottom: none;
+}
+
+/* Add styles for the auth page */
+.demoInfo {
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.demoInfo h4 {
+  margin: 0 0 0.5rem 0;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.demoInfo p {
+  margin: 0.25rem 0;
+  font-size: 0.8rem;
+  color: #6c757d;
+  font-family: monospace;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  border: 1px solid #f5c6cb;
+}
+
+.divider {
+  text-align: center;
+  margin: 1rem 0;
+  position: relative;
+}
+
+.divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: #dee2e6;
+}
+
+.divider span {
+  background-color: white;
+  padding: 0 1rem;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* Salons Section */
+.salonsSection {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 20px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
+}
+.viewOptions {
+  display: flex;
+  gap: 8px;
+}
+
+.viewToggle {
+  padding: 8px 16px;
+  border: 2px solid #f59e0b;
+  background: transparent;
+  color: #f59e0b;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.viewToggle:hover {
+  background: #f59e0b;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.viewToggle.active {
+  background: #f59e0b;
+  color: white;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.mapLoading {
+  height: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(45deg, #f3f4f6, #e5e7eb);
+  border-radius: 20px;
+  font-size: 18px;
+  color: #6b7280;
+}
+.viewAllButton {
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--gold-primary);
+  border: 2px solid var(--gold-primary);
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.viewAllButton:hover {
+  background: var(--gold-primary);
+  color: var(--contrast-dark);
+}
+
+.salonsCarousel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 24px;
+}
+
+.salonCard {
+  background: var(--background-primary);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.salonCard:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border-color: var(--gold-primary);
+}
+
+.salonImage {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+}
+
+.salonImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.salonCard:hover .salonImage img {
+  transform: scale(1.05);
+}
+
+.salonBadge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  color: var(--contrast-dark);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.salonInfo {
+  padding: 20px;
+}
+
+.salonName {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.salonLocation {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.salonStats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.rating,
+.bookings {
+  font-size: 14px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rating {
+  color: var(--gold-primary);
+  font-weight: 600;
+}
+
+.salonServices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.serviceTag {
+  background: var(--background-secondary);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.bookButton {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  color: var(--contrast-dark);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.bookButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
+}
+
+/* Footer */
+.footer {
+  background: var(--contrast-dark);
+  color: var(--background-primary);
+  padding: 60px 0 20px;
+  margin-top: 80px;
+}
+
+.footerContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 40px;
+}
+
+.footerSection h4 {
+  color: var(--gold-primary);
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+
+.footerSection h5 {
+  color: var(--background-primary);
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.footerSection ul {
+  list-style: none;
+  padding: 0;
+}
+
+.footerSection ul li {
+  margin-bottom: 8px;
+}
+
+.footerSection ul li a {
+  color: var(--contrast-light);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.footerSection ul li a:hover {
+  color: var(--gold-primary);
+}
+
+.footerBottom {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  text-align: center;
+  border-top: 1px solid var(--contrast-medium);
+  margin-top: 40px;
+}
+
+.loadingSalons {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.loadingSalons p {
+  margin-top: 16px;
+  color: var(--text-secondary);
+}
+
+.noSalons {
+  text-align: center;
+  padding: 60px 20px;
+  background: var(--background-secondary);
+  border-radius: 16px;
+}
+
+.noSalons p {
+  color: var(--text-secondary);
+  font-size: 16px;
+  margin-bottom: 24px;
+}
+
+.registerSalonButton {
+  padding: 12px 24px;
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  color: var(--contrast-dark);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.registerSalonButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
+}
+
+.distanceBadge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .headerContent {
+    padding: 0 16px;
+  }
+
+  .headerActions {
+    gap: 8px;
+  }
+
+  .ownerButton,
+  .loginButton {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .welcomeTitle {
+    font-size: 32px;
+  }
+
+  .quickStats {
+    gap: 30px;
+  }
+
+  .statNumber {
+    font-size: 24px;
+  }
+
+  .servicesGrid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .serviceCard {
+    padding: 24px 16px;
+  }
+
+  .salonsCarousel {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .sectionHeader {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .footerContent {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    text-align: center;
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </file>
 
@@ -14362,6 +14992,804 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 </file>
 
+<file path="src/pages/feedback.js">
+// src/pages/feedback.js - Enhanced feedback with star ratings
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
+
+export default function FeedbackPage() {
+  const router = useRouter();
+  const { bookingId } = router.query;
+
+  const [bookings, setBooking] = useState(null);
+  const [ratings, setRatings] = useState({
+    serviceQuality: 0,
+    timing: 0,
+    barberPerformance: 0,
+    ambience: 0,
+    overall: 0,
+  });
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchBookingDetails = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setBooking(data.booking); // Fix: access booking from response
+      } else {
+        console.error("Failed to fetch booking:", response.status);
+      }
+    } catch (error) {
+      console.error("Error fetching booking:", error);
+    }
+  }, [bookingId]);
+
+  useEffect(() => {
+    if (bookingId) {
+      fetchBookingDetails();
+    }
+  }, [bookingId, fetchBookingDetails]);
+
+  // StarRating component - fixed version
+  const StarRating = ({ value, onChange, label, required = true }) => {
+    return (
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        <div className="flex space-x-1 items-center">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              onClick={() => onChange(star)}
+              className={`text-3xl transition-all duration-200 hover:scale-110 ${
+                star <= value
+                  ? "text-yellow-400 drop-shadow-sm"
+                  : "text-gray-300 hover:text-yellow-200"
+              }`}
+            >
+              {star <= value ? "⭐" : "☆"}
+            </button>
+          ))}
+          <div className="ml-3">
+            {value === 0 ? (
+              <span className="text-sm text-gray-400">Tap to rate</span>
+            ) : (
+              <span className="text-sm text-gray-600 font-medium">
+                {value}/5 {getRatingLabel(value)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Add rating labels
+  const getRatingLabel = (rating) => {
+    switch (rating) {
+      case 1:
+        return "Poor";
+      case 2:
+        return "Fair";
+      case 3:
+        return "Good";
+      case 4:
+        return "Very Good";
+      case 5:
+        return "Excellent";
+      default:
+        return "";
+    }
+  };
+
+  // Add validation before submission
+  const submitFeedback = async () => {
+    if (!bookingId) {
+      alert("Invalid booking ID");
+      return;
+    }
+
+    // Validate that all ratings are provided
+    const unratedFields = Object.entries(ratings)
+      .filter(([key, value]) => value === 0)
+      .map(([key]) => key.replace(/([A-Z])/g, " $1").toLowerCase());
+
+    if (unratedFields.length > 0) {
+      alert(`Please rate: ${unratedFields.join(", ")}`);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/bookings/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingId,
+          feedback: {
+            ratings,
+            comment,
+            submittedAt: new Date(),
+          },
+        }),
+      });
+
+      if (response.ok) {
+        alert("Thank you for your feedback!");
+
+        // Store booking data in localStorage for registration prefill
+        if (bookings) {
+          const prefillData = {
+            name: bookings.customerName,
+            phone: bookings.customerPhone,
+            lastbookings: {
+              salonId: bookings.salonId,
+              service: bookings.service,
+              date: bookings.date,
+              time: bookings.time,
+            },
+            timestamp: new Date().getTime(),
+          };
+
+          console.log("Storing prefill data:", prefillData);
+          localStorage.setItem("userPrefillData", JSON.stringify(prefillData));
+        }
+
+        router.push("/auth/user/register");
+      } else {
+        alert("Failed to submit feedback");
+      }
+    } catch (error) {
+      console.error("Feedback submission error:", error);
+      alert("Error submitting feedback");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!bookings) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p>Loading booking details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-2xl mx-auto px-4">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Rate Your Experience
+            </h1>
+            <p className="text-gray-600">
+              How was your visit to {bookings.salonName || "the salon"}?
+            </p>
+          </div>
+
+          {/* Booking Summary */}
+          <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold mb-2">Booking Summary</h3>
+            <p>
+              <strong>Service:</strong> {bookings.service}
+            </p>
+            {bookings.barber && (
+              <p>
+                <strong>Barber:</strong> {bookings.barber}
+              </p>
+            )}
+            <p>
+              <strong>Date:</strong> {bookings.date} at {bookings.time}
+            </p>
+            <p>
+              <strong>Amount:</strong> ₹{bookings.price}
+            </p>
+          </div>
+
+          {/* Rating Form */}
+          <div className="space-y-4">
+            <StarRating
+              label="Service Quality"
+              value={ratings.serviceQuality}
+              onChange={(value) =>
+                setRatings({ ...ratings, serviceQuality: value })
+              }
+            />
+
+            <StarRating
+              label="Timing/Punctuality"
+              value={ratings.timing}
+              onChange={(value) => setRatings({ ...ratings, timing: value })}
+            />
+
+            <StarRating
+              label="Barber Performance"
+              value={ratings.barberPerformance}
+              onChange={(value) =>
+                setRatings({ ...ratings, barberPerformance: value })
+              }
+            />
+
+            <StarRating
+              label="Salon Ambience / Cleanliness"
+              value={ratings.ambience}
+              onChange={(value) => setRatings({ ...ratings, ambience: value })}
+            />
+
+            <StarRating
+              label="Overall Experience"
+              value={ratings.overall}
+              onChange={(value) => setRatings({ ...ratings, overall: value })}
+            />
+
+            {/* Text Feedback */}
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Additional Comments (Optional)
+              </label>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Share your experience in detail..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows="4"
+              />
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <div className="mt-8 text-center">
+            <button
+              onClick={submitFeedback}
+              disabled={submitting}
+              className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {submitting ? "Submitting..." : "✅ Submit Feedback"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/pages/index.js">
+// pages/index.js
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
+import styles from "../styles/Home.module.css";
+import Image from "next/image";
+
+export default function Home() {
+  const router = useRouter();
+  const [userOnboarding, setUserOnboarding] = useState(null);
+  const [nearbySalons, setNearbySalons] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingSalons, setIsLoadingSalons] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showMapView, setShowMapView] = useState(false);
+  const [selectedSalon, setSelectedSalon] = useState(null);
+  const [showLoginMenu, setShowLoginMenu] = useState(false);
+
+  // Dynamic import for map component
+  const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
+    ssr: false,
+    loading: () => <div className={styles.mapLoading}>Loading map...</div>,
+  });
+
+  useEffect(() => {
+    // Check if user has completed onboarding
+    const hasOnboarded = localStorage.getItem("hasOnboarded");
+    const onboardingData = localStorage.getItem("userOnboardingData");
+
+    if (!hasOnboarded) {
+      router.push("/onboarding");
+      return;
+    }
+
+    if (onboardingData) {
+      const userData = JSON.parse(onboardingData);
+      setUserOnboarding(userData);
+
+      // Load nearby salons based on user location
+      if (
+        userData.location &&
+        userData.location.latitude &&
+        userData.location.longitude
+      ) {
+        loadNearbySalons(
+          userData.location.latitude,
+          userData.location.longitude,
+          userData.gender
+        );
+      }
+    }
+
+    // Check theme preference
+    const darkMode = localStorage.getItem("darkMode") === "true";
+    setIsDarkMode(darkMode);
+    if (darkMode) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+
+    setIsLoading(false);
+  }, [router]);
+
+  const loadNearbySalons = async (latitude, longitude, gender) => {
+    setIsLoadingSalons(true);
+    try {
+      console.log("Loading salons for coordinates:", latitude, longitude);
+
+      const response = await fetch(
+        `/api/salons/nearby?latitude=${latitude}&longitude=${longitude}&radius=40&gender=${gender}`
+      );
+
+      const data = await response.json();
+      console.log("Salon API response:", data);
+
+      if (response.ok) {
+        setNearbySalons(data.salons || []);
+        console.log("Set nearby salons:", data.salons?.length || 0);
+      } else {
+        console.error("Error loading salons:", data.message);
+        setNearbySalons([]);
+      }
+    } catch (error) {
+      console.error("Error loading salons:", error);
+      setNearbySalons([]);
+    } finally {
+      setIsLoadingSalons(false);
+    }
+  };
+
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    localStorage.setItem("darkMode", newMode.toString());
+
+    if (newMode) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+  };
+
+  const navigateToAuth = (type, role) => {
+    router.push(`/auth/${role}/${type}`);
+  };
+
+  const handleSalonCardClick = (salonId) => {
+    router.push(`/salons/${salonId}`);
+  };
+
+  if (isLoading) {
+    return (
+      <div className={styles.loadingContainer}>
+        <div className={styles.spinner}></div>
+        <p>Loading your personalized experience...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.container}>
+      {/* Header */}
+      <header className={styles.header}>
+        <div className={styles.headerContent}>
+          <motion.h1
+            className={styles.logo}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className={styles.goldText}>Luxe</span>Salon
+          </motion.h1>
+
+          <div className={styles.headerActions}>
+            <button
+              className={styles.themeToggle}
+              onClick={toggleDarkMode}
+              title={
+                isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
+              }
+            >
+              {isDarkMode ? "☀️" : "🌙"}
+            </button>
+            <button
+              className={styles.bookingButton}
+              onClick={() => {
+                // Check if user is logged in
+                const userToken = localStorage.getItem("userToken");
+                if (userToken) {
+                  router.push("/user/dashboard");
+                } else {
+                  alert("Please login first to view your bookings");
+                  router.push("/auth/user/login");
+                }
+              }}
+            >
+              Show Bookings
+            </button>
+            <button
+              className="dashboard-button"
+              onClick={() => router.push("/user/dashboard")}
+            >
+              Dashboard
+            </button>
+            <button
+              className={styles.ownerButton}
+              onClick={() => navigateToAuth("register", "salon")}
+            >
+              Register as Owner
+            </button>
+
+            <div className={styles.loginDropdown}>
+              <button
+                className={styles.loginButton}
+                onClick={() => setShowLoginMenu(!showLoginMenu)}
+              >
+                Login ▼
+              </button>
+              {showLoginMenu && (
+                <div className={styles.loginMenu}>
+                  <button
+                    onClick={() => {
+                      router.push("/auth/user/login");
+                      setShowLoginMenu(false);
+                    }}
+                  >
+                    👤 User Login
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigateToAuth("login", "salon");
+                      setShowLoginMenu(false);
+                    }}
+                  >
+                    🏪 Salon Login
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Welcome Section */}
+      <motion.section
+        className={styles.welcomeSection}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8 }}
+      >
+        <div className={styles.welcomeContent}>
+          <h2 className={styles.welcomeTitle}>
+            Welcome back,{" "}
+            <span className={styles.goldText}>{userOnboarding?.name}</span>! 👋
+          </h2>
+          <p className={styles.welcomeSubtitle}>
+            Discover luxury salon experiences near{" "}
+            {userOnboarding?.location?.address || "you"}
+          </p>
+        </div>
+
+        <div className={styles.quickStats}>
+          <div className={styles.stat}>
+            <span className={styles.statNumber}>{nearbySalons.length}</span>
+            <span className={styles.statLabel}>Nearby Salons</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statNumber}>
+              {nearbySalons.reduce(
+                (total, salon) => total + (salon.topServices?.length || 0),
+                0
+              )}
+            </span>
+            <span className={styles.statLabel}>Available Services</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statNumber}>
+              {nearbySalons.reduce(
+                (total, salon) => total + (salon.stats?.totalBookings || 0),
+                0
+              )}
+            </span>
+            <span className={styles.statLabel}>Happy Bookings</span>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* Search Section */}
+      <motion.section
+        className={styles.searchSection}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.2 }}
+      >
+        <div className={styles.searchContainer}>
+          <div className={styles.searchBox}>
+            <input
+              type="text"
+              placeholder="Search for services or salons..."
+              className={styles.searchInput}
+            />
+            <button className={styles.searchButton}>🔍</button>
+          </div>
+
+          <div className={styles.quickFilters}>
+            <button className={styles.filterChip}>💇 Haircut</button>
+            <button className={styles.filterChip}>🧔 Beard Trim</button>
+            <button className={styles.filterChip}>💅 Manicure</button>
+            <button className={styles.filterChip}>✨ Facial</button>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* Popular Services for Gender */}
+      <motion.section
+        className={styles.servicesSection}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.4 }}
+      >
+        <h3 className={styles.sectionTitle}>
+          Popular Services for {userOnboarding?.gender}s
+        </h3>
+
+        <div className={styles.servicesGrid}>
+          {getGenderBasedServices(userOnboarding?.gender).map(
+            (service, index) => (
+              <motion.div
+                key={service.name}
+                className={styles.serviceCard}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.1 * index }}
+              >
+                <div className={styles.serviceIcon}>{service.icon}</div>
+                <h4 className={styles.serviceName}>{service.name}</h4>
+                <p className={styles.servicePrice}>₹{service.price}</p>
+                <p className={styles.serviceDuration}>{service.duration} min</p>
+              </motion.div>
+            )
+          )}
+        </div>
+      </motion.section>
+
+      {/* Nearby Salons - Dynamic */}
+      <motion.section
+        className={styles.salonsSection}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.6 }}
+      >
+        <div className={styles.sectionHeader}>
+          <h3 className={styles.sectionTitle}>Nearby Luxury Salons</h3>
+          <div className={styles.viewOptions}>
+            <button
+              className={`${styles.viewToggle} ${
+                !showMapView ? styles.active : ""
+              }`}
+              onClick={() => setShowMapView(false)}
+            >
+              Grid View
+            </button>
+            <button
+              className={`${styles.viewToggle} ${
+                showMapView ? styles.active : ""
+              }`}
+              onClick={() => setShowMapView(true)}
+            >
+              Map View
+            </button>
+          </div>
+        </div>
+
+        {isLoadingSalons ? (
+          <div className={styles.loadingSalons}>
+            <div className={styles.spinner}></div>
+            <p>Finding salons near you...</p>
+          </div>
+        ) : nearbySalons.length > 0 ? (
+          showMapView ? (
+            <SalonMap
+              salons={nearbySalons}
+              userLocation={{
+                lat: userOnboarding?.location?.latitude,
+                lng: userOnboarding?.location?.longitude,
+              }}
+              selectedSalon={selectedSalon}
+              onSalonSelect={setSelectedSalon}
+              onBookNow={handleSalonCardClick}
+              userGender={userOnboarding?.gender}
+            />
+          ) : (
+            <div className={styles.salonsCarousel}>
+              {nearbySalons.map((salon, index) => {
+                return (
+                  <motion.div
+                    key={salon._id?.$oid || salon._id?.toString() || index}
+                    className={styles.salonCard}
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.6, delay: 0.1 * index }}
+                    whileHover={{ y: -8 }}
+                    onClick={() =>
+                      handleSalonCardClick(salon._id?.$oid || salon._id)
+                    }
+                  >
+                    <div className={styles.salonImage}>
+                      <img
+                        src={
+                          typeof salon.salonImages?.[0] === "string"
+                            ? salon.salonImages[0]
+                            : salon.salonImages?.[0]?.url ||
+                              "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&h=200&fit=crop"
+                        }
+                        alt={salon.salonName || "Salon image"}
+                        width={300}
+                        height={200}
+                        style={{ objectFit: "cover" }}
+                      />
+
+                      <div className={styles.salonBadge}>
+                        {salon.distance < 2
+                          ? "Very Close"
+                          : salon.isVerified
+                          ? "Verified"
+                          : "Popular"}
+                      </div>
+                      <div className={styles.distanceBadge}>
+                        {salon.distance}km away
+                      </div>
+                    </div>
+                    <div className={styles.salonInfo}>
+                      <h4 className={styles.salonName}>{salon.salonName}</h4>
+                      <p className={styles.salonLocation}>
+                        {salon.location.address}
+                      </p>
+
+                      <div className={styles.salonStats}>
+                        <div className={styles.rating}>
+                          ⭐{" "}
+                          {(
+                            salon.ratings?.overall ??
+                            salon.rating ??
+                            0
+                          ).toFixed(1)}
+                        </div>
+                        <div className={styles.bookings}>
+                          {salon.stats.totalBookings} bookings
+                        </div>
+                      </div>
+
+                      <div className={styles.salonServices}>
+                        {salon.topServices?.map((service, idx) => (
+                          <span key={idx} className={styles.serviceTag}>
+                            {String(service?.name)} ₹{String(service?.price)}
+                          </span>
+                        ))}
+                      </div>
+
+                      <button
+                        className={styles.bookButton}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSalonCardClick(salon._id);
+                        }}
+                      >
+                        Book Now
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )
+        ) : (
+          <div className={styles.noSalons}>
+            <p>
+              No salons found near your location. Try expanding the search
+              radius or register a salon in your area!
+            </p>
+            <button
+              className={styles.registerSalonButton}
+              onClick={() => navigateToAuth("register", "salon")}
+            >
+              Register Your Salon
+            </button>
+          </div>
+        )}
+      </motion.section>
+
+      {/* Footer */}
+      <footer className={styles.footer}>
+        <div className={styles.footerContent}>
+          <div className={styles.footerSection}>
+            <h4>LuxeSalon</h4>
+            <p>Premium salon booking experience</p>
+          </div>
+
+          <div className={styles.footerSection}>
+            <h5>Quick Links</h5>
+            <ul>
+              <li>
+                <a href="#about">About</a>
+              </li>
+              <li>
+                <a href="#services">Services</a>
+              </li>
+              <li>
+                <a href="#contact">Contact</a>
+              </li>
+            </ul>
+          </div>
+
+          <div className={styles.footerSection}>
+            <h5>For Business</h5>
+            <ul>
+              <li>
+                <a href="#register-salon">Register Your Salon</a>
+              </li>
+              <li>
+                <a href="#partner">Partner with Us</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div className={styles.footerBottom}>
+          <p>&copy; 2025 LuxeSalon. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function getGenderBasedServices(gender) {
+  const maleServices = [
+    { name: "Haircut", price: 200, duration: 30, icon: "✂️" },
+    { name: "Beard Trim", price: 150, duration: 20, icon: "🧔" },
+    { name: "Hair Styling", price: 250, duration: 25, icon: "💇‍♂️" },
+    { name: "Face Cleanup", price: 300, duration: 45, icon: "🧴" },
+  ];
+
+  const femaleServices = [
+    { name: "Haircut & Style", price: 400, duration: 60, icon: "💇‍♀️" },
+    { name: "Hair Coloring", price: 800, duration: 120, icon: "🎨" },
+    { name: "Facial Treatment", price: 600, duration: 75, icon: "✨" },
+    { name: "Manicure", price: 350, duration: 45, icon: "💅" },
+  ];
+
+  const otherServices = [
+    { name: "Hair Treatment", price: 500, duration: 60, icon: "🌿" },
+    { name: "Scalp Massage", price: 300, duration: 30, icon: "💆" },
+    { name: "Hair Wash", price: 150, duration: 20, icon: "🚿" },
+    { name: "Styling", price: 350, duration: 40, icon: "💫" },
+  ];
+
+  switch (gender) {
+    case "Male":
+      return maleServices;
+    case "Female":
+      return femaleServices;
+    default:
+      return otherServices;
+  }
+}
+</file>
+
 <file path="src/pages/salons/[id].js">
 // pages/salons/[id].js
 import { useState, useEffect, useCallback } from "react";
@@ -15182,7 +16610,8 @@ export default function SalonDetail({ initialSalon }) {
                     );
                     // optionally navigate to confirmation page
                     router.push(
-                      "/booking/confirmed?id=" + (data.bookingId || data.id)
+                      "user/bookings/confirmed?id=" +
+                        (data.bookingId || data.id)
                     );
                   } catch (e) {
                     console.error(e);
@@ -15241,18 +16670,46 @@ export default function DashboardPage() {
   const [salon, setSalon] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // <-- control mobile sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState("today"); // New state for date filtering
 
-  const loadTodayBookings = useCallback(async (salonId) => {
+  const loadBookings = useCallback(async (salonId, filter = "today") => {
     try {
       setLoading(true);
       const now = new Date();
       const istOffset = 5.5 * 60 * 60 * 1000;
       const istDate = new Date(now.getTime() + istOffset);
-      const today = istDate.toISOString().split("T")[0];
+
+      let dateParam = "";
+
+      switch (filter) {
+        case "yesterday":
+          const yesterday = new Date(istDate);
+          yesterday.setDate(yesterday.getDate() - 1);
+          dateParam = `&date=${yesterday.toISOString().split("T")[0]}`;
+          break;
+        case "today":
+          dateParam = `&date=${istDate.toISOString().split("T")[0]}`;
+          break;
+        case "tomorrow":
+          const tomorrow = new Date(istDate);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          dateParam = `&date=${tomorrow.toISOString().split("T")[0]}`;
+          break;
+        case "fromTomorrow":
+          const fromTomorrow = new Date(istDate);
+          fromTomorrow.setDate(fromTomorrow.getDate() + 1);
+          dateParam = `&from=${fromTomorrow.toISOString().split("T")[0]}`;
+          break;
+        case "all":
+          dateParam = "";
+          break;
+        default:
+          dateParam = `&date=${istDate.toISOString().split("T")[0]}`;
+      }
 
       const response = await fetch(
-        `/api/salons/bookings?salonId=${salonId}&date=${today}`,
+        `/api/salons/bookings?salonId=${salonId}${dateParam}`,
         { cache: "no-store", headers: { "Content-Type": "application/json" } }
       );
 
@@ -15277,8 +16734,80 @@ export default function DashboardPage() {
     }
     const salonData = JSON.parse(salonSession);
     setSalon(salonData);
-    loadTodayBookings(salonData._id);
-  }, [router, router.isReady, loadTodayBookings]);
+    loadBookings(salonData._id, dateFilter);
+  }, [router, router.isReady, loadBookings, dateFilter]);
+
+  // Handle date filter change
+  const handleDateFilterChange = (newFilter) => {
+    setDateFilter(newFilter);
+    if (salon) {
+      loadBookings(salon._id, newFilter);
+    }
+  };
+
+  // Get display text for current filter
+  const getFilterDisplayText = () => {
+    switch (dateFilter) {
+      case "yesterday":
+        return "Yesterday's Bookings";
+      case "today":
+        return "Today's Bookings";
+      case "tomorrow":
+        return "Tomorrow's Bookings";
+      case "fromTomorrow":
+        return "Upcoming Bookings (From Tomorrow)";
+      case "all":
+        return "All Bookings";
+      default:
+        return "Today's Bookings";
+    }
+  };
+
+  // Get current date display
+  const getCurrentDateDisplay = () => {
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(now.getTime() + istOffset);
+
+    switch (dateFilter) {
+      case "yesterday":
+        const yesterday = new Date(istDate);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return yesterday.toLocaleDateString("en-IN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      case "today":
+        return istDate.toLocaleDateString("en-IN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      case "tomorrow":
+        const tomorrow = new Date(istDate);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toLocaleDateString("en-IN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      case "fromTomorrow":
+        return "From Tomorrow Onwards";
+      case "all":
+        return "All Time";
+      default:
+        return istDate.toLocaleDateString("en-IN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+    }
+  };
 
   const updateBookingStatus = async (bookingId, status) => {
     try {
@@ -15367,15 +16896,56 @@ export default function DashboardPage() {
               <p className="text-text-secondary">Owner: {salon?.ownerName}</p>
             </div>
 
+            {/* Date Filter Controls */}
+            <div className="card">
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <h2 className="text-lg font-semibold">Filter Bookings</h2>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "yesterday", label: "Yesterday", emoji: "⏮️" },
+                    { value: "today", label: "Today", emoji: "📅" },
+                    { value: "tomorrow", label: "Tomorrow", emoji: "⏭️" },
+                    {
+                      value: "fromTomorrow",
+                      label: "From Tomorrow",
+                      emoji: "🔜",
+                    },
+                    { value: "all", label: "All Bookings", emoji: "📊" },
+                  ].map((filter) => (
+                    <button
+                      key={filter.value}
+                      onClick={() => handleDateFilterChange(filter.value)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        dateFilter === filter.value
+                          ? "bg-primary text-white shadow-lg transform scale-105"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md"
+                      }`}
+                    >
+                      {filter.emoji} {filter.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* Bookings */}
             <div className="card">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">
-                  Today’s Bookings ({bookings.length})
-                </h2>
-                <span className="text-sm text-text-secondary">
-                  {getCurrentDate()}
-                </span>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-semibold mb-1">
+                    {getFilterDisplayText()} ({bookings.length})
+                  </h2>
+                  <span className="text-sm text-text-secondary">
+                    {getCurrentDateDisplay()}
+                  </span>
+                </div>
+                <button
+                  onClick={() => loadBookings(salon._id, dateFilter)}
+                  className="mt-2 sm:mt-0 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
+                  disabled={loading}
+                >
+                  🔄 {loading ? "Refreshing..." : "Refresh"}
+                </button>
               </div>
 
               {error && (
@@ -15385,7 +16955,27 @@ export default function DashboardPage() {
               )}
 
               {bookings.length === 0 ? (
-                <p className="text-text-secondary">No bookings today</p>
+                <div className="text-center py-8">
+                  <div className="text-6xl mb-4">📅</div>
+                  <p className="text-text-secondary text-lg">
+                    No bookings found for{" "}
+                    {dateFilter === "today"
+                      ? "today"
+                      : dateFilter === "yesterday"
+                      ? "yesterday"
+                      : dateFilter === "tomorrow"
+                      ? "tomorrow"
+                      : dateFilter === "fromTomorrow"
+                      ? "upcoming dates"
+                      : "selected period"}
+                  </p>
+                  <button
+                    onClick={() => handleDateFilterChange("all")}
+                    className="mt-3 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark transition-colors"
+                  >
+                    View All Bookings
+                  </button>
+                </div>
               ) : (
                 <div className="grid gap-4">
                   {bookings.map((b) => (

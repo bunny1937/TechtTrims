@@ -44,31 +44,18 @@ export default function SalonDetail({ initialSalon }) {
   const [regMobile, setRegMobile] = useState("");
   const [regEmail, setRegEmail] = useState("");
 
-  // In your [id].js file - ADD THIS CORRECTLY
   useEffect(() => {
+    // Only run once when component mounts
     if (typeof window !== "undefined") {
-      const interval = setInterval(() => {
-        // Your refresh logic here
-        console.log("Refreshing slots...");
-      }, 30000);
-
-      return () => {
-        if (typeof window !== "undefined") {
-          clearInterval(interval);
+      const stored = localStorage.getItem("userOnboardingData");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setUserInfo(parsed);
+          console.log("Loaded userInfo from localStorage:", parsed);
+        } catch (err) {
+          console.error("Failed to parse onboarding data:", err);
         }
-      };
-    }
-  }, []);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("userOnboardingData");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setUserInfo(parsed);
-        console.log("Loaded userInfo from onboarding:", parsed);
-      } catch (err) {
-        console.error("Failed to parse onboarding data:", err);
       }
     }
   }, []);
@@ -81,21 +68,34 @@ export default function SalonDetail({ initialSalon }) {
       selectedTime
     );
   }, [selectedServices, selectedTime]);
+
   useEffect(() => {
     if (selectedServices.length > 0 && salon?._id) {
       const fetchAvailableBarbers = async () => {
         try {
-          const serviceNames = selectedServices.map((s) => s.name);
-          console.log("Fetching barbers for services:", serviceNames);
+          // Use the first selected service name
+          const firstServiceName = selectedServices[0].name;
+          console.log("Fetching barbers for service:", firstServiceName);
 
-          // Fetch barbers who can perform the selected services
+          // Fetch barbers who can perform the selected service
           const res = await fetch(
-            `/api/salons/barbers/available?salonId=${salon._id}&service=${serviceNames[0]}`
+            `/api/salons/barbers/available?salonId=${
+              salon._id
+            }&service=${encodeURIComponent(firstServiceName)}`
           );
-          const barbers = await res.json();
 
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+
+          const barbers = await res.json();
           console.log("Available barbers:", barbers);
           setAvailableBarbers(barbers);
+
+          // If no barbers available, show a message but don't prevent booking
+          if (barbers.length === 0) {
+            console.warn("No barbers available for selected service");
+          }
         } catch (err) {
           console.error("Error fetching barbers:", err);
           setAvailableBarbers([]);
@@ -161,9 +161,8 @@ export default function SalonDetail({ initialSalon }) {
 
       return slots;
     },
-    [salon]
+    [salon, selectedDate]
   );
-
   useEffect(() => {
     if (!selectedDate) {
       setTimeSlots([]);
@@ -173,7 +172,6 @@ export default function SalonDetail({ initialSalon }) {
     const slots = computeTimeSlotsForDate(selectedDate);
     setTimeSlots(slots);
   }, [selectedDate, computeTimeSlotsForDate]);
-
   const getFilteredServices = () => {
     if (!salon) return [];
 
@@ -240,7 +238,8 @@ export default function SalonDetail({ initialSalon }) {
       return;
     }
 
-    if (!selectedBarber) {
+    // Allow booking even if no specific barber selected (salon can assign one)
+    if (availableBarbers.length > 0 && !selectedBarber) {
       alert("Please select a barber");
       return;
     }
@@ -254,19 +253,21 @@ export default function SalonDetail({ initialSalon }) {
       alert("Please select a time slot");
       return;
     }
+
     try {
-      console.log("Available variables:", {
-        selectedServices, // ← Use the PLURAL version
+      console.log("Booking with:", {
+        selectedServices,
         selectedSlot,
         selectedBarber,
         userInfo,
       });
-      const selectedBarberDetails = availableBarbers.find(
-        (b) => b._id === selectedBarber
-      );
 
-      // Since you have multiple services selected, you can:
-      // Option 1: Use all services
+      // Find selected barber details if one is selected
+      const selectedBarberDetails = selectedBarber
+        ? availableBarbers.find((b) => b._id === selectedBarber)
+        : null;
+
+      // Prepare booking data
       const allServices = selectedServices
         .map((service) => service.name)
         .join(", ");
@@ -275,23 +276,34 @@ export default function SalonDetail({ initialSalon }) {
         0
       );
 
-      // Option 2: Use just the first service
-      const firstService = selectedServices[0];
+      const getCurrentUserInfo = () => {
+        if (typeof window === "undefined") return null;
+        try {
+          const stored = localStorage.getItem("userOnboardingData");
+          return stored ? JSON.parse(stored) : null;
+        } catch {
+          return null;
+        }
+      };
+
+      const currentUserInfo = getCurrentUserInfo() || userInfo;
 
       const payload = {
         salonId: salon._id,
-        service: allServices, // or firstService.name
-        barber: selectedBarberDetails?.name || selectedBarber,
-        barberId: selectedBarber,
+        service: allServices,
+        barber:
+          selectedBarberDetails?.name || selectedBarber || "Any Available",
+        barberId: selectedBarber || null,
         date: selectedDate,
         time: selectedSlot,
-        price: totalPrice, // or firstService.price
-        customerName: userInfo?.name || "Anonymous",
-        customerPhone: userInfo?.phone || "",
-        user: userInfo,
+        price: totalPrice,
+        customerName: currentUserInfo?.name || "Anonymous",
+        customerPhone: currentUserInfo?.phone || "",
+        user: currentUserInfo,
+        userId: currentUserInfo?._id || null,
       };
 
-      console.log("Booking data to send:", payload);
+      console.log("Booking payload:", payload);
 
       const response = await fetch("/api/bookings/create", {
         method: "POST",
@@ -301,18 +313,16 @@ export default function SalonDetail({ initialSalon }) {
         body: JSON.stringify(payload),
       });
 
-      // FIX 1: Handle 409 conflict BEFORE checking response.ok
+      // Handle 409 conflict (slot already booked)
       if (response.status === 409) {
         const errorData = await response.json();
         alert(
           "⚠️ Sorry! This time slot was just booked by another customer. Please select a different time."
         );
-        // Refresh the page to show updated available slots
         window.location.reload();
-        return; // Exit early, don't continue
+        return;
       }
 
-      // FIX 2: Use 'response' instead of 'res'
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
@@ -320,16 +330,18 @@ export default function SalonDetail({ initialSalon }) {
         );
       }
 
-      const data = await response.json(); // ← FIX: 'response' not 'res'
-      console.log("✅ Booking confirmed with:", data);
+      const data = await response.json();
+      console.log("✅ Booking confirmed:", data);
 
       alert("✅ Booking confirmed successfully!");
+
+      // Reset form
       setSelectedServices([]);
       setSelectedBarber(null);
       setSelectedDate("");
       setSelectedSlot("");
 
-      // Redirect to booking confirmation page
+      // Redirect to confirmation page
       router.push(`/booking/confirmed?id=${data.bookingId || data._id}`);
     } catch (error) {
       console.error("❌ Booking error:", error);
@@ -534,7 +546,8 @@ export default function SalonDetail({ initialSalon }) {
       </motion.section>
 
       {/* Barber Selection Section */}
-      {selectedServices.length > 0 && availableBarbers.length > 0 && (
+
+      {selectedServices.length > 0 && (
         <motion.section
           className={styles.barbersSection}
           initial={{ opacity: 0, y: 30 }}
@@ -542,58 +555,74 @@ export default function SalonDetail({ initialSalon }) {
           transition={{ duration: 0.8, delay: 0.4 }}
         >
           <h3 className={styles.sectionTitle}>Choose Your Barber</h3>
-          <div className={styles.barbersGrid}>
-            {availableBarbers.map((barber, index) => (
-              <motion.div
-                key={barber._id || index}
-                className={`${styles.barberCard} ${
-                  selectedBarber === barber._id ? styles.selected : ""
-                }`}
-                onClick={() => setSelectedBarber(barber._id)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className={styles.barberImage}>
-                  {barber.photo ? (
-                    <img
-                      src={barber.photo}
-                      alt={barber.name}
-                      className={styles.barberPhoto}
-                    />
-                  ) : (
-                    <div className={styles.defaultBarberImage}>👨‍💼</div>
-                  )}
-                </div>
-                <h4 className={styles.barberName}>{barber.name}</h4>
-                <p className={styles.barberExperience}>
-                  {barber.experience} yrs experience
-                </p>
-                <div className={styles.barberRating}>
-                  <span className="text-yellow-500">⭐</span>
-                  <span>{barber.rating}/5</span>
-                  <span className="text-gray-500 ml-2">
-                    ({barber.totalBookings} bookings)
-                  </span>
-                </div>
-                <div className={styles.barberSkills}>
-                  {barber.skills.slice(0, 3).map((skill) => (
-                    <span key={skill} className={styles.skillChip}>
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-                {barber.bio && (
-                  <p className={styles.barberBio}>
-                    {barber.bio.length > 80
-                      ? `${barber.bio.substring(0, 80)}...`
-                      : barber.bio}
+
+          {availableBarbers.length > 0 ? (
+            <div className={styles.barbersGrid}>
+              {availableBarbers.map((barber, index) => (
+                <motion.div
+                  key={barber._id || index}
+                  className={`${styles.barberCard} ${
+                    selectedBarber === barber._id ? styles.selected : ""
+                  }`}
+                  onClick={() => setSelectedBarber(barber._id)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {/* Barber card content */}
+                  <div className={styles.barberImage}>
+                    {barber.photo ? (
+                      <img
+                        src={barber.photo}
+                        alt={barber.name}
+                        className={styles.barberPhoto}
+                      />
+                    ) : (
+                      <div className={styles.defaultBarberImage}>👨‍💼</div>
+                    )}
+                  </div>
+                  <h4 className={styles.barberName}>{barber.name}</h4>
+                  <p className={styles.barberExperience}>
+                    {barber.experience} yrs experience
                   </p>
-                )}
-              </motion.div>
-            ))}
-          </div>
+                  <div className={styles.barberRating}>
+                    <span>⭐</span>
+                    <span>{barber.rating}/5</span>
+                    <span className="text-gray-500 ml-2">
+                      ({barber.totalBookings} bookings)
+                    </span>
+                  </div>
+                  <div className={styles.barberSkills}>
+                    {barber.skills.slice(0, 3).map((skill) => (
+                      <span key={skill} className={styles.skillChip}>
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                  {barber.bio && (
+                    <p className={styles.barberBio}>
+                      {barber.bio.length > 80
+                        ? `${barber.bio.substring(0, 80)}...`
+                        : barber.bio}
+                    </p>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-blue-50 rounded-lg">
+              <h4 className="text-lg font-semibold text-blue-800 mb-2">
+                Salon Will Assign Best Available Barber
+              </h4>
+              <p className="text-blue-600">
+                No specialized barbers are currently available for the selected
+                services, but the salon will assign the best available barber
+                for your appointment.
+              </p>
+            </div>
+          )}
         </motion.section>
       )}
+
       {selectedServices.length > 0 && availableBarbers.length === 0 && (
         <motion.section
           className={styles.noBarbersSection}
@@ -688,17 +717,20 @@ export default function SalonDetail({ initialSalon }) {
       {/* Book Appointment Button */}
       <div className={styles.bookButtonContainer}>
         <button
-          onClick={() => {
-            console.log("Book Appointment clicked");
-            console.log("Selected Service:", selectedServices);
-            console.log("Selected Slot:", selectedTime);
-            console.log("Selected Barber:", selectedBarber);
-            console.log("User Details:", userInfo);
-            handleBooking();
-          }}
+          onClick={handleBooking}
           disabled={selectedServices.length === 0 || !selectedSlot}
+          className={`${styles.bookButton} ${
+            selectedServices.length === 0 || !selectedSlot
+              ? styles.disabled
+              : ""
+          }`}
         >
           Book Appointment
+          {availableBarbers.length === 0 && selectedServices.length > 0 && (
+            <small className={styles.buttonSubtext}>
+              (Salon will assign barber)
+            </small>
+          )}
         </button>
       </div>
 

@@ -167,7 +167,7 @@ export default function Onboarding() {
       <div className={styles.onboardingCard}>
         <div className={styles.header}>
           <h1 className={styles.title}>
-            Welcome to <span className={styles.goldText}>LuxeSalon</span>
+            Welcome to <span className={styles.goldText}>TechTrims</span>
           </h1>
           <p className={styles.subtitle}>
             Let&apos;s personalize your experience

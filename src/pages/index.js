@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import styles from "../styles/Home.module.css";
 import Image from "next/image";
+import { UserDataManager } from "../lib/userData";
 
 export default function Home() {
   const router = useRouter();
@@ -16,6 +17,10 @@ export default function Home() {
   const [showMapView, setShowMapView] = useState(false);
   const [selectedSalon, setSelectedSalon] = useState(null);
   const [showLoginMenu, setShowLoginMenu] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedService, setSelectedService] = useState("");
+  const [filteredSalons, setFilteredSalons] = useState([]);
 
   // Dynamic import for map component
   const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
@@ -24,42 +29,115 @@ export default function Home() {
   });
 
   useEffect(() => {
-    // Check if user has completed onboarding
-    const hasOnboarded = localStorage.getItem("hasOnboarded");
-    const onboardingData = localStorage.getItem("userOnboardingData");
+    const initializeUser = async () => {
+      if (typeof window === "undefined") return;
 
-    if (!hasOnboarded) {
-      router.push("/onboarding");
+      // Check if user has completed onboarding
+      if (!UserDataManager.hasOnboarded()) {
+        router.push("/onboarding");
+        return;
+      }
+
+      const userToken = localStorage.getItem("userToken");
+
+      if (userToken) {
+        // User is logged in - get API data and use hardcoded location for now
+        try {
+          const response = await fetch("/api/user/profile", {
+            headers: { Authorization: `Bearer ${userToken}` },
+          });
+
+          if (response.ok) {
+            const apiUserData = await response.json();
+
+            // Use API data with hardcoded location (temporary fix)
+            const userData = {
+              ...apiUserData,
+              location: {
+                latitude: 19.248192,
+                longitude: 73.157593,
+                address:
+                  "Shahad, Ambivali, Kalyan-Dombivli, Kalyan Taluka, Thane, Maharashtra, 410209, India",
+              },
+            };
+
+            setUserOnboarding(userData);
+
+            // Load salons with the location
+            loadNearbySalons(
+              userData.location.latitude,
+              userData.location.longitude,
+              userData.gender
+            );
+          }
+        } catch (error) {
+          console.error("Error loading user data:", error);
+        }
+      } else {
+        // User not logged in - check onboarding data
+        const onboardingData = localStorage.getItem("userOnboardingData");
+        if (onboardingData) {
+          try {
+            const userData = JSON.parse(onboardingData);
+            setUserOnboarding(userData);
+
+            if (userData.location?.latitude && userData.location?.longitude) {
+              loadNearbySalons(
+                userData.location.latitude,
+                userData.location.longitude,
+                userData.gender
+              );
+            }
+          } catch (error) {
+            console.error("Error parsing onboarding data:", error);
+          }
+        }
+      }
+
+      // Check theme preference
+      const darkMode = localStorage.getItem("darkMode") === "true";
+      setIsDarkMode(darkMode);
+      if (darkMode) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+
+      setIsLoading(false);
+    };
+
+    initializeUser();
+  }, [router]);
+  useEffect(() => {
+    if (!nearbySalons.length) {
+      setFilteredSalons([]);
       return;
     }
 
-    if (onboardingData) {
-      const userData = JSON.parse(onboardingData);
-      setUserOnboarding(userData);
+    let filtered = nearbySalons;
 
-      // Load nearby salons based on user location
-      if (
-        userData.location &&
-        userData.location.latitude &&
-        userData.location.longitude
-      ) {
-        loadNearbySalons(
-          userData.location.latitude,
-          userData.location.longitude,
-          userData.gender
-        );
-      }
+    // Filter by selected service
+    if (selectedService) {
+      filtered = filtered.filter((salon) =>
+        salon.topServices?.some((service) =>
+          service.name.toLowerCase().includes(selectedService.toLowerCase())
+        )
+      );
     }
 
-    // Check theme preference
-    const darkMode = localStorage.getItem("darkMode") === "true";
-    setIsDarkMode(darkMode);
-    if (darkMode) {
-      document.documentElement.setAttribute("data-theme", "dark");
+    // Filter by search term
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (salon) =>
+          salon.salonName.toLowerCase().includes(searchLower) ||
+          salon.location.address.toLowerCase().includes(searchLower) ||
+          salon.topServices?.some((service) =>
+            service.name.toLowerCase().includes(searchLower)
+          )
+      );
     }
 
-    setIsLoading(false);
-  }, [router]);
+    setFilteredSalons(filtered);
+  }, [nearbySalons, searchTerm, selectedService]);
 
   const loadNearbySalons = async (latitude, longitude, gender) => {
     setIsLoadingSalons(true);
@@ -111,407 +189,966 @@ export default function Home() {
   if (isLoading) {
     return (
       <div className={styles.loadingContainer}>
-        <div className={styles.spinner}></div>
-        <p>Loading your personalized experience...</p>
+        <div className={styles.luxurySpinner}>
+          <div className={styles.spinnerRing}></div>
+          <div className={styles.spinnerCore}></div>
+        </div>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className={styles.loadingText}
+        >
+          Crafting your luxury experience...
+        </motion.p>
       </div>
     );
   }
 
   return (
     <div className={styles.container}>
-      {/* Header */}
+      {/* Enhanced Header */}
       <header className={styles.header}>
         <div className={styles.headerContent}>
-          <motion.h1
-            className={styles.logo}
-            initial={{ opacity: 0, x: -20 }}
+          <motion.div
+            className={styles.logoContainer}
+            initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            <span className={styles.goldText}>Luxe</span>Salon
-          </motion.h1>
+            <div className={styles.logoIcon}>✨</div>
+            <h1 className={styles.logo}>
+              <span className={styles.goldText}>Tech</span>
+              <span className={styles.trimText}>Trims</span>
+            </h1>
+          </motion.div>
 
-          <div className={styles.headerActions}>
-            <button
-              className={styles.themeToggle}
-              onClick={toggleDarkMode}
-              title={
-                isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
-              }
-            >
-              {isDarkMode ? "☀️" : "🌙"}
-            </button>
-            <button
-              className={styles.bookingButton}
-              onClick={() => {
-                // Check if user is logged in
-                const userToken = localStorage.getItem("userToken");
-                if (userToken) {
-                  router.push("/user/dashboard");
-                } else {
-                  alert("Please login first to view your bookings");
-                  router.push("/auth/user/login");
+          {/* Desktop Navigation */}
+          <nav className={styles.desktopNav}>
+            <div className={styles.navLinks}>
+              <button className={styles.navLink}>Services</button>
+              <button className={styles.navLink}>Salons</button>
+              <button className={styles.navLink}>About</button>
+            </div>
+
+            <div className={styles.headerActions}>
+              <motion.button
+                className={styles.themeToggle}
+                onClick={toggleDarkMode}
+                whileHover={{ scale: 1.1, rotate: 15 }}
+                whileTap={{ scale: 0.95 }}
+                title={
+                  isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
                 }
-              }}
-            >
-              Show Bookings
-            </button>
-            <button
-              className="dashboard-button"
-              onClick={() => router.push("/user/dashboard")}
-            >
-              Dashboard
-            </button>
-            <button
-              className={styles.ownerButton}
-              onClick={() => navigateToAuth("register", "salon")}
-            >
-              Register as Owner
-            </button>
-
-            <div className={styles.loginDropdown}>
-              <button
-                className={styles.loginButton}
-                onClick={() => setShowLoginMenu(!showLoginMenu)}
               >
-                Login ▼
-              </button>
-              {showLoginMenu && (
-                <div className={styles.loginMenu}>
-                  <button
-                    onClick={() => {
-                      router.push("/auth/user/login");
-                      setShowLoginMenu(false);
-                    }}
-                  >
-                    👤 User Login
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigateToAuth("login", "salon");
-                      setShowLoginMenu(false);
-                    }}
-                  >
-                    🏪 Salon Login
-                  </button>
-                </div>
+                <span className={styles.themeIcon}>
+                  {isDarkMode ? "☀️" : "🌙"}
+                </span>
+              </motion.button>
+
+              {UserDataManager.isLoggedIn() && (
+                <motion.button
+                  className={`${styles.actionButton} ${styles.bookingButton}`}
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => router.push("/user/dashboard")}
+                >
+                  <span className={styles.buttonIcon}>📅</span>
+                  My Bookings
+                </motion.button>
               )}
+
+              <motion.button
+                className={`${styles.actionButton} ${styles.ownerButton}`}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigateToAuth("register", "salon")}
+              >
+                <span className={styles.buttonIcon}>🏪</span>
+                Register Salon
+              </motion.button>
+
+              <div className={styles.loginDropdown}>
+                <motion.button
+                  className={`${styles.actionButton} ${styles.loginButton}`}
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowLoginMenu(!showLoginMenu)}
+                >
+                  <span className={styles.buttonIcon}>👤</span>
+                  Login
+                  <span className={styles.dropdownArrow}>▼</span>
+                </motion.button>
+                {showLoginMenu && (
+                  <motion.div
+                    className={styles.loginMenu}
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <button
+                      onClick={() => {
+                        router.push("/auth/user/login");
+                        setShowLoginMenu(false);
+                      }}
+                    >
+                      👤 User Login
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigateToAuth("login", "salon");
+                        setShowLoginMenu(false);
+                      }}
+                    >
+                      🏪 Salon Login
+                    </button>
+                  </motion.div>
+                )}
+              </div>
+            </div>
+          </nav>
+
+          {/* Mobile Menu Button */}
+          <button
+            className={styles.mobileMenuButton}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            <span
+              className={`${styles.hamburgerLine} ${
+                isMobileMenuOpen ? styles.active : ""
+              }`}
+            ></span>
+            <span
+              className={`${styles.hamburgerLine} ${
+                isMobileMenuOpen ? styles.active : ""
+              }`}
+            ></span>
+            <span
+              className={`${styles.hamburgerLine} ${
+                isMobileMenuOpen ? styles.active : ""
+              }`}
+            ></span>
+          </button>
+
+          {/* Mobile Navigation */}
+          {isMobileMenuOpen && (
+            <motion.div
+              className={styles.mobileNav}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className={styles.mobileNavLinks}>
+                <button className={styles.mobileNavLink}>Services</button>
+                <button className={styles.mobileNavLink}>Salons</button>
+                <button className={styles.mobileNavLink}>About</button>
+                <div className={styles.mobileNavDivider}></div>
+                {UserDataManager.isLoggedIn() && (
+                  <button
+                    className={styles.mobileNavLink}
+                    onClick={() => {
+                      router.push("/user/dashboard");
+                      setIsMobileMenuOpen(false);
+                    }}
+                  >
+                    📅 My Bookings
+                  </button>
+                )}
+                <button
+                  className={styles.mobileNavLink}
+                  onClick={() => {
+                    router.push("/auth/user/login");
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  👤 User Login
+                </button>
+                <button
+                  className={styles.mobileNavLink}
+                  onClick={() => {
+                    navigateToAuth("login", "salon");
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  🏪 Salon Login
+                </button>
+                <button
+                  className={styles.mobileNavLink}
+                  onClick={() => {
+                    navigateToAuth("register", "salon");
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  🏪 Register Salon
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </header>
+      {/* Hero Section */}
+      <section className={styles.heroSection}>
+        <div className={styles.heroBackground}>
+          <div className={styles.heroPattern}></div>
+          <div className={styles.floatingElements}>
+            <div className={`${styles.floatingElement} ${styles.element1}`}>
+              ✨
+            </div>
+            <div className={`${styles.floatingElement} ${styles.element2}`}>
+              💎
+            </div>
+            <div className={`${styles.floatingElement} ${styles.element3}`}>
+              👑
+            </div>
+            <div className={`${styles.floatingElement} ${styles.element4}`}>
+              🌟
             </div>
           </div>
         </div>
-      </header>
 
-      {/* Welcome Section */}
-      <motion.section
-        className={styles.welcomeSection}
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-      >
-        <div className={styles.welcomeContent}>
-          <h2 className={styles.welcomeTitle}>
-            Welcome back,{" "}
-            <span className={styles.goldText}>{userOnboarding?.name}</span>! 👋
-          </h2>
-          <p className={styles.welcomeSubtitle}>
-            Discover luxury salon experiences near{" "}
-            {userOnboarding?.location?.address || "you"}
-          </p>
+        <div className={styles.heroContent}>
+          <div className={styles.heroLeft}>
+            <motion.div
+              className={styles.heroTextContainer}
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+            >
+              <motion.h1
+                className={styles.heroTitle}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1, delay: 0.2 }}
+              >
+                Welcome back,
+                <br />
+                <span className={styles.heroNameHighlight}>
+                  {userOnboarding?.name || "Guest"} ✨{" "}
+                </span>
+              </motion.h1>
+
+              <motion.p
+                className={styles.heroSubtitle}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1, delay: 0.4 }}
+              >
+                Discover luxury salon experiences and premium beauty services
+                near{" "}
+                <span className={styles.locationHighlight}>
+                  {userOnboarding?.location?.address || "you"}{" "}
+                </span>
+              </motion.p>
+
+              <motion.div
+                className={styles.heroStats}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1, delay: 0.6 }}
+              >
+                <div className={styles.heroStat}>
+                  <div className={styles.statIcon}>🏪</div>
+                  <div className={styles.statContent}>
+                    <span className={styles.statNumber}>
+                      {nearbySalons.length}
+                    </span>
+                    <span className={styles.statLabel}>Premium Salons</span>
+                  </div>
+                </div>
+                <div className={styles.heroStat}>
+                  <div className={styles.statIcon}>💆</div>
+                  <div className={styles.statContent}>
+                    <span className={styles.statNumber}>
+                      {nearbySalons.reduce(
+                        (total, salon) =>
+                          total + (salon.topServices?.length || 0),
+                        0
+                      )}
+                    </span>
+                    <span className={styles.statLabel}>Expert Services</span>
+                  </div>
+                </div>
+                <div className={styles.heroStat}>
+                  <div className={styles.statIcon}>⭐</div>
+                  <div className={styles.statContent}>
+                    <span className={styles.statNumber}>
+                      {nearbySalons.reduce(
+                        (total, salon) =>
+                          total + (salon.stats?.totalBookings || 0),
+                        0
+                      )}
+                    </span>
+                    <span className={styles.statLabel}>Happy Clients</span>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                className={styles.heroActions}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1, delay: 0.8 }}
+              >
+                <button className={`${styles.heroCta} ${styles.primary}`}>
+                  <span className={styles.ctaIcon}>🔍</span>
+                  Find Salons Near Me
+                </button>
+                <button className={`${styles.heroCta} ${styles.secondary}`}>
+                  <span className={styles.ctaIcon}>📅</span>
+                  Book Appointment
+                </button>
+              </motion.div>
+            </motion.div>
+          </div>
+
+          <div className={styles.heroRight}>
+            <motion.div
+              className={styles.heroVisuals}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 1, delay: 0.3 }}
+            >
+              <div className={styles.visualsContainer}>
+                <div className={styles.mainImage}>
+                  <img
+                    src="https://images.unsplash.com/photo-1560066984-138dadb4c035?w=600&h=400&fit=crop&crop=face"
+                    alt="Luxury salon interior"
+                    className={styles.heroImage}
+                  />
+                  <div className={styles.imageGradient}></div>
+                </div>
+
+                <div className={styles.floatingCards}>
+                  <motion.div
+                    className={`${styles.floatingCard} ${styles.card1}`}
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                  >
+                    <div className={styles.cardIcon}>💇‍♀️</div>
+                    <div className={styles.cardText}>
+                      <span className={styles.cardTitle}>Hair Styling</span>
+                      <span className={styles.cardPrice}>from ₹299</span>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    className={`${styles.floatingCard} ${styles.card2}`}
+                    animate={{ y: [0, 10, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, delay: 1 }}
+                  >
+                    <div className={styles.cardIcon}>✨</div>
+                    <div className={styles.cardText}>
+                      <span className={styles.cardTitle}>Facial Treatment</span>
+                      <span className={styles.cardPrice}>from ₹599</span>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    className={`${styles.floatingCard} ${styles.card3}`}
+                    animate={{ y: [0, -8, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, delay: 2 }}
+                  >
+                    <div className={styles.cardIcon}>💅</div>
+                    <div className={styles.cardText}>
+                      <span className={styles.cardTitle}>Manicure</span>
+                      <span className={styles.cardPrice}>from ₹399</span>
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* Decorative Elements */}
+                <div className={styles.decorativeShapes}>
+                  <div className={`${styles.shape} ${styles.shape1}`}></div>
+                  <div className={`${styles.shape} ${styles.shape2}`}></div>
+                  <div className={`${styles.shape} ${styles.shape3}`}></div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </div>
-
-        <div className={styles.quickStats}>
-          <div className={styles.stat}>
-            <span className={styles.statNumber}>{nearbySalons.length}</span>
-            <span className={styles.statLabel}>Nearby Salons</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statNumber}>
-              {nearbySalons.reduce(
-                (total, salon) => total + (salon.topServices?.length || 0),
-                0
-              )}
-            </span>
-            <span className={styles.statLabel}>Available Services</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statNumber}>
-              {nearbySalons.reduce(
-                (total, salon) => total + (salon.stats?.totalBookings || 0),
-                0
-              )}
-            </span>
-            <span className={styles.statLabel}>Happy Bookings</span>
-          </div>
-        </div>
-      </motion.section>
-
-      {/* Search Section */}
+      </section>
+      {/* Enhanced Search Section */}
       <motion.section
         className={styles.searchSection}
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.2 }}
       >
         <div className={styles.searchContainer}>
-          <div className={styles.searchBox}>
-            <input
-              type="text"
-              placeholder="Search for services or salons..."
-              className={styles.searchInput}
-            />
-            <button className={styles.searchButton}>🔍</button>
-          </div>
+          <motion.div
+            className={styles.searchBox}
+            whileHover={{ scale: 1.02 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            <div className={styles.searchInputWrapper}>
+              <span className={styles.searchIcon}>🔍</span>
+              <input
+                type="text"
+                placeholder="Search for services, salons, or treatments..."
+                className={styles.searchInput}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <motion.button
+                className={styles.searchButton}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Search
+              </motion.button>
+            </div>
+          </motion.div>
 
           <div className={styles.quickFilters}>
-            <button className={styles.filterChip}>💇 Haircut</button>
-            <button className={styles.filterChip}>🧔 Beard Trim</button>
-            <button className={styles.filterChip}>💅 Manicure</button>
-            <button className={styles.filterChip}>✨ Facial</button>
+            <span className={styles.filtersLabel}>Popular:</span>
+            {[
+              { icon: "💇", label: "Haircut", color: "#FF6B6B" },
+              { icon: "🧔", label: "Beard Trim", color: "#4ECDC4" },
+              { icon: "💅", label: "Manicure", color: "#45B7D1" },
+              { icon: "✨", label: "Facial", color: "#96CEB4" },
+              { icon: "🎨", label: "Hair Color", color: "#FECA57" },
+              { icon: "💆", label: "Massage", color: "#FF9FF3" },
+            ].map((filter, index) => (
+              <motion.button
+                key={filter.label}
+                className={`${styles.filterChip} ${
+                  selectedService === filter.label ? styles.activeFilter : ""
+                }`}
+                style={{ "--filter-color": filter.color }}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 * index }}
+                onClick={() => {
+                  if (selectedService === filter.label) {
+                    setSelectedService(""); // Deselect if already selected
+                  } else {
+                    setSelectedService(filter.label);
+                  }
+                }}
+              >
+                <span className={styles.filterIcon}>{filter.icon}</span>
+                {filter.label}
+              </motion.button>
+            ))}
           </div>
         </div>
       </motion.section>
-
-      {/* Popular Services for Gender */}
-      <motion.section
+      {/* <motion.section
         className={styles.servicesSection}
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.4 }}
       >
-        <h3 className={styles.sectionTitle}>
-          Popular Services for {userOnboarding?.gender}s
-        </h3>
+        <div className={styles.sectionHeader}>
+          <div className={styles.sectionTitleContainer}>
+            <motion.h3
+              className={styles.sectionTitle}
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+            >
+              {userOnboarding
+                ? `Perfect for ${userOnboarding.gender || "Everyone"}`
+                : "Perfect Services for You"}
+            </motion.h3>
+            <motion.p
+              className={styles.sectionSubtitle}
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              Curated services designed just for you
+            </motion.p>
+          </div>
+        </div>
 
         <div className={styles.servicesGrid}>
-          {getGenderBasedServices(userOnboarding?.gender).map(
+          {getGenderBasedServices(userOnboarding?.gender || "Other").map(
             (service, index) => (
               <motion.div
                 key={service.name}
                 className={styles.serviceCard}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.1 * index }}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.1 * index }}
+                whileHover={{
+                  y: -8,
+                  scale: 1.02,
+                  transition: { type: "spring", stiffness: 300 },
+                }}
               >
+                <div className={styles.serviceCardBackground}></div>
                 <div className={styles.serviceIcon}>{service.icon}</div>
                 <h4 className={styles.serviceName}>{service.name}</h4>
-                <p className={styles.servicePrice}>₹{service.price}</p>
-                <p className={styles.serviceDuration}>{service.duration} min</p>
+                <div className={styles.serviceDetails}>
+                  <p className={styles.servicePrice}>₹{service.price}</p>
+                  <p className={styles.serviceDuration}>
+                    ⏱ {service.duration} min
+                  </p>
+                </div>
+                <motion.button
+                  className={styles.serviceBookButton}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Book Now
+                </motion.button>
               </motion.div>
             )
           )}
         </div>
       </motion.section>
-
-      {/* Nearby Salons - Dynamic */}
+      ; */}
       <motion.section
         className={styles.salonsSection}
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.6 }}
       >
         <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Nearby Luxury Salons</h3>
+          <div className={styles.sectionTitleContainer}>
+            <h3 className={styles.sectionTitle}>Premium Salons Near You</h3>
+            <p className={styles.sectionSubtitle}>
+              Handpicked luxury experiences in your area
+            </p>
+          </div>
           <div className={styles.viewOptions}>
-            <button
+            <motion.button
               className={`${styles.viewToggle} ${
                 !showMapView ? styles.active : ""
               }`}
               onClick={() => setShowMapView(false)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
             >
+              <span className={styles.viewIcon}>🏗</span>
               Grid View
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               className={`${styles.viewToggle} ${
                 showMapView ? styles.active : ""
               }`}
               onClick={() => setShowMapView(true)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
             >
+              <span className={styles.viewIcon}>🗺</span>
               Map View
-            </button>
+            </motion.button>
           </div>
         </div>
 
         {isLoadingSalons ? (
           <div className={styles.loadingSalons}>
-            <div className={styles.spinner}></div>
-            <p>Finding salons near you...</p>
+            <div className={styles.luxurySpinner}>
+              <div className={styles.spinnerRing}></div>
+              <div className={styles.spinnerCore}></div>
+            </div>
+            <p>Discovering premium salons near you...</p>
           </div>
         ) : nearbySalons.length > 0 ? (
           showMapView ? (
-            <SalonMap
-              salons={nearbySalons}
-              userLocation={{
-                lat: userOnboarding?.location?.latitude,
-                lng: userOnboarding?.location?.longitude,
-              }}
-              selectedSalon={selectedSalon}
-              onSalonSelect={setSelectedSalon}
-              onBookNow={handleSalonCardClick}
-              userGender={userOnboarding?.gender}
-            />
+            <div className={styles.mapContainer}>
+              <SalonMap
+                salons={nearbySalons}
+                userLocation={{
+                  lat: userOnboarding?.location?.latitude,
+                  lng: userOnboarding?.location?.longitude,
+                }}
+                selectedSalon={selectedSalon}
+                onSalonSelect={setSelectedSalon}
+                onBookNow={handleSalonCardClick}
+                userGender={userOnboarding?.gender}
+              />
+            </div>
           ) : (
-            <div className={styles.salonsCarousel}>
-              {nearbySalons.map((salon, index) => {
-                return (
-                  <motion.div
-                    key={salon._id?.$oid || salon._id?.toString() || index}
-                    className={styles.salonCard}
-                    initial={{ opacity: 0, x: 50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.6, delay: 0.1 * index }}
-                    whileHover={{ y: -8 }}
-                    onClick={() =>
-                      handleSalonCardClick(salon._id?.$oid || salon._id)
-                    }
-                  >
-                    <div className={styles.salonImage}>
-                      <img
-                        src={
-                          typeof salon.salonImages?.[0] === "string"
-                            ? salon.salonImages[0]
-                            : salon.salonImages?.[0]?.url ||
-                              "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&h=200&fit=crop"
-                        }
-                        alt={salon.salonName || "Salon image"}
-                        width={300}
-                        height={200}
-                        style={{ objectFit: "cover" }}
-                      />
+            <div className={styles.salonsGrid}>
+              {(filteredSalons.length > 0 ? filteredSalons : nearbySalons).map(
+                (salon, index) => {
+                  return (
+                    <motion.div
+                      key={salon._id?.$oid || salon._id?.toString() || index}
+                      className={styles.salonCard}
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.6, delay: 0.1 * index }}
+                      whileHover={{
+                        y: -12,
+                        scale: 1.02,
+                        transition: { type: "spring", stiffness: 300 },
+                      }}
+                      onClick={() =>
+                        handleSalonCardClick(salon._id?.$oid || salon._id)
+                      }
+                    >
+                      <div className={styles.salonImageContainer}>
+                        <img
+                          src={
+                            typeof salon.salonImages?.[0] === "string"
+                              ? salon.salonImages[0]
+                              : salon.salonImages?.[0]?.url ||
+                                "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&h=200&fit=crop"
+                          }
+                          alt={salon.salonName || "Salon image"}
+                          className={styles.salonImage}
+                        />
+                        <div className={styles.salonImageOverlay}></div>
 
-                      <div className={styles.salonBadge}>
-                        {salon.distance < 2
-                          ? "Very Close"
-                          : salon.isVerified
-                          ? "Verified"
-                          : "Popular"}
-                      </div>
-                      <div className={styles.distanceBadge}>
-                        {salon.distance}km away
-                      </div>
-                    </div>
-                    <div className={styles.salonInfo}>
-                      <h4 className={styles.salonName}>{salon.salonName}</h4>
-                      <p className={styles.salonLocation}>
-                        {salon.location.address}
-                      </p>
-
-                      <div className={styles.salonStats}>
-                        <div className={styles.rating}>
-                          ⭐{" "}
-                          {(
-                            salon.ratings?.overall ??
-                            salon.rating ??
-                            0
-                          ).toFixed(1)}
-                        </div>
-                        <div className={styles.bookings}>
-                          {salon.stats.totalBookings} bookings
-                        </div>
-                      </div>
-
-                      <div className={styles.salonServices}>
-                        {salon.topServices?.map((service, idx) => (
-                          <span key={idx} className={styles.serviceTag}>
-                            {String(service?.name)} ₹{String(service?.price)}
+                        <div className={styles.salonBadges}>
+                          <span
+                            className={`${styles.salonBadge} ${styles.primaryBadge}`}
+                          >
+                            {salon.distance < 2
+                              ? "Very Close"
+                              : salon.isVerified
+                              ? "Verified"
+                              : "Popular"}
                           </span>
-                        ))}
+                          <span
+                            className={`${styles.salonBadge} ${styles.distanceBadge}`}
+                          >
+                            {salon.distance}km away
+                          </span>
+                        </div>
                       </div>
 
-                      <button
-                        className={styles.bookButton}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSalonCardClick(salon._id);
-                        }}
-                      >
-                        Book Now
-                      </button>
-                    </div>
-                  </motion.div>
-                );
-              })}
+                      <div className={styles.salonInfo}>
+                        <div className={styles.salonHeader}>
+                          <h4 className={styles.salonName}>
+                            {highlightText(salon.salonName, searchTerm)}
+                          </h4>{" "}
+                          <div className={styles.salonRating}>
+                            <span className={styles.ratingStars}>
+                              ⭐⭐⭐⭐⭐
+                            </span>
+                            <span className={styles.ratingNumber}>
+                              {(
+                                salon.ratings?.overall ??
+                                salon.rating ??
+                                4.5
+                              ).toFixed(1)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className={styles.salonLocation}>
+                          📍 {highlightText(salon.location.address, searchTerm)}
+                        </p>
+
+                        <div className={styles.salonMetrics}>
+                          <div className={styles.metric}>
+                            <span className={styles.metricIcon}>👥</span>
+                            <span className={styles.metricValue}>
+                              {salon.stats?.totalBookings || 0} bookings
+                            </span>
+                          </div>
+                          <div className={styles.metric}>
+                            <span className={styles.metricIcon}>⏰</span>
+                            <span className={styles.metricValue}>Open Now</span>
+                          </div>
+                        </div>
+
+                        <div className={styles.salonServices}>
+                          {salon.topServices
+                            ?.slice(0, 3)
+                            .map((service, idx) => {
+                              const isHighlighted =
+                                selectedService &&
+                                service.name
+                                  .toLowerCase()
+                                  .includes(selectedService.toLowerCase());
+                              return (
+                                <span
+                                  key={idx}
+                                  className={`${styles.serviceTag} ${
+                                    isHighlighted
+                                      ? styles.highlightedService
+                                      : ""
+                                  }`}
+                                >
+                                  {highlightText(
+                                    String(service?.name),
+                                    searchTerm
+                                  )}{" "}
+                                  <strong>₹{String(service?.price)}</strong>
+                                </span>
+                              );
+                            })}
+                        </div>
+
+                        <motion.button
+                          className={styles.salonBookButton}
+                          whileHover={{ scale: 1.02, y: -2 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSalonCardClick(salon._id);
+                          }}
+                        >
+                          <span className={styles.bookButtonIcon}>📅</span>
+                          Book Appointment
+                          <span className={styles.bookButtonArrow}>→</span>
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  );
+                }
+              )}
             </div>
           )
+        ) : searchTerm || selectedService ? (
+          <div className={styles.noSalons}>
+            <div className={styles.noSalonsIcon}>🔍</div>
+            <h4 className={styles.noSalonsTitle}>No Results Found</h4>
+            <p className={styles.noSalonsText}>
+              No salons found matching &quot;{searchTerm || selectedService}
+              &quot;. Try adjusting your search.
+            </p>
+            <motion.button
+              className={styles.registerSalonButton}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                setSearchTerm("");
+                setSelectedService("");
+              }}
+            >
+              <span className={styles.registerIcon}>🔄</span>
+              Clear Filters
+            </motion.button>
+          </div>
         ) : (
           <div className={styles.noSalons}>
-            <p>
-              No salons found near your location. Try expanding the search
-              radius or register a salon in your area!
+            <div className={styles.noSalonsIcon}>🏪</div>
+            <h4 className={styles.noSalonsTitle}>No Premium Salons Found</h4>
+            <p className={styles.noSalonsText}>
+              We couldn&#39;t find any salons in your area. Help us grow by
+              registering your salon!
             </p>
-            <button
+            <motion.button
               className={styles.registerSalonButton}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => navigateToAuth("register", "salon")}
             >
+              <span className={styles.registerIcon}>✨</span>
               Register Your Salon
-            </button>
+            </motion.button>
           </div>
         )}
       </motion.section>
-
-      {/* Footer */}
-      <footer className={styles.footer}>
-        <div className={styles.footerContent}>
-          <div className={styles.footerSection}>
-            <h4>LuxeSalon</h4>
-            <p>Premium salon booking experience</p>
-          </div>
-
-          <div className={styles.footerSection}>
-            <h5>Quick Links</h5>
-            <ul>
-              <li>
-                <a href="#about">About</a>
-              </li>
-              <li>
-                <a href="#services">Services</a>
-              </li>
-              <li>
-                <a href="#contact">Contact</a>
-              </li>
-            </ul>
-          </div>
-
-          <div className={styles.footerSection}>
-            <h5>For Business</h5>
-            <ul>
-              <li>
-                <a href="#register-salon">Register Your Salon</a>
-              </li>
-              <li>
-                <a href="#partner">Partner with Us</a>
-              </li>
-            </ul>
-          </div>
+      ;{/* Testimonials Section */}
+      <motion.section
+        className={styles.testimonialsSection}
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.8 }}
+      >
+        <div className={styles.sectionHeader}>
+          <h3 className={styles.sectionTitle}>What Our Clients Say</h3>
+          <p className={styles.sectionSubtitle}>
+            Real experiences from real people
+          </p>
         </div>
 
-        <div className={styles.footerBottom}>
-          <p>&copy; 2025 LuxeSalon. All rights reserved.</p>
+        <div className={styles.testimonialsGrid}>
+          {[
+            {
+              name: "Priya Sharma",
+              service: "Hair Styling & Color",
+              rating: 5,
+              text: "Absolutely amazing experience! The staff was professional and the results exceeded my expectations.",
+              image:
+                "https://images.unsplash.com/photo-1494790108755-2616b612b742?w=80&h=80&fit=crop&crop=face",
+            },
+            {
+              name: "Rajesh Kumar",
+              service: "Beard Styling",
+              rating: 5,
+              text: "Best grooming experience I've had in Mumbai. Clean, professional, and great attention to detail.",
+              image:
+                "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face",
+            },
+            {
+              name: "Anita Patel",
+              service: "Facial & Manicure",
+              rating: 5,
+              text: "Such a relaxing and luxurious experience. I feel completely refreshed and beautiful!",
+              image:
+                "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face",
+            },
+          ].map((testimonial, index) => (
+            <motion.div
+              key={testimonial.name}
+              className={styles.testimonialCard}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 * index }}
+              whileHover={{ y: -5, scale: 1.02 }}
+            >
+              <div className={styles.testimonialHeader}>
+                <img
+                  src={testimonial.image}
+                  alt={testimonial.name}
+                  className={styles.testimonialAvatar}
+                />
+                <div className={styles.testimonialMeta}>
+                  <h5 className={styles.testimonialName}>{testimonial.name}</h5>
+                  <p className={styles.testimonialService}>
+                    {testimonial.service}
+                  </p>
+                  <div className={styles.testimonialRating}>
+                    {"⭐".repeat(testimonial.rating)}
+                  </div>
+                </div>
+              </div>
+              <p className={styles.testimonialText}>
+                &quot;{testimonial.text}&quot;
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      </motion.section>
+      {/* Enhanced Footer */}
+      <footer className={styles.footer}>
+        <div className={styles.footerContent}>
+          <div className={styles.footerMain}>
+            <div className={styles.footerBrand}>
+              <div className={styles.footerLogo}>
+                <div className={styles.footerLogoIcon}>✨</div>
+                <h4>TechTrims</h4>
+              </div>
+              <p className={styles.footerTagline}>
+                Elevating beauty experiences through technology and luxury
+              </p>
+              <div className={styles.footerSocials}>
+                <button className={styles.socialButton}>📘</button>
+                <button className={styles.socialButton}>📸</button>
+                <button className={styles.socialButton}>🐦</button>
+                <button className={styles.socialButton}>💼</button>
+              </div>
+            </div>
+
+            <div className={styles.footerLinks}>
+              <div className={styles.footerColumn}>
+                <h5 className={styles.footerColumnTitle}>Services</h5>
+                <ul className={styles.footerList}>
+                  <li>
+                    <a href="#haircut">Hair Styling</a>
+                  </li>
+                  <li>
+                    <a href="#facial">Facial Treatments</a>
+                  </li>
+                  <li>
+                    <a href="#manicure">Nail Care</a>
+                  </li>
+                  <li>
+                    <a href="#massage">Spa & Massage</a>
+                  </li>
+                </ul>
+              </div>
+
+              <div className={styles.footerColumn}>
+                <h5 className={styles.footerColumnTitle}>For Business</h5>
+                <ul className={styles.footerList}>
+                  <li>
+                    <a href="#register">Register Your Salon</a>
+                  </li>
+                  <li>
+                    <a href="#partner">Partner with Us</a>
+                  </li>
+                  <li>
+                    <a href="#business">Business Solutions</a>
+                  </li>
+                  <li>
+                    <a href="#support">Business Support</a>
+                  </li>
+                </ul>
+              </div>
+
+              <div className={styles.footerColumn}>
+                <h5 className={styles.footerColumnTitle}>Support</h5>
+                <ul className={styles.footerList}>
+                  <li>
+                    <a href="#help">Help Center</a>
+                  </li>
+                  <li>
+                    <a href="#contact">Contact Us</a>
+                  </li>
+                  <li>
+                    <a href="#terms">Terms of Service</a>
+                  </li>
+                  <li>
+                    <a href="#privacy">Privacy Policy</a>
+                  </li>
+                </ul>
+              </div>
+
+              <div className={styles.footerColumn}>
+                <h5 className={styles.footerColumnTitle}>Connect</h5>
+                <div className={styles.footerContact}>
+                  <p>📞 +91 98765 43210</p>
+                  <p>✉️ hello@techtrims.com</p>
+                  <p>📍 Mumbai, Maharashtra</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.footerBottom}>
+            <div className={styles.footerBottomContent}>
+              <p>&copy; 2025 TechTrims. All rights reserved.</p>
+              <div className={styles.footerBadges}>
+                <span className={styles.footerBadge}>🔒 Secure</span>
+                <span className={styles.footerBadge}>⭐ Verified</span>
+                <span className={styles.footerBadge}>💎 Premium</span>
+              </div>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
   );
 }
 
+// Helper function to highlight search text
+function highlightText(text, highlight) {
+  if (!highlight) return text;
+
+  const regex = new RegExp(`(${highlight})`, "gi");
+  return text.split(regex).map((part, index) =>
+    regex.test(part) ? (
+      <mark key={index} style={{ background: "#ffd700", padding: "0 2px" }}>
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
 function getGenderBasedServices(gender) {
   const maleServices = [
-    { name: "Haircut", price: 200, duration: 30, icon: "✂️" },
-    { name: "Beard Trim", price: 150, duration: 20, icon: "🧔" },
-    { name: "Hair Styling", price: 250, duration: 25, icon: "💇‍♂️" },
-    { name: "Face Cleanup", price: 300, duration: 45, icon: "🧴" },
+    { name: "Premium Haircut", price: 299, duration: 45, icon: "✂️" },
+    { name: "Beard Styling", price: 199, duration: 30, icon: "🧔" },
+    { name: "Hair Styling", price: 349, duration: 35, icon: "💇‍♂️" },
+    { name: "Face Treatment", price: 449, duration: 60, icon: "🧴" },
   ];
 
   const femaleServices = [
-    { name: "Haircut & Style", price: 400, duration: 60, icon: "💇‍♀️" },
-    { name: "Hair Coloring", price: 800, duration: 120, icon: "🎨" },
-    { name: "Facial Treatment", price: 600, duration: 75, icon: "✨" },
-    { name: "Manicure", price: 350, duration: 45, icon: "💅" },
+    { name: "Hair Styling", price: 599, duration: 90, icon: "💇‍♀️" },
+    { name: "Hair Coloring", price: 1299, duration: 150, icon: "🎨" },
+    { name: "Facial Glow", price: 799, duration: 90, icon: "✨" },
+    { name: "Luxury Manicure", price: 499, duration: 60, icon: "💅" },
   ];
 
   const otherServices = [
-    { name: "Hair Treatment", price: 500, duration: 60, icon: "🌿" },
-    { name: "Scalp Massage", price: 300, duration: 30, icon: "💆" },
-    { name: "Hair Wash", price: 150, duration: 20, icon: "🚿" },
-    { name: "Styling", price: 350, duration: 40, icon: "💫" },
+    { name: "Hair Treatment", price: 699, duration: 75, icon: "🌿" },
+    { name: "Scalp Therapy", price: 449, duration: 45, icon: "💆" },
+    { name: "Hair Wash & Dry", price: 199, duration: 30, icon: "🚿" },
+    { name: "Style Consultation", price: 499, duration: 60, icon: "💫" },
   ];
 
   switch (gender) {
