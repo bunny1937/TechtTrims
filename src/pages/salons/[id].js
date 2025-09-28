@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import styles from "../../styles/SalonDetail.module.css";
 import Image from "next/image";
+import { UserDataManager } from "../../lib/userData";
 
 // Dynamic map import to avoid SSR issues
 const MapContainer = dynamic(
@@ -276,23 +277,13 @@ export default function SalonDetail({ initialSalon }) {
         0
       );
 
-      const getCurrentUserInfo = () => {
-        if (typeof window === "undefined") return null;
-        try {
-          const stored = localStorage.getItem("userOnboardingData");
-          return stored ? JSON.parse(stored) : null;
-        } catch {
-          return null;
-        }
-      };
-
-      const currentUserInfo = getCurrentUserInfo() || userInfo;
+      const currentUserInfo = UserDataManager.getStoredUserData();
+      const userToken = localStorage.getItem("userToken");
 
       const payload = {
         salonId: salon._id,
         service: allServices,
-        barber:
-          selectedBarberDetails?.name || selectedBarber || "Any Available",
+        barber: selectedBarberDetails?.name || "Any Available",
         barberId: selectedBarber || null,
         date: selectedDate,
         time: selectedSlot,
@@ -300,20 +291,20 @@ export default function SalonDetail({ initialSalon }) {
         customerName: currentUserInfo?.name || "Anonymous",
         customerPhone: currentUserInfo?.phone || "",
         user: currentUserInfo,
-        userId: currentUserInfo?._id || null,
+        userId: currentUserInfo?._id || currentUserInfo?.id || null,
       };
 
       console.log("Booking payload:", payload);
-
       const response = await fetch("/api/bookings/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(userToken && { Authorization: `Bearer ${userToken}` }),
         },
         body: JSON.stringify(payload),
       });
 
-      // Handle 409 conflict (slot already booked)
+      // Handle 409 conflict (slot already booked) first
       if (response.status === 409) {
         const errorData = await response.json();
         alert(
@@ -325,30 +316,51 @@ export default function SalonDetail({ initialSalon }) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(
-          errorData.error || `Booking failed: ${response.status}`
-        );
+        throw new Error(errorData.error || "Booking failed");
       }
 
-      const data = await response.json();
-      console.log("✅ Booking confirmed:", data);
+      const bookingResult = await response.json();
+      console.log("✅ Booking confirmed:", bookingResult);
+
+      // Preserve user info for feedback
+      UserDataManager.preserveUserInfoForBooking(payload);
 
       alert("✅ Booking confirmed successfully!");
 
-      // Reset form
-      setSelectedServices([]);
-      setSelectedBarber(null);
-      setSelectedDate("");
-      setSelectedSlot("");
+      if (!userToken && !currentUserInfo?._id) {
+        setRegName(payload.customerName);
+        setRegMobile(payload.customerPhone);
+        setShowRegistrationModal(true);
 
-      // Redirect to confirmation page
-      router.push(`/booking/confirmed?id=${data.bookingId || data._id}`);
+        // Reset form for anonymous users
+        setSelectedServices([]);
+        setSelectedBarber(null);
+        setSelectedDate("");
+        setSelectedSlot("");
+
+        // Redirect to feedback page for anonymous users
+        router.push(
+          `/feedback?bookingId=${bookingResult.bookingId || bookingResult._id}`
+        );
+      } else {
+        // Reset form for logged in users
+        setSelectedServices([]);
+        setSelectedBarber(null);
+        setSelectedDate("");
+        setSelectedSlot("");
+
+        // Redirect to confirmation page for logged in users
+        router.push(
+          `/booking/confirmed?id=${
+            bookingResult.bookingId || bookingResult._id
+          }`
+        );
+      }
     } catch (error) {
       console.error("❌ Booking error:", error);
       alert(`Booking failed: ${error.message}`);
     }
   };
-
   const handleRegisterAndLink = async () => {
     // call registration API
     if (!regName || !regMobile) return alert("Please enter name and mobile");

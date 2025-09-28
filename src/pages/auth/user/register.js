@@ -24,16 +24,16 @@ export default function UserRegisterPage() {
     console.log("savedPrefillData:", savedPrefillData);
 
     let prefillInfo = null;
+
     if (savedPrefillData) {
       try {
         const data = JSON.parse(savedPrefillData);
         console.log("Parsed prefill data:", data);
-
         prefillInfo = {
           name: data.name || "",
           phone: data.phone || "",
           gender: data.gender || "",
-          lastBooking: data.lastBooking || {},
+          lastBookings: data.lastBookings || "",
           source: "feedback",
         };
         setPrefillData(prefillInfo);
@@ -54,12 +54,12 @@ export default function UserRegisterPage() {
           location: data.location || null,
           source: "onboarding",
         };
-
         setPrefillData(prefillInfo);
         setFormData((prev) => ({
           ...prev,
           name: data.name || prev.name,
           phone: data.phone || prev.phone,
+          gender: data.gender || prev.gender,
         }));
       } catch (error) {
         console.error("Error parsing prefill data:", error);
@@ -72,22 +72,47 @@ export default function UserRegisterPage() {
     setIsLoading(true);
 
     try {
+      // Include location data from onboarding if available
+      const onboardingData = localStorage.getItem("userOnboardingData");
+      let locationData = null;
+      if (onboardingData) {
+        try {
+          const data = JSON.parse(onboardingData);
+          locationData = data.location;
+        } catch (e) {
+          console.error("Error parsing onboarding location:", e);
+        }
+      }
+
+      const registrationData = {
+        ...formData,
+        location: locationData,
+      };
+
       const response = await fetch("/api/auth/user/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(registrationData),
       });
 
       if (response.ok) {
         const result = await response.json();
+
+        // Store authentication data
         localStorage.setItem("userToken", result.token);
+        localStorage.setItem(
+          "authenticatedUserData",
+          JSON.stringify(result.user)
+        );
+
+        // Clean up temporary data but keep onboarding for location
         localStorage.removeItem("userPrefillData");
-        localStorage.removeItem("userOnboardingData");
+
         alert("Registration successful! Welcome to TechTrims!");
         router.push("/user/dashboard");
       } else {
         const error = await response.json();
-        alert(`Registration failed: ${error.message}`);
+        alert("Registration failed: " + error.message);
       }
     } catch (error) {
       console.error("Registration error:", error);

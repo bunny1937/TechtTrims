@@ -24,7 +24,8 @@ function publishNotification(salonId, payload) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ message: "Method not allowed" });
+  if (req.method !== "POST")
+    return res.status(405).json({ message: "Method not allowed" });
   try {
     const body = req.body || {};
     const { salonId, service, barber, date, time, user } = body;
@@ -39,7 +40,8 @@ export default async function handler(req, res) {
     let userId = null;
 
     const bookingDate = new Date(date);
-    if (isNaN(bookingDate.getTime())) return res.status(400).json({ message: "Invalid date" });
+    if (isNaN(bookingDate.getTime()))
+      return res.status(400).json({ message: "Invalid date" });
 
     const bookingDoc = {
       salonId: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId,
@@ -52,25 +54,32 @@ export default async function handler(req, res) {
       price: body.price || 0,
       paymentStatus: "pending",
       status: "confirmed",
-      createdAt: new Date()
+      createdAt: new Date(),
     };
 
     const transactionFn = async (session) => {
       // double booking check inside transaction
-      const existing = await db.collection("bookings").findOne({
-        salonId: bookingDoc.salonId,
-        date,
-        time,
-        barber: bookingDoc.barber,
-        status: { $ne: "cancelled" }
-      }, { session });
+      const existing = await db.collection("bookings").findOne(
+        {
+          salonId: bookingDoc.salonId,
+          date,
+          time,
+          barber: bookingDoc.barber,
+          status: { $ne: "cancelled" },
+        },
+        { session }
+      );
       if (existing) throw new Error("Slot already booked");
 
-      const insertResult = await db.collection("bookings").insertOne(bookingDoc, { session });
+      const insertResult = await db
+        .collection("bookings")
+        .insertOne(bookingDoc, { session });
       bookingId = insertResult.insertedId;
-
+      // Create or find user - Enhanced user handling
       if (user && user.mobile) {
-        let existingUser = await db.collection("users").findOne({ mobile: user.mobile }, { session });
+        let existingUser = await db
+          .collection("users")
+          .findOne({ mobile: user.mobile }, { session });
         if (!existingUser) {
           const newUser = {
             name: user.name || "Guest",
@@ -79,23 +88,72 @@ export default async function handler(req, res) {
             gender: user.gender || "other",
             location: user.location || null,
             bookingHistory: [bookingId],
-            createdAt: new Date()
+            preferences: user.preferences || {},
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            isActive: true,
           };
-          const ur = await db.collection("users").insertOne(newUser, { session });
+          const ur = await db
+            .collection("users")
+            .insertOne(newUser, { session });
           userId = ur.insertedId;
         } else {
           userId = existingUser._id;
-          await db.collection("users").updateOne({ _id: userId }, { $push: { bookingHistory: bookingId }, $set: { updatedAt: new Date() } }, { session });
+          // Update existing user's booking history and preserve location data
+          await db.collection("users").updateOne(
+            { _id: userId },
+            {
+              $push: { bookingHistory: bookingId },
+              $set: {
+                updatedAt: new Date(),
+                // Update location if new location data is provided
+                ...(user.location && { location: user.location }),
+              },
+            },
+            { session }
+          );
         }
-        await db.collection("bookings").updateOne({ _id: bookingId }, { $set: { userId } }, { session });
+
+        // Always link booking to user
+        await db
+          .collection("bookings")
+          .updateOne({ _id: bookingId }, { $set: { userId } }, { session });
+      }
+
+      // If userId from token is available, also link the booking
+      if (body.userId) {
+        await db
+          .collection("bookings")
+          .updateOne(
+            { _id: bookingId },
+            { $set: { userId: new ObjectId(body.userId) } },
+            { session }
+          );
+
+        // Update user's booking history
+        await db.collection("users").updateOne(
+          { _id: new ObjectId(body.userId) },
+          {
+            $push: { bookingHistory: bookingId },
+            $set: { updatedAt: new Date() },
+          },
+          { session }
+        );
       }
 
       // update salon bookings array
-      await db.collection("salons").updateOne(
-        { _id: bookingDoc.salonId },
-        { $push: { bookings: { _id: bookingId, date, time, service, barber } }, $set: { updatedAt: new Date() } },
-        { session }
-      );
+      await db
+        .collection("salons")
+        .updateOne(
+          { _id: bookingDoc.salonId },
+          {
+            $push: {
+              bookings: { _id: bookingId, date, time, service, barber },
+            },
+            $set: { updatedAt: new Date() },
+          },
+          { session }
+        );
     };
 
     if (session) {
@@ -113,7 +171,14 @@ export default async function handler(req, res) {
 
     // Publish SSE notification (dev-time)
     try {
-      publishNotification(String(salonId), { type: "new_booking", bookingId: String(bookingId), date, time, service, barber });
+      publishNotification(String(salonId), {
+        type: "new_booking",
+        bookingId: String(bookingId),
+        date,
+        time,
+        service,
+        barber,
+      });
     } catch (e) {
       console.warn("Publish failed", e.message);
     }
@@ -124,7 +189,9 @@ export default async function handler(req, res) {
       return res.status(409).json({ message: "Slot already booked" });
     }
     console.error("Booking API error:", e);
-    return res.status(500).json({ message: e.message || "Internal server error" });
+    return res
+      .status(500)
+      .json({ message: e.message || "Internal server error" });
   }
 }
 
@@ -139,7 +206,7 @@ export function _subscribe(salonId, res) {
 function reqClose(res) {
   res.on("close", () => {
     for (const sid of Object.keys(subscribers)) {
-      subscribers[sid] = subscribers[sid].filter(r => r !== res);
+      subscribers[sid] = subscribers[sid].filter((r) => r !== res);
     }
   });
 }

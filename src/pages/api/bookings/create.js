@@ -1,4 +1,4 @@
-import { connectToDatabase } from "../../../lib/mongodb";
+import { connectToDatabase, clientPromise } from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export default async function handler(req, res) {
@@ -7,65 +7,186 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { db } = await connectToDatabase();
+    const { db, client } = await connectToDatabase();
     const {
       salonId,
       service,
       barber,
+      barberId,
       date,
       time,
       user,
       price,
       customerName,
       customerPhone,
+      userId,
     } = req.body;
 
     if (!salonId || !service || !date || !time) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Check for existing booking
-    const existingBooking = await db.collection("bookings").findOne({
-      salonId: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId,
-      date,
-      time,
-      status: { $ne: "cancelled" },
-    });
+    const session = client.startSession ? client.startSession() : null;
+    let bookingId = null;
+    let finalUserId = null;
 
-    if (existingBooking) {
-      return res.status(409).json({ error: "Time slot already booked" });
-    }
+    const transactionFn = async (session) => {
+      // Check for existing booking inside transaction
+      const existingBooking = await db.collection("bookings").findOne(
+        {
+          salonId: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId,
+          date,
+          time,
+          status: { $ne: "cancelled" },
+        },
+        { session }
+      );
 
-    const bookingData = {
-      salonId: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId,
-      service,
-      barber: barber || null,
-      date,
-      time,
-      customerName: customerName || "Guest",
-      customerPhone: customerPhone || "",
-      price: price || 0,
-      paymentStatus: "pending",
-      status: "confirmed",
-      userId: user?._id || user?.id || null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      feedback: {
-        submitted: false,
-        ratings: {},
-        comment: "",
-      },
+      if (existingBooking) {
+        throw new Error("Time slot already booked");
+      }
+
+      const bookingData = {
+        salonId: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId,
+        service,
+        barber: barber || null,
+        barberId: barberId ? new ObjectId(barberId) : null,
+        date,
+        time,
+        customerName: customerName || user?.name || "Guest",
+        customerPhone: customerPhone || user?.phone || user?.mobile || "",
+        price: price || 0,
+        paymentStatus: "pending",
+        status: "confirmed",
+        userId: null, // Will be set below
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        feedback: {
+          submitted: false,
+          ratings: {},
+          comment: "",
+        },
+      };
+
+      const result = await db
+        .collection("bookings")
+        .insertOne(bookingData, { session });
+      bookingId = result.insertedId;
+
+      // Enhanced user handling - Create or find user
+      if (userId && ObjectId.isValid(userId)) {
+        // Authenticated user booking
+        finalUserId = new ObjectId(userId);
+        await db
+          .collection("bookings")
+          .updateOne(
+            { _id: bookingId },
+            { $set: { userId: finalUserId } },
+            { session }
+          );
+
+        // Update user's booking history
+        await db.collection("users").updateOne(
+          { _id: finalUserId },
+          {
+            $push: { bookingHistory: bookingId },
+            $set: { updatedAt: new Date() },
+          },
+          { session }
+        );
+      } else if (user && (user.phone || user.mobile)) {
+        // Anonymous user booking - create or find user
+        const phoneNumber = user.phone || user.mobile || customerPhone;
+        let existingUser = await db.collection("users").findOne(
+          {
+            $or: [{ phone: phoneNumber }, { mobile: phoneNumber }],
+          },
+          { session }
+        );
+
+        if (!existingUser) {
+          const newUser = {
+            name: user.name || customerName || "Guest",
+            phone: phoneNumber,
+            mobile: phoneNumber,
+            email: user.email || null,
+            gender: user.gender || "other",
+            location: user.location || null,
+            bookingHistory: [bookingId],
+            preferences: user.preferences || {},
+            role: "user",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            isActive: true,
+          };
+          const userResult = await db
+            .collection("users")
+            .insertOne(newUser, { session });
+          finalUserId = userResult.insertedId;
+        } else {
+          finalUserId = existingUser._id;
+          // Update existing user's booking history and preserve location data
+          await db.collection("users").updateOne(
+            { _id: finalUserId },
+            {
+              $push: { bookingHistory: bookingId },
+              $set: {
+                updatedAt: new Date(),
+                // Update location if new location data is provided
+                ...(user.location && { location: user.location }),
+              },
+            },
+            { session }
+          );
+        }
+
+        // Always link booking to user
+        await db
+          .collection("bookings")
+          .updateOne(
+            { _id: bookingId },
+            { $set: { userId: finalUserId } },
+            { session }
+          );
+      }
+
+      // Update salon bookings array
+      await db.collection("salons").updateOne(
+        { _id: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId },
+        {
+          $push: {
+            bookings: { _id: bookingId, date, time, service, barber },
+          },
+          $set: { updatedAt: new Date() },
+        },
+        { session }
+      );
     };
 
-    const result = await db.collection("bookings").insertOne(bookingData);
+    if (session) {
+      try {
+        await session.withTransaction(async () => {
+          await transactionFn(session);
+        });
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      // fallback: not a replica set / no sessions available
+      await transactionFn(null);
+    }
 
     res.status(201).json({
       success: true,
       message: "Booking created successfully",
-      bookingId: result.insertedId,
-      _id: result.insertedId,
+      bookingId: bookingId,
+      _id: bookingId,
+      userId: finalUserId,
     });
   } catch (error) {
+    if (error.message && error.message.includes("Time slot already booked")) {
+      return res.status(409).json({ error: "Time slot already booked" });
+    }
     console.error("Booking creation error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
