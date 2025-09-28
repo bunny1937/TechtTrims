@@ -220,11 +220,6 @@ const SalonRegisterForm = () => {
   const handleSubmit = async () => {
     if (!validateStep(4)) return;
 
-    // Remove this duplicate validation check - it's already in validateStep
-    console.log("Location data:", formData.locationData);
-    console.log("Form lat/lng:", formData.latitude, formData.longitude);
-    console.log("Barbers data:", formData.barbers); // ADD THIS LOG
-
     const lat = formData.locationData?.lat || parseFloat(formData.latitude);
     const lng = formData.locationData?.lng || parseFloat(formData.longitude);
 
@@ -244,8 +239,6 @@ const SalonRegisterForm = () => {
         services: formData.services,
         barbers: formData.barbers,
       };
-
-      console.log("Salon Registration Data:", registrationData);
 
       // Here you would send data to your backend API
       const response = await fetch("/api/auth/salon/register", {

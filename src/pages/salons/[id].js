@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import styles from "../../styles/SalonDetail.module.css";
 import Image from "next/image";
 import { UserDataManager } from "../../lib/userData";
+import RetryButton from "@/components/RetryButton";
 
 // Dynamic map import to avoid SSR issues
 const MapContainer = dynamic(
@@ -44,6 +45,7 @@ export default function SalonDetail({ initialSalon }) {
   const [regName, setRegName] = useState("");
   const [regMobile, setRegMobile] = useState("");
   const [regEmail, setRegEmail] = useState("");
+  const [bookingError, setBookingError] = useState(null);
 
   useEffect(() => {
     // Only run once when component mounts
@@ -295,14 +297,23 @@ export default function SalonDetail({ initialSalon }) {
       };
 
       console.log("Booking payload:", payload);
-      const response = await fetch("/api/bookings/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(userToken && { Authorization: `Bearer ${userToken}` }),
-        },
-        body: JSON.stringify(payload),
-      });
+      const makeBookingRequest = async () => {
+        try {
+          setBookingError(null);
+          const response = await fetchWithRetry("/api/bookings/create", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(userToken && { Authorization: `Bearer ${userToken}` }),
+            },
+            body: JSON.stringify(payload),
+          });
+          return response;
+        } catch (error) {
+          setBookingError(error.message);
+          throw error;
+        }
+      };
 
       // Handle 409 conflict (slot already booked) first
       if (response.status === 409) {
@@ -449,6 +460,12 @@ export default function SalonDetail({ initialSalon }) {
 
   return (
     <div className={styles.container}>
+      {bookingError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+          <p className="text-red-700 text-sm mb-2">❌ {bookingError}</p>
+          <RetryButton onRetry={makeBookingRequest} />
+        </div>
+      )}
       {/* Header */}
       <header className={styles.header}>
         <button onClick={() => router.back()} className={styles.backButton}>
