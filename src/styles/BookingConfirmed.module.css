@@ -1,0 +1,330 @@
+/* BookingConfirmed.module.css */
+
+.container {
+  padding: var(--space-8);
+  max-width: 600px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.loading,
+.notFound {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-8);
+  text-align: center;
+}
+
+.bookingCard {
+  background: var(--background-secondary);
+  padding: var(--space-8);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-8);
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-normal);
+}
+
+.bookingInfo {
+  margin-bottom: var(--space-4);
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.bookingInfo strong {
+  color: var(--primary);
+  font-weight: 600;
+  margin-right: var(--space-2);
+}
+
+.statusSection {
+  margin-bottom: var(--space-8);
+}
+
+.statusHeading {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-6);
+}
+
+.statusTracker {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: var(--space-8) 0;
+  position: relative;
+}
+
+.statusTracker::before {
+  content: "";
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  right: 15px;
+  height: 2px;
+  background: var(--border-color);
+  z-index: 0;
+}
+
+.statusStep {
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  transition: all var(--transition-normal);
+}
+
+.statusStep.active,
+.statusStep.completed {
+  opacity: 1;
+}
+
+.statusStep.inactive {
+  opacity: 0.4;
+}
+
+.statusIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin: 0 auto var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: bold;
+  transition: all var(--transition-luxury);
+  box-shadow: var(--shadow-md);
+}
+
+.statusIcon.completed {
+  background: linear-gradient(135deg, var(--success), #059669);
+  color: white;
+  animation: scaleIn 0.5s ease-out;
+}
+
+.statusIcon.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: var(--black);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.statusIcon.inactive {
+  background: var(--gray-400);
+  color: white;
+}
+
+.statusLabel {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.statusStep.active .statusLabel,
+.statusStep.completed .statusLabel {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.completedAlert {
+  background: linear-gradient(135deg, #d4edda, #c3e6cb);
+  border: 2px solid var(--success);
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-8);
+  box-shadow: var(--shadow-lg);
+  animation: fadeInUp 0.6s ease-out;
+}
+
+[data-theme="dark"] .completedAlert {
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.2),
+    rgba(5, 150, 105, 0.15)
+  );
+  border-color: var(--success);
+}
+
+.completedTitle {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--success);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.completedText {
+  color: #155724;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+[data-theme="dark"] .completedText {
+  color: var(--text-primary);
+}
+
+.feedbackButton {
+  background: linear-gradient(135deg, var(--success), #059669);
+  color: white;
+  border: none;
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  margin-top: var(--space-4);
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all var(--transition-luxury);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.feedbackButton::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.feedbackButton:hover::before {
+  left: 100%;
+}
+
+.feedbackButton:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: var(--shadow-xl), 0 0 20px rgba(16, 185, 129, 0.4);
+}
+
+.feedbackButton:active {
+  transform: translateY(0);
+}
+
+.pendingAlert {
+  background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+  border: 2px solid var(--warning);
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="dark"] .pendingAlert {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.2),
+    rgba(217, 119, 6, 0.15)
+  );
+  border-color: var(--warning);
+}
+
+.pendingText {
+  margin: 0;
+  color: #856404;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+[data-theme="dark"] .pendingText {
+  color: var(--text-primary);
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(212, 175, 55, 0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding: var(--space-6);
+  }
+
+  .heading {
+    font-size: 1.5rem;
+  }
+
+  .statusTracker {
+    margin: var(--space-6) 0;
+  }
+
+  .statusIcon {
+    width: 35px;
+    height: 35px;
+    font-size: 0.875rem;
+  }
+
+  .statusLabel {
+    font-size: 0.625rem;
+  }
+
+  .feedbackButton {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .bookingCard {
+    padding: var(--space-6);
+  }
+
+  .statusIcon {
+    width: 30px;
+    height: 30px;
+    font-size: 0.75rem;
+  }
+
+  .statusLabel {
+    font-size: 0.5rem;
+  }
+
+  .completedTitle {
+    font-size: 1.25rem;
+  }
+}

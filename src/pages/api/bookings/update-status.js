@@ -30,6 +30,35 @@ export default async function handler(req, res) {
         },
       }
     );
+    if (status === "completed") {
+      const booking = await db
+        .collection("bookings")
+        .findOne({ _id: new ObjectId(bookingId) });
+      if (booking) {
+        const scheduledTime = new Date(`${booking.date}T${booking.time}:00`);
+        const waitMinutes = Math.max(
+          0,
+          (booking.completedAt - scheduledTime) / 60000
+        );
+
+        // Get current average and update it
+        const salon = await db
+          .collection("salons")
+          .findOne({ _id: booking.salonId });
+        const currentAvg = salon?.stats?.averageWaitTime || 0;
+        const totalBookings = salon?.stats?.totalBookings || 1;
+        const newAvg = Math.round(
+          (currentAvg * (totalBookings - 1) + waitMinutes) / totalBookings
+        );
+
+        await db
+          .collection("salons")
+          .updateOne(
+            { _id: booking.salonId },
+            { $set: { "stats.averageWaitTime": newAvg } }
+          );
+      }
+    }
 
     if (result.matchedCount === 0) {
       return res.status(404).json({ error: "Booking not found" });

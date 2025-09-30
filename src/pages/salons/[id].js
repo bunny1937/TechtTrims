@@ -235,15 +235,162 @@ export default function SalonDetail({ initialSalon }) {
     setSelectedSlot(time); // optional: keep both in sync
   };
 
+  const makeBookingRequest = async () => {
+    try {
+      setBookingError(null);
+      const response = await fetch("/api/bookings/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(userToken && { Authorization: `Bearer ${userToken}` }),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      // ✅ Handle 409 conflict INSIDE makeBookingRequest
+      if (response.status === 409) {
+        const errorData = await response.json();
+        alert(
+          "Sorry! This time slot was just booked by another customer. Please select a different time."
+        );
+        window.location.reload();
+        throw new Error("Slot already booked");
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Booking failed");
+      }
+
+      const bookingResult = await response.json();
+      return bookingResult;
+    } catch (error) {
+      setBookingError(error.message);
+      throw error;
+    }
+  };
+
+  // const handleBooking = async () => {
+  //   if (selectedServices.length === 0) {
+  //     alert("Please select at least one service");
+  //     return;
+  //   }
+
+  //   if (!selectedDate) {
+  //     alert("Please select a date");
+  //     return;
+  //   }
+
+  //   if (!selectedSlot) {
+  //     alert("Please select a time slot");
+  //     return;
+  //   }
+
+  //   try {
+  //     console.log(
+  //       "Booking with:",
+  //       selectedServices,
+  //       selectedSlot,
+  //       selectedBarber,
+  //       userInfo
+  //     );
+
+  //     // Find selected barber details if one is selected
+  //     const selectedBarberDetails = selectedBarber
+  //       ? availableBarbers.find((b) => b._id === selectedBarber)
+  //       : null;
+
+  //     // Prepare booking data
+  //     const allServices = selectedServices
+  //       .map((service) => service.name)
+  //       .join(", ");
+  //     const totalPrice = selectedServices.reduce(
+  //       (sum, service) => sum + service.price,
+  //       0
+  //     );
+  //     const currentUserInfo = UserDataManager.getStoredUserData();
+  //     const userToken = localStorage.getItem("userToken");
+
+  //     const payload = {
+  //       salonId: salon._id,
+  //       service: allServices,
+  //       barber: selectedBarberDetails?.name || "Any Available",
+  //       barberId: selectedBarber || null,
+  //       date: selectedDate,
+  //       time: selectedSlot,
+  //       price: totalPrice,
+  //       customerName: currentUserInfo?.name || "Anonymous",
+  //       customerPhone: currentUserInfo?.phone || "",
+  //       user: currentUserInfo,
+  //       userId: currentUserInfo?._id || currentUserInfo?.id || null,
+  //     };
+
+  //     console.log("Booking payload:", payload);
+
+  //     // Define makeBookingRequest function
+  //     const makeBookingRequest = async () => {
+  //       try {
+  //         setBookingError(null);
+  //         const response = await fetch("/api/bookings/create", {
+  //           method: "POST",
+  //           headers: {
+  //             "Content-Type": "application/json",
+  //             ...(userToken && { Authorization: `Bearer ${userToken}` }),
+  //           },
+  //           body: JSON.stringify(payload),
+  //         });
+
+  //         // Handle 409 conflict
+  //         if (response.status === 409) {
+  //           const errorData = await response.json();
+  //           alert(
+  //             "Sorry! This time slot was just booked by another customer. Please select a different time."
+  //           );
+  //           window.location.reload();
+  //           throw new Error("Slot already booked");
+  //         }
+
+  //         if (!response.ok) {
+  //           const errorData = await response.json();
+  //           throw new Error(errorData.error || "Booking failed");
+  //         }
+
+  //         const bookingResult = await response.json();
+  //         return bookingResult;
+  //       } catch (error) {
+  //         setBookingError(error.message);
+  //         throw error;
+  //       }
+  //     };
+
+  //     // Make the booking request
+  //     const bookingResult = await makeBookingRequest();
+
+  //     // ✅ REMOVED: All the duplicate response checking code that was causing the error
+
+  //     console.log("✅ Booking confirmed", bookingResult);
+
+  //     // Extract the booking ID correctly
+  //     const bookingId =
+  //       bookingResult.bookingId || bookingResult.id || bookingResult._id;
+
+  //     // Reset form
+  //     setSelectedServices([]);
+  //     setSelectedBarber(null);
+  //     setSelectedDate("");
+  //     setSelectedSlot("");
+
+  //     // Redirect to booking confirmation page
+  //     router.push(`/booking/confirmed?id=${bookingId}`);
+  //   } catch (error) {
+  //     console.error("❌ Booking error:", error);
+  //     alert("Booking failed: " + error.message);
+  //   }
+  // };
+
   const handleBooking = async () => {
     if (selectedServices.length === 0) {
       alert("Please select at least one service");
-      return;
-    }
-
-    // Allow booking even if no specific barber selected (salon can assign one)
-    if (availableBarbers.length > 0 && !selectedBarber) {
-      alert("Please select a barber");
       return;
     }
 
@@ -258,12 +405,13 @@ export default function SalonDetail({ initialSalon }) {
     }
 
     try {
-      console.log("Booking with:", {
+      console.log(
+        "Booking with:",
         selectedServices,
         selectedSlot,
         selectedBarber,
-        userInfo,
-      });
+        userInfo
+      );
 
       // Find selected barber details if one is selected
       const selectedBarberDetails = selectedBarber
@@ -278,9 +426,25 @@ export default function SalonDetail({ initialSalon }) {
         (sum, service) => sum + service.price,
         0
       );
-
-      const currentUserInfo = UserDataManager.getStoredUserData();
       const userToken = localStorage.getItem("userToken");
+
+      // ✅ Get user info with GUARANTEED fallback to onboarding data
+      let currentUserInfo = UserDataManager.getStoredUserData();
+
+      // ✅ WORST-CASE FALLBACK: If UserDataManager returns null, directly check userOnboardingData
+      if (!currentUserInfo) {
+        const onboardingData = localStorage.getItem("userOnboardingData");
+        if (onboardingData) {
+          try {
+            currentUserInfo = JSON.parse(onboardingData);
+            console.log("Using onboarding data as fallback:", currentUserInfo);
+          } catch (e) {
+            console.error("Error parsing onboarding data:", e);
+          }
+        }
+      }
+
+      console.log("Final user info for booking:", currentUserInfo);
 
       const payload = {
         salonId: salon._id,
@@ -290,17 +454,20 @@ export default function SalonDetail({ initialSalon }) {
         date: selectedDate,
         time: selectedSlot,
         price: totalPrice,
-        customerName: currentUserInfo?.name || "Anonymous",
-        customerPhone: currentUserInfo?.phone || "",
+        // ✅ Use onboarding data if available, otherwise fallback to 'Guest'
+        customerName: currentUserInfo?.name || "Guest",
+        customerPhone: currentUserInfo?.phone || currentUserInfo?.mobile || "",
         user: currentUserInfo,
         userId: currentUserInfo?._id || currentUserInfo?.id || null,
       };
 
       console.log("Booking payload:", payload);
+
+      // Define makeBookingRequest function
       const makeBookingRequest = async () => {
         try {
           setBookingError(null);
-          const response = await fetchWithRetry("/api/bookings/create", {
+          const response = await fetch("/api/bookings/create", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -308,70 +475,53 @@ export default function SalonDetail({ initialSalon }) {
             },
             body: JSON.stringify(payload),
           });
-          return response;
+
+          // Handle 409 conflict
+          if (response.status === 409) {
+            const errorData = await response.json();
+            alert(
+              "Sorry! This time slot was just booked by another customer. Please select a different time."
+            );
+            window.location.reload();
+            throw new Error("Slot already booked");
+          }
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Booking failed");
+          }
+
+          const bookingResult = await response.json();
+          return bookingResult;
         } catch (error) {
           setBookingError(error.message);
           throw error;
         }
       };
 
-      // Handle 409 conflict (slot already booked) first
-      if (response.status === 409) {
-        const errorData = await response.json();
-        alert(
-          "⚠️ Sorry! This time slot was just booked by another customer. Please select a different time."
-        );
-        window.location.reload();
-        return;
-      }
+      // Make the booking request
+      const bookingResult = await makeBookingRequest();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Booking failed");
-      }
+      console.log("✅ Booking confirmed", bookingResult);
 
-      const bookingResult = await response.json();
-      console.log("✅ Booking confirmed:", bookingResult);
+      // Extract the booking ID correctly
+      const bookingId =
+        bookingResult.bookingId || bookingResult.id || bookingResult._id;
 
-      // Preserve user info for feedback
-      UserDataManager.preserveUserInfoForBooking(payload);
+      // Reset form
+      setSelectedServices([]);
+      setSelectedBarber(null);
+      setSelectedDate("");
+      setSelectedSlot("");
 
-      alert("✅ Booking confirmed successfully!");
-
-      if (!userToken && !currentUserInfo?._id) {
-        setRegName(payload.customerName);
-        setRegMobile(payload.customerPhone);
-        setShowRegistrationModal(true);
-
-        // Reset form for anonymous users
-        setSelectedServices([]);
-        setSelectedBarber(null);
-        setSelectedDate("");
-        setSelectedSlot("");
-
-        // Redirect to feedback page for anonymous users
-        router.push(
-          `/feedback?bookingId=${bookingResult.bookingId || bookingResult._id}`
-        );
-      } else {
-        // Reset form for logged in users
-        setSelectedServices([]);
-        setSelectedBarber(null);
-        setSelectedDate("");
-        setSelectedSlot("");
-
-        // Redirect to confirmation page for logged in users
-        router.push(
-          `/booking/confirmed?id=${
-            bookingResult.bookingId || bookingResult._id
-          }`
-        );
-      }
+      // Redirect to booking confirmation page
+      router.push(`/booking/confirmed?id=${bookingId}`);
     } catch (error) {
       console.error("❌ Booking error:", error);
-      alert(`Booking failed: ${error.message}`);
+      alert("Booking failed: " + error.message);
     }
   };
+
   const handleRegisterAndLink = async () => {
     // call registration API
     if (!regName || !regMobile) return alert("Please enter name and mobile");

@@ -75,6 +75,7 @@ export default async function handler(req, res) {
         .collection("bookings")
         .insertOne(bookingDoc, { session });
       bookingId = insertResult.insertedId;
+
       // Create or find user - Enhanced user handling
       if (user && user.mobile) {
         let existingUser = await db
@@ -141,17 +142,40 @@ export default async function handler(req, res) {
         );
       }
 
-      // update salon bookings array
+      // update salon bookings array AND stats
+      await db.collection("salons").updateOne(
+        { _id: bookingDoc.salonId },
+        {
+          $push: {
+            bookings: {
+              id: bookingId,
+              date,
+              time,
+              service,
+              barber,
+            },
+          },
+          $inc: { "stats.totalBookings": 1 },
+          $set: { updatedAt: new Date() },
+        },
+        { session }
+      );
+
+      // Calculate and update repeat customers
+      const repeatCustomers = await db.collection("bookings").distinct(
+        "userId",
+        {
+          salonId: bookingDoc.salonId,
+          userId: { $ne: null },
+        },
+        { session }
+      );
+
       await db
         .collection("salons")
         .updateOne(
           { _id: bookingDoc.salonId },
-          {
-            $push: {
-              bookings: { _id: bookingId, date, time, service, barber },
-            },
-            $set: { updatedAt: new Date() },
-          },
+          { $set: { "stats.repeatCustomers": repeatCustomers.length } },
           { session }
         );
     };

@@ -9,7 +9,7 @@ export default function SalonCard({ salon, gender }) {
   }
 
   const handleBookNow = () => {
-    router.push(`/salons/${salon.id}`);
+    router.push({ pathname: "/salons/[id]", query: { id: salon.id } });
   };
 
   return (

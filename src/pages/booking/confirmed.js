@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import styles from "../../styles/BookingConfirmed.module.css";
 
 export default function BookingConfirmed() {
   const router = useRouter();
@@ -37,19 +38,10 @@ export default function BookingConfirmed() {
   if (!booking) return <div style={{ padding: 20 }}>Booking not found.</div>;
 
   return (
-    <div style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
-      <h2>Booking Status</h2>
-
-      <div
-        style={{
-          background: "#f8f9fa",
-          color: "black",
-          padding: 20,
-          borderRadius: 8,
-          marginBottom: 20,
-        }}
-      >
-        <p>
+    <div className={styles.container}>
+      <h2 className={styles.heading}>Booking Status</h2>
+      <div className={styles.bookingCard}>
+        <p className={styles.bookingInfo}>
           <strong>Booking ID:</strong> {booking._id}
         </p>
         <p>
@@ -71,15 +63,9 @@ export default function BookingConfirmed() {
         </p>
       </div>
 
-      <div style={{ marginBottom: 20 }}>
-        <h3>Service Status</h3>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            margin: "20px 0",
-          }}
-        >
+      <div className={styles.statusSection}>
+        <h3 className={styles.statusHeading}>Service Status</h3>
+        <div className={styles.statusTracker}>
           <StatusStep
             label="Confirmed"
             active={true}
@@ -110,47 +96,22 @@ export default function BookingConfirmed() {
       </div>
 
       {booking.status === "completed" && (
-        <div
-          style={{
-            background: "#d4edda",
-            color: "black",
-            border: "1px solid #c3e6cb",
-            padding: 15,
-            borderRadius: 5,
-            marginBottom: 20,
-          }}
-        >
-          <h3 style={{ color: "black", margin: 0 }}>Service Completed!</h3>
-          <p style={{ color: "black", margin: "10px 0 0 0" }}>
-            Your service has been completed. Please provide feedback.
+        <div className={styles.completedAlert}>
+          <h3 className={styles.completedTitle}>Service Completed!</h3>
+          <p className={styles.completedText}>
+            Your service has been completed...
           </p>
-          <button
-            onClick={proceedToFeedback}
-            style={{
-              background: "#28a745",
-              color: "white",
-              border: "none",
-              padding: "10px 20px",
-              borderRadius: 5,
-              cursor: "pointer",
-              marginTop: 10,
-            }}
-          >
+          <button onClick={proceedToFeedback} className={styles.feedbackButton}>
             Give Feedback
           </button>
         </div>
       )}
 
       {booking.status !== "completed" && (
-        <div
-          style={{
-            background: "#fff3cd",
-            border: "1px solid #ffeaa7",
-            padding: 15,
-            borderRadius: 5,
-          }}
-        >
-          <p style={{ margin: 0 }}>{getStatusMessage(booking.status)}</p>
+        <div className={styles.pendingAlert}>
+          <p className={styles.pendingText}>
+            {getStatusMessage(booking.status)}
+          </p>
         </div>
       )}
     </div>
@@ -160,29 +121,22 @@ export default function BookingConfirmed() {
 function StatusStep({ label, active, completed }) {
   return (
     <div
-      style={{
-        textAlign: "center",
-        opacity: active || completed ? 1 : 0.4,
-      }}
+      className={`${styles.statusStep} ${
+        active || completed ? styles.active : styles.inactive
+      }`}
     >
       <div
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: "50%",
-          background: completed ? "#28a745" : active ? "#ffc107" : "#6c757d",
-          margin: "0 auto 5px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "white",
-          fontSize: 12,
-          fontWeight: "bold",
-        }}
+        className={`${styles.statusIcon} ${
+          completed
+            ? styles.completed
+            : active
+            ? styles.active
+            : styles.inactive
+        }`}
       >
         {completed ? "✓" : active ? "⏳" : "⏸"}
       </div>
-      <div style={{ fontSize: 12 }}>{label}</div>
+      <div className={styles.statusLabel}>{label}</div>
     </div>
   );
 }
