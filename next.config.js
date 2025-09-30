@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  trailingSlash: false,
   experimental: {
     swcTraceProfiling: false, // 🚫 disables trace file
   },
