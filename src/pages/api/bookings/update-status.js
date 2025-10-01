@@ -1,6 +1,6 @@
 // src/pages/api/bookings/update-status.js
 import { connectToDatabase } from "../../../lib/mongodb";
-import { updateSalonStats, updateBarberStats } from "../../../lib/Statshelper";
+import { updateSalonStats, updateBarberStats } from "../../../lib/statsHelper";
 import { ObjectId } from "mongodb";
 
 export default async function handler(req, res) {
