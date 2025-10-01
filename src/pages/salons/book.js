@@ -2,7 +2,6 @@
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 import styles from "../../styles/Booking.module.css";
-import Layout from "../../components/Layout/Layout";
 
 export default function BookingPage() {
   const router = useRouter();
@@ -122,94 +121,92 @@ export default function BookingPage() {
   };
 
   return (
-    <Layout>
-      <div className={styles.container}>
-        <h1>Book Appointment</h1>
-        <div className={styles.serviceInfo}>
-          <h2>{serviceName}</h2>
-          <span className={styles.price}>₹{price}</span>
+    <div className={styles.container}>
+      <h1>Book Appointment</h1>
+      <div className={styles.serviceInfo}>
+        <h2>{serviceName}</h2>
+        <span className={styles.price}>₹{price}</span>
+      </div>
+
+      <div className={styles.form}>
+        <div className={styles.formGroup}>
+          <label>📱 Mobile Number</label>
+          <input
+            type="tel"
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value)}
+            placeholder="Enter your mobile number"
+            maxLength="10"
+          />
         </div>
 
-        <div className={styles.form}>
-          <div className={styles.formGroup}>
-            <label>📱 Mobile Number</label>
-            <input
-              type="tel"
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
-              placeholder="Enter your mobile number"
-              maxLength="10"
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>👨‍🦱 Select Barber</label>
-            <div className={styles.barberGrid}>
-              {barbers.map((barber) => (
-                <div
-                  key={barber.id}
-                  className={`${styles.barberCard} ${
-                    selectedBarber === barber.id ? styles.selected : ""
-                  }`}
-                  onClick={() => setSelectedBarber(barber.id)}
-                >
-                  <div className={styles.barberInfo}>
-                    <h3>{barber.name}</h3>
-                    <p>
-                      ⭐ {barber.rating} | {barber.specialization}
-                    </p>
-                    <p>{barber.bookings} bookings</p>
-                  </div>
+        <div className={styles.formGroup}>
+          <label>👨‍🦱 Select Barber</label>
+          <div className={styles.barberGrid}>
+            {barbers.map((barber) => (
+              <div
+                key={barber.id}
+                className={`${styles.barberCard} ${
+                  selectedBarber === barber.id ? styles.selected : ""
+                }`}
+                onClick={() => setSelectedBarber(barber.id)}
+              >
+                <div className={styles.barberInfo}>
+                  <h3>{barber.name}</h3>
+                  <p>
+                    ⭐ {barber.rating} | {barber.specialization}
+                  </p>
+                  <p>{barber.bookings} bookings</p>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>📅 Select Date</label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            min={new Date().toISOString().split("T")[0]}
+          />
+        </div>
+
+        {slots.length > 0 && (
+          <div className={styles.formGroup}>
+            <label>⏰ Select Time Slot</label>
+            <div className={styles.slotGrid}>
+              {slots.map((slot) => (
+                <button
+                  key={slot.time}
+                  className={`${styles.slotBtn} 
+                      ${!slot.available ? styles.unavailable : ""} 
+                      ${selectedSlot === slot.time ? styles.selected : ""}`}
+                  onClick={() => slot.available && setSelectedSlot(slot.time)}
+                  disabled={!slot.available}
+                >
+                  {slot.time}
+                  {slot.available && slot.waitTime > 0 && (
+                    <span className={styles.waitTime}>
+                      ~{slot.waitTime}min wait
+                    </span>
+                  )}
+                </button>
               ))}
             </div>
           </div>
+        )}
 
-          <div className={styles.formGroup}>
-            <label>📅 Select Date</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              min={new Date().toISOString().split("T")[0]}
-            />
-          </div>
-
-          {slots.length > 0 && (
-            <div className={styles.formGroup}>
-              <label>⏰ Select Time Slot</label>
-              <div className={styles.slotGrid}>
-                {slots.map((slot) => (
-                  <button
-                    key={slot.time}
-                    className={`${styles.slotBtn} 
-                      ${!slot.available ? styles.unavailable : ""} 
-                      ${selectedSlot === slot.time ? styles.selected : ""}`}
-                    onClick={() => slot.available && setSelectedSlot(slot.time)}
-                    disabled={!slot.available}
-                  >
-                    {slot.time}
-                    {slot.available && slot.waitTime > 0 && (
-                      <span className={styles.waitTime}>
-                        ~{slot.waitTime}min wait
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className={styles.userDetails}>
-            <p>Booking for: {userInfo?.name || "Guest"}</p>
-            <p>Gender: {userInfo?.gender || "Not specified"}</p>
-          </div>
-
-          <button className={styles.confirmBtn} onClick={handleBooking}>
-            Confirm Booking
-          </button>
+        <div className={styles.userDetails}>
+          <p>Booking for: {userInfo?.name || "Guest"}</p>
+          <p>Gender: {userInfo?.gender || "Not specified"}</p>
         </div>
+
+        <button className={styles.confirmBtn} onClick={handleBooking}>
+          Confirm Booking
+        </button>
       </div>
-    </Layout>
+    </div>
   );
 }
