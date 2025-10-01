@@ -1,6 +1,6 @@
 import { connectToDatabase, clientPromise } from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
-import { updateSalonStats } from "../../../lib/Statshelper";
+import { updateSalonStats } from "../../../lib/statsHelper";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
