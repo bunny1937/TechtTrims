@@ -1,5 +1,6 @@
 // src/pages/api/bookings/update-status.js
 import { connectToDatabase } from "../../../lib/mongodb";
+import { updateSalonStats, updateBarberStats } from "../../../lib/Statshelper";
 import { ObjectId } from "mongodb";
 
 export default async function handler(req, res) {
@@ -64,10 +65,28 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Booking not found" });
     }
 
-    // Get updated booking to return
     const updatedBooking = await db.collection("bookings").findOne({
       _id: new ObjectId(bookingId),
     });
+
+    // ✅ UPDATE SALON STATS IN REAL-TIME
+    if (updatedBooking?.salonId) {
+      await updateSalonStats(updatedBooking.salonId);
+    }
+
+    // ✅ UPDATE BARBER STATS IF COMPLETED
+    if (status === "completed" && updatedBooking?.barber) {
+      const barber = await db.collection("barbers").findOne({
+        name: updatedBooking.barber,
+      });
+      if (barber) {
+        await updateBarberStats(
+          barber._id,
+          barber.name,
+          updatedBooking.salonId
+        );
+      }
+    }
 
     res.status(200).json({
       success: true,

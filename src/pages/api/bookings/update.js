@@ -48,7 +48,36 @@ export default async function handler(req, res) {
         await updateSalonRatings(db, booking.salonId, feedback.ratings);
       }
     }
+    if (feedback?.submitted) {
+      updateData.feedback = {
+        submitted: true,
+        ...feedback,
+        submittedAt: new Date(),
+      };
+    }
 
+    const updatedBooking = await db.collection("bookings").findOne({
+      _id: new ObjectId(bookingId),
+    });
+
+    // ✅ UPDATE SALON RATINGS IN REAL-TIME
+    if (feedback?.submitted && updatedBooking?.salonId) {
+      await updateSalonRatings(updatedBooking.salonId);
+
+      // ✅ UPDATE BARBER STATS IF BARBER WAS RATED
+      if (feedback.ratings?.barberPerformance && updatedBooking.barber) {
+        const barber = await db.collection("barbers").findOne({
+          name: updatedBooking.barber,
+        });
+        if (barber) {
+          await updateBarberStats(
+            barber._id,
+            barber.name,
+            updatedBooking.salonId
+          );
+        }
+      }
+    }
     res.status(200).json({
       success: true,
       message: "Booking updated successfully",

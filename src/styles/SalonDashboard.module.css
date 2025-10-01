@@ -1,0 +1,586 @@
+/* Dashboard.module.css */
+
+.dashboardWrapper {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--background-primary);
+}
+
+/* Sidebar */
+.sidebarDesktop {
+  display: none;
+  width: 16rem;
+  border-right: 1px solid var(--border-color);
+}
+
+@media (min-width: 768px) {
+  .sidebarDesktop {
+    display: block;
+  }
+}
+
+/* Mobile Sidebar Overlay */
+.mobileOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+}
+
+@media (min-width: 768px) {
+  .mobileOverlay {
+    display: none;
+  }
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.drawer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-width: 20rem;
+  width: 100%;
+  background-color: var(--background-primary);
+  box-shadow: var(--shadow-2xl);
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Main Content */
+.mainContent {
+  flex: 1;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .mainContent {
+    padding: 1.5rem;
+  }
+}
+
+.contentContainer {
+  max-width: 80rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading State */
+.loadingContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.loadingContent {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Mobile Top Bar */
+.mobileTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--background-primary);
+  padding: 0.75rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border: 1px solid var(--border-color);
+}
+
+@media (min-width: 768px) {
+  .mobileTopBar {
+    display: none;
+  }
+}
+
+.menuButton {
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+}
+
+.menuButton:hover {
+  background-color: var(--background-secondary);
+}
+
+.mobileTitle {
+  font-weight: 700;
+  font-size: 1.125rem;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card Component */
+.card {
+  background-color: var(--background-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+}
+
+@media (min-width: 768px) {
+  .card {
+    padding: 1.5rem;
+  }
+}
+
+/* Salon Info */
+.salonTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.25rem;
+}
+
+.salonOwner {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
+/* Filter Section */
+.filterHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+@media (min-width: 640px) {
+  .filterHeader {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.filterTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.filterButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.filterButton {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  border: none;
+  cursor: pointer;
+}
+
+.filterButtonActive {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: var(--black);
+  box-shadow: var(--shadow-lg);
+  transform: scale(1.05);
+}
+
+.filterButtonInactive {
+  background-color: var(--background-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.filterButtonInactive:hover {
+  background-color: var(--background-tertiary);
+  box-shadow: var(--shadow-md);
+}
+
+/* Bookings Section */
+.bookingsHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .bookingsHeader {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.bookingsInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.bookingsTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+}
+/* Date Picker Styles */
+.datePickerContainer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.datePickerLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.datePickerInput {
+  padding: 10px 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.datePickerInput:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.datePickerInput:hover {
+  border-color: #9ca3af;
+}
+
+.currentDateDisplay {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.currentDateIcon {
+  font-size: 20px;
+}
+
+.currentDateText {
+  font-size: 14px;
+  font-weight: 700;
+  color: #92400e;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .datePickerContainer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .datePickerInput {
+    width: 100%;
+  }
+}
+
+.bookingsDate {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.refreshButton {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+@media (min-width: 640px) {
+  .refreshButton {
+    margin-top: 0;
+  }
+}
+
+.refreshButton:hover {
+  background-color: rgba(59, 130, 246, 0.2);
+}
+
+.refreshButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error Message */
+.errorBox {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--error);
+  color: var(--error);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+}
+
+/* Empty State */
+.emptyState {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.emptyIcon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.emptyText {
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  margin-bottom: 1rem;
+}
+
+.viewAllButton {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: var(--black);
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-luxury);
+}
+
+.viewAllButton:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Bookings Grid */
+.bookingsGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.bookingCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background-color: var(--background-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+}
+
+@media (min-width: 768px) {
+  .bookingCard {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.bookingCard:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
+}
+
+.bookingDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.customerName {
+  font-weight: 600;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+}
+
+.bookingInfo {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
+/* Booking Actions */
+.bookingActions {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .bookingActions {
+    margin-top: 0;
+  }
+}
+
+.statusBadge {
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+  align-self: flex-start;
+}
+
+@media (min-width: 768px) {
+  .statusBadge {
+    align-self: flex-end;
+  }
+}
+
+.statusConfirmed {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #1e40af;
+}
+
+.statusStarted {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+}
+
+.statusCompleted {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+}
+
+.statusCancelled {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: var(--error);
+}
+
+.statusDefault {
+  background-color: var(--background-secondary);
+  color: var(--text-secondary);
+}
+
+.actionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.actionButton {
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: var(--black);
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-luxury);
+  box-shadow: var(--shadow-sm);
+}
+
+.actionButton:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.cancelButton {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.cancelButton:hover {
+  background: var(--primary);
+  color: var(--black);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .filterButtonActive {
+  color: var(--black);
+}
+
+[data-theme="dark"] .actionButton {
+  color: var(--black);
+}
+
+[data-theme="dark"] .statusConfirmed {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .statusStarted {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}

@@ -143,7 +143,7 @@ export default function Home() {
       console.log("Loading salons for coordinates:", latitude, longitude);
 
       const response = await fetch(
-        `/api/salons/nearby?latitude=${latitude}&longitude=${longitude}&radius=40&gender=${gender}`
+        `/api/salons/nearby?latitude=${latitude}&longitude=${longitude}&radius=100&gender=${gender}`
       );
 
       const data = await response.json();
