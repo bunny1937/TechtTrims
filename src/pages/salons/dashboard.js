@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
-import Layout from "../../components/Layout/Layout";
 import OwnerSidebar from "../../components/OwnerSidebar";
+import styles from "../../styles/SalonDashboard.module.css";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -10,41 +10,20 @@ export default function DashboardPage() {
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState("today"); // New state for date filtering
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const loadBookings = useCallback(async (salonId, filter = "today") => {
+  const loadBookings = useCallback(async (salonId, dateString) => {
     try {
       setLoading(true);
-      const now = new Date();
-      const istOffset = 5.5 * 60 * 60 * 1000;
-      const istDate = new Date(now.getTime() + istOffset);
-
       let dateParam = "";
 
-      switch (filter) {
-        case "yesterday":
-          const yesterday = new Date(istDate);
-          yesterday.setDate(yesterday.getDate() - 1);
-          dateParam = `&date=${yesterday.toISOString().split("T")[0]}`;
-          break;
-        case "today":
-          dateParam = `&date=${istDate.toISOString().split("T")[0]}`;
-          break;
-        case "tomorrow":
-          const tomorrow = new Date(istDate);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          dateParam = `&date=${tomorrow.toISOString().split("T")[0]}`;
-          break;
-        case "fromTomorrow":
-          const fromTomorrow = new Date(istDate);
-          fromTomorrow.setDate(fromTomorrow.getDate() + 1);
-          dateParam = `&from=${fromTomorrow.toISOString().split("T")[0]}`;
-          break;
-        case "all":
-          dateParam = "";
-          break;
-        default:
-          dateParam = `&date=${istDate.toISOString().split("T")[0]}`;
+      if (dateString === "all") {
+        dateParam = ""; // No filter
+      } else {
+        dateParam = `&date=${dateString}`;
       }
 
       const response = await fetch(
@@ -73,79 +52,46 @@ export default function DashboardPage() {
     }
     const salonData = JSON.parse(salonSession);
     setSalon(salonData);
-    loadBookings(salonData._id, dateFilter);
-  }, [router, router.isReady, loadBookings, dateFilter]);
+    loadBookings(salonData._id, selectedDate);
+  }, [router, router.isReady, loadBookings, selectedDate]);
 
-  // Handle date filter change
-  const handleDateFilterChange = (newFilter) => {
-    setDateFilter(newFilter);
+  // Handle date change
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
     if (salon) {
-      loadBookings(salon._id, newFilter);
+      loadBookings(salon._id, newDate);
     }
   };
 
-  // Get display text for current filter
-  const getFilterDisplayText = () => {
-    switch (dateFilter) {
-      case "yesterday":
-        return "Yesterday's Bookings";
-      case "today":
-        return "Today's Bookings";
-      case "tomorrow":
-        return "Tomorrow's Bookings";
-      case "fromTomorrow":
-        return "Upcoming Bookings (From Tomorrow)";
-      case "all":
-        return "All Bookings";
-      default:
-        return "Today's Bookings";
-    }
+  // Quick date buttons
+  const setQuickDate = (daysOffset) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysOffset);
+    const dateString = date.toISOString().split("T")[0];
+    handleDateChange(dateString);
   };
 
-  // Get current date display
-  const getCurrentDateDisplay = () => {
-    const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const istDate = new Date(now.getTime() + istOffset);
+  // Get display text for current date
+  const getDateDisplayText = () => {
+    if (selectedDate === "all") return "All Time";
 
-    switch (dateFilter) {
-      case "yesterday":
-        const yesterday = new Date(istDate);
-        yesterday.setDate(yesterday.getDate() - 1);
-        return yesterday.toLocaleDateString("en-IN", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
-      case "today":
-        return istDate.toLocaleDateString("en-IN", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
-      case "tomorrow":
-        const tomorrow = new Date(istDate);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow.toLocaleDateString("en-IN", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
-      case "fromTomorrow":
-        return "From Tomorrow Onwards";
-      case "all":
-        return "All Time";
-      default:
-        return istDate.toLocaleDateString("en-IN", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
-    }
+    const selected = new Date(selectedDate + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selected.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.floor((selected - today) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today's Bookings";
+    if (diffDays === -1) return "Yesterday's Bookings";
+    if (diffDays === 1) return "Tomorrow's Bookings";
+
+    return selected.toLocaleDateString("en-IN", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
 
   const updateBookingStatus = async (bookingId, status) => {
@@ -172,240 +118,244 @@ export default function DashboardPage() {
     }
   };
 
-  const getCurrentDate = () =>
-    new Date().toLocaleDateString("en-IN", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-
-  if (loading)
+  if (loading && !salon) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="spinner"></div>
-        <p className="ml-2">Loading dashboard...</p>
+      <div className={styles.loadingContainer}>
+        <div className={styles.loadingContent}>
+          <div className={styles.spinner}></div>
+          <p>Loading dashboard...</p>
+        </div>
       </div>
     );
+  }
 
   return (
-    <Layout>
-      <div className="flex min-h-screen bg-background-primary">
-        {/* Sidebar Desktop */}
-        <aside className="hidden md:block w-64 border-r">
-          <OwnerSidebar />
-        </aside>
+    <div className={styles.dashboardWrapper}>
+      {/* Sidebar Desktop */}
+      <aside className={styles.sidebarDesktop}>
+        <OwnerSidebar />
+      </aside>
 
-        {/* Sidebar Mobile (slide-in) */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-40 flex md:hidden">
-            {/* Overlay */}
-            <div
-              className="fixed inset-0 bg-black bg-opacity-40"
-              onClick={() => setSidebarOpen(false)}
-            ></div>
-            {/* Drawer */}
-            <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white shadow-xl animate-slideIn">
-              <OwnerSidebar closeSidebar={() => setSidebarOpen(false)} />
-            </div>
+      {/* Sidebar Mobile */}
+      {sidebarOpen && (
+        <div className={styles.mobileOverlay}>
+          <div
+            className={styles.overlay}
+            onClick={() => setSidebarOpen(false)}
+          ></div>
+          <div className={styles.drawer}>
+            <OwnerSidebar closeSidebar={() => setSidebarOpen(false)} />
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Main Content */}
-        <main className="flex-1 p-4 md:p-6">
-          <div className="max-w-6xl mx-auto space-y-6 animate-slideIn">
-            {/* Top Bar for mobile */}
-            <div className="md:hidden flex items-center justify-between bg-white p-3 rounded-lg shadow-sm sticky top-0 z-30">
+      {/* Main Content */}
+      <main className={styles.mainContent}>
+        <div className={styles.contentContainer}>
+          {/* Top Bar for mobile */}
+          <div className={styles.mobileTopBar}>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className={styles.menuButton}
+            >
+              ☰
+            </button>
+            <h1 className={styles.mobileTitle}>
+              {salon?.salonName || "Dashboard"}
+            </h1>
+          </div>
+
+          {/* Salon Info */}
+          <div className={styles.card}>
+            <h1 className={styles.salonTitle}>{salon?.salonName}</h1>
+            <p className={styles.salonOwner}>Owner: {salon?.ownerName}</p>
+          </div>
+
+          {/* Date Picker Section */}
+          <div className={styles.card}>
+            <h2 className={styles.filterTitle}>📅 Select Date</h2>
+
+            {/* Quick Date Buttons */}
+            <div className={styles.filterButtons}>
               <button
-                onClick={() => setSidebarOpen(true)}
-                className="p-2 rounded-md hover:bg-gray-100"
+                onClick={() => setQuickDate(-1)}
+                className={styles.filterButton}
               >
-                ☰
+                ⏮️ Yesterday
               </button>
-              <h1 className="font-bold text-lg gold-gradient-text">
-                {salon?.salonName || "Dashboard"}
-              </h1>
+              <button
+                onClick={() => setQuickDate(0)}
+                className={`${styles.filterButton} ${styles.filterButtonActive}`}
+              >
+                📅 Today
+              </button>
+              <button
+                onClick={() => setQuickDate(1)}
+                className={styles.filterButton}
+              >
+                ⏭️ Tomorrow
+              </button>
+              <button
+                onClick={() => {
+                  handleDateChange("all");
+                  setShowDatePicker(false);
+                }}
+                className={`${styles.filterButton} ${
+                  selectedDate === "all" ? styles.filterButtonActive : ""
+                }`}
+              >
+                📊 All Time
+              </button>
+
+              {/* Pick a Date Button */}
+              <button
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                className={`${styles.filterButton} ${
+                  showDatePicker ? styles.filterButtonActive : ""
+                }`}
+              >
+                📆 Pick a Date
+              </button>
+
+              {/* Date Picker Input - Shows only when button clicked */}
+              {showDatePicker && (
+                <input
+                  type="date"
+                  value={selectedDate === "all" ? "" : selectedDate}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  className={styles.datePickerInput}
+                  autoFocus
+                />
+              )}
             </div>
 
-            {/* Salon Info */}
-            <div className="card">
-              <h1 className="text-2xl font-bold gold-gradient-text">
-                {salon?.salonName}
-              </h1>
-              <p className="text-text-secondary">Owner: {salon?.ownerName}</p>
-            </div>
+            {/* Current Selection Display
+            <div className={styles.currentDateDisplay}>
+              <span className={styles.currentDateIcon}>🗓️</span>
+              <span className={styles.currentDateText}>
+                {getDateDisplayText()}
+              </span>
+            </div> */}
+          </div>
 
-            {/* Date Filter Controls */}
-            <div className="card">
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                <h2 className="text-lg font-semibold">Filter Bookings</h2>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: "yesterday", label: "Yesterday", emoji: "⏮️" },
-                    { value: "today", label: "Today", emoji: "📅" },
-                    { value: "tomorrow", label: "Tomorrow", emoji: "⏭️" },
-                    {
-                      value: "fromTomorrow",
-                      label: "From Tomorrow",
-                      emoji: "🔜",
-                    },
-                    { value: "all", label: "All Bookings", emoji: "📊" },
-                  ].map((filter) => (
-                    <button
-                      key={filter.value}
-                      onClick={() => handleDateFilterChange(filter.value)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                        dateFilter === filter.value
-                          ? "bg-primary text-white shadow-lg transform scale-105"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md"
-                      }`}
-                    >
-                      {filter.emoji} {filter.label}
-                    </button>
-                  ))}
-                </div>
+          {/* Bookings */}
+          <div className={styles.card}>
+            <div className={styles.bookingsHeader}>
+              <div className={styles.bookingsInfo}>
+                <h2 className={styles.bookingsTitle}>
+                  Bookings ({bookings.length})
+                </h2>
+                <span className={styles.bookingsDate}>
+                  {getDateDisplayText()}
+                </span>
               </div>
+              <button
+                onClick={() => loadBookings(salon._id, selectedDate)}
+                className={styles.refreshButton}
+                disabled={loading}
+              >
+                🔄 {loading ? "Refreshing..." : "Refresh"}
+              </button>
             </div>
 
-            {/* Bookings */}
-            <div className="card">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-semibold mb-1">
-                    {getFilterDisplayText()} ({bookings.length})
-                  </h2>
-                  <span className="text-sm text-text-secondary">
-                    {getCurrentDateDisplay()}
-                  </span>
-                </div>
+            {error && <div className={styles.errorBox}>{error}</div>}
+
+            {bookings.length === 0 ? (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon}>📅</div>
+                <p className={styles.emptyText}>
+                  No bookings found for{" "}
+                  {selectedDate === "all" ? "all time" : "selected date"}
+                </p>
                 <button
-                  onClick={() => loadBookings(salon._id, dateFilter)}
-                  className="mt-2 sm:mt-0 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
-                  disabled={loading}
+                  onClick={() => handleDateChange("all")}
+                  className={styles.viewAllButton}
                 >
-                  🔄 {loading ? "Refreshing..." : "Refresh"}
+                  View All Bookings
                 </button>
               </div>
+            ) : (
+              <div className={styles.bookingsGrid}>
+                {bookings.map((b) => (
+                  <div key={b._id || b.id} className={styles.bookingCard}>
+                    <div className={styles.bookingDetails}>
+                      <h3 className={styles.customerName}>{b.customerName}</h3>
+                      <p className={styles.bookingInfo}>📞 {b.customerPhone}</p>
+                      <p className={styles.bookingInfo}>✂️ {b.service}</p>
+                      {b.barber && (
+                        <p className={styles.bookingInfo}>👤 {b.barber}</p>
+                      )}
+                      <p className={styles.bookingInfo}>
+                        📅 {b.date} at {b.time}
+                      </p>
+                      <p className={styles.bookingInfo}>💰 ₹{b.price}</p>
+                    </div>
 
-              {error && (
-                <div className="bg-error/10 border border-error text-error px-4 py-3 rounded mb-4">
-                  {error}
-                </div>
-              )}
+                    <div className={styles.bookingActions}>
+                      <span
+                        className={`${styles.statusBadge} ${getStatusClassName(
+                          b.status
+                        )}`}
+                      >
+                        {b.status}
+                      </span>
 
-              {bookings.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-6xl mb-4">📅</div>
-                  <p className="text-text-secondary text-lg">
-                    No bookings found for{" "}
-                    {dateFilter === "today"
-                      ? "today"
-                      : dateFilter === "yesterday"
-                      ? "yesterday"
-                      : dateFilter === "tomorrow"
-                      ? "tomorrow"
-                      : dateFilter === "fromTomorrow"
-                      ? "upcoming dates"
-                      : "selected period"}
-                  </p>
-                  <button
-                    onClick={() => handleDateFilterChange("all")}
-                    className="mt-3 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark transition-colors"
-                  >
-                    View All Bookings
-                  </button>
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {bookings.map((b) => (
-                    <div
-                      key={b._id || b.id}
-                      className="flex flex-col md:flex-row justify-between md:items-center card p-4"
-                    >
-                      <div className="space-y-1">
-                        <h3 className="font-semibold text-lg">
-                          {b.customerName}
-                        </h3>
-                        <p className="text-text-secondary">
-                          📞 {b.customerPhone}
-                        </p>
-                        <p className="text-text-secondary">✂️ {b.service}</p>
-                        {b.barber && (
-                          <p className="text-text-secondary">👤 {b.barber}</p>
+                      <div className={styles.actionButtons}>
+                        {b.status === "confirmed" && (
+                          <button
+                            onClick={() =>
+                              updateBookingStatus(b._id, "started")
+                            }
+                            className={styles.actionButton}
+                          >
+                            Start Service
+                          </button>
                         )}
-                        <p className="text-text-secondary">
-                          📅 {b.date} at {b.time}
-                        </p>
-                        <p className="text-text-secondary">💰 ₹{b.price}</p>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="mt-3 md:mt-0 flex flex-col space-y-2">
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-medium self-start md:self-end ${getStatusColor(
-                            b.status
-                          )}`}
-                        >
-                          {b.status}
-                        </span>
-
-                        <div className="flex flex-wrap gap-2">
-                          {b.status === "confirmed" && (
+                        {b.status === "started" && (
+                          <button
+                            onClick={() =>
+                              updateBookingStatus(b._id, "completed")
+                            }
+                            className={styles.actionButton}
+                          >
+                            Mark Done
+                          </button>
+                        )}
+                        {b.status !== "cancelled" &&
+                          b.status !== "completed" && (
                             <button
                               onClick={() =>
-                                updateBookingStatus(b._id, "started")
+                                updateBookingStatus(b._id, "cancelled")
                               }
-                              className="btn btn-primary text-sm"
+                              className={`${styles.actionButton} ${styles.cancelButton}`}
                             >
-                              Start Service
+                              Cancel
                             </button>
                           )}
-                          {b.status === "started" && (
-                            <button
-                              onClick={() =>
-                                updateBookingStatus(b._id, "completed")
-                              }
-                              className="btn btn-primary text-sm"
-                            >
-                              Mark Done
-                            </button>
-                          )}
-                          {b.status !== "cancelled" &&
-                            b.status !== "completed" && (
-                              <button
-                                onClick={() =>
-                                  updateBookingStatus(b._id, "cancelled")
-                                }
-                                className="btn btn-secondary text-sm"
-                              >
-                                Cancel
-                              </button>
-                            )}
-                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </main>
-      </div>
-    </Layout>
+        </div>
+      </main>
+    </div>
   );
 }
 
-function getStatusColor(status) {
+function getStatusClassName(status) {
   switch (status) {
     case "confirmed":
-      return "bg-blue-100 text-blue-800";
+      return styles.statusConfirmed;
     case "started":
-      return "bg-yellow-100 text-yellow-800";
+      return styles.statusStarted;
     case "completed":
-      return "bg-success/20 text-success";
+      return styles.statusCompleted;
     case "cancelled":
-      return "bg-error/20 text-error";
+      return styles.statusCancelled;
     default:
-      return "bg-gray-100 text-gray-800";
+      return styles.statusDefault;
   }
 }

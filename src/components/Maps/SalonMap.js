@@ -2,9 +2,11 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useRouter } from "next/router";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { Navigation } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import styles from "../../styles/SalonMap.module.css";
+// import SalonCard from "../Salon/SalonCard";
 
 // Fix for default markers in react-leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -26,16 +28,18 @@ const salonIcon = new L.Icon({
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
     </svg>
   `),
-  iconSize: [60, 30],
-  iconAnchor: [15, 30],
-  popupAnchor: [0, -30],
+  iconSize: [35, 35], // Fixed size
+  iconAnchor: [17.5, 35],
+  popupAnchor: [0, -35],
+  className: "fixed-marker-icon",
 });
 
 // User location marker
 const userIcon = new L.Icon({
-  iconUrl: "/maps/usericon.jpg", // Put your icon here
-  iconSize: [30, 30],
-  iconAnchor: [15, 15],
+  iconUrl: "/maps/usericon.png", // Put your icon here
+  iconSize: [25, 25], // Fixed size
+  iconAnchor: [12.5, 12.5],
+  className: "fixed-user-icon",
 });
 
 const SalonCard = ({
@@ -174,6 +178,52 @@ const MapUpdater = ({ selectedSalon, salons }) => {
 
 //   return null;
 // };
+// Live Location Control Component
+const LiveLocationControl = ({ userLocation, map }) => {
+  const [locating, setLocating] = useState(false);
+
+  const centerOnUser = () => {
+    if (userLocation?.lat && userLocation?.lng && map) {
+      setLocating(true);
+      map.flyTo([userLocation.lat, userLocation.lng], 16, {
+        animate: true,
+        duration: 1.5,
+      });
+      setTimeout(() => setLocating(false), 1500);
+    } else {
+      // Request live location
+      if (navigator.geolocation) {
+        setLocating(true);
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const newPos = [
+              position.coords.latitude,
+              position.coords.longitude,
+            ];
+            map.flyTo(newPos, 16, { animate: true, duration: 1.5 });
+            setTimeout(() => setLocating(false), 1500);
+          },
+          (error) => {
+            alert("Unable to get location");
+            setLocating(false);
+          }
+        );
+      }
+    }
+  };
+
+  return (
+    <button
+      className={styles.liveLocationBtn}
+      onClick={centerOnUser}
+      disabled={locating}
+      title="Center on my location"
+    >
+      <span className={locating ? styles.spinning : ""}>📍</span>
+      {locating ? "Locating..." : "My Location"}
+    </button>
+  );
+};
 
 const SalonMap = ({
   salons,
@@ -186,8 +236,10 @@ const SalonMap = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const selectedSalonData = salons.find((s) => s._id === selectedSalon);
   const router = useRouter();
-  const mapRef = useRef(null);
   const [mapTheme, setMapTheme] = useState("standard");
+  const [selectedSalonPopup, setSelectedSalonPopup] = useState(null);
+  const [mapInstance, setMapInstance] = useState(null);
+  const [mapRef, setMapRef] = useState(null);
 
   const mapThemes = {
     standard: {
@@ -257,9 +309,10 @@ const SalonMap = ({
         center={defaultCenter}
         zoom={15}
         maxZoom={20}
-        ref={mapRef}
         className={styles.map}
-        whenCreated={() => setMapLoaded(true)}
+        ref={setMapRef}
+        whenReady={(map) => setMapRef(map.target)}
+        whenCreated={setMapInstance}
       >
         <TileLayer
           url={mapThemes[mapTheme].url}
@@ -311,7 +364,10 @@ const SalonMap = ({
                 <div className="flex flex-col gap-1">
                   <button
                     className="text-xs bg-orange-500 text-white rounded px-4 py-1 font-medium hover:bg-orange-600"
-                    onClick={() => onSalonSelect(salon)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSalonPopup(salon);
+                    }}
                   >
                     View Details
                   </button>
@@ -346,21 +402,33 @@ const SalonMap = ({
           />
         ))}
       </MapContainer>
-
+      {userLocation && mapRef && (
+        <LiveLocationControl userLocation={userLocation} map={mapRef} />
+      )}
       {/* Salon Details Card */}
-      {selectedSalonData && (
-        <div className={styles.sidePanel}>
-          <button
-            className={styles.closeButton}
-            onClick={() => onSalonSelect(null)}
+      {selectedSalonPopup && (
+        <div
+          className={styles.salonPopupOverlay}
+          onClick={() => setSelectedSalonPopup(null)}
+        >
+          <div
+            className={styles.salonPopupCard}
+            onClick={(e) => e.stopPropagation()}
           >
-            ×
-          </button>
-          <SalonCard
-            salon={selectedSalonData}
-            onBookNow={onBookNow}
-            userGender={userGender}
-          />
+            <button
+              className={styles.popupClose}
+              onClick={() => setSelectedSalonPopup(null)}
+            >
+              ×
+            </button>
+            <SalonCard
+              salon={selectedSalonPopup}
+              userLocation={userLocation}
+              onSalonSelect={onSalonSelect}
+              onBookNow={onBookNow}
+              userGender={userGender}
+            />
+          </div>
         </div>
       )}
     </div>

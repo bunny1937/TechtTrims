@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import styles from "../styles/SalonCard.module.css";
+import styles from "../../styles/SalonCard.module.css";
 import Image from "next/image";
 
 export default function SalonCard({ salon, gender }) {

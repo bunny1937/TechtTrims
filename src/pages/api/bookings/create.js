@@ -1,5 +1,6 @@
 import { connectToDatabase, clientPromise } from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
+import { updateSalonStats } from "../../../lib/Statshelper";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -175,6 +176,7 @@ export default async function handler(req, res) {
       // fallback: not a replica set / no sessions available
       await transactionFn(null);
     }
+    await updateSalonStats(salonId);
 
     res.status(201).json({
       success: true,

@@ -6,17 +6,81 @@
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
+/* CHANGE FROM: (doesn't exist)
+/* CHANGE TO: */
+.liveLocationBtn {
+  position: absolute;
+  bottom: 100px;
+  right: 10px;
+  z-index: 1000;
+  background: white;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.liveLocationBtn:hover:not(:disabled) {
+  background: #f59e0b;
+  color: white;
+  transform: scale(1.05);
+}
+
+.liveLocationBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .custom-popup .leaflet-popup-content-wrapper {
   border-radius: 8px !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
   padding: 0 !important;
   min-width: 50px !important;
+  width: max-content !important;
+  font-size: 14px;
 }
-
+@media (max-width: 768px) {
+  .custom-popup .leaflet-popup-content-wrapper {
+    max-width: 220px !important;
+    font-size: 12px;
+  }
+}
 .custom-popup .leaflet-popup-content {
   margin: 0 !important;
   padding: 0 !important;
   width: auto !important;
+}
+/* CHANGE FROM: (existing behavior)
+/* CHANGE TO: */
+.fixed-marker-icon,
+.fixed-user-icon {
+  transition: none !important;
+  transform: none !important;
+}
+
+.leaflet-zoom-animated .fixed-marker-icon,
+.leaflet-zoom-animated .fixed-user-icon {
+  transform: translate3d(0, 0, 0) !important;
+  will-change: transform;
 }
 
 .custom-popup .leaflet-popup-tip {
@@ -38,6 +102,94 @@
   border-radius: 20px;
   font-size: 18px;
   color: #6b7280;
+}
+/* Salon Popup Overlay */
+.salonPopupOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 2000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.salonPopupCard {
+  background: white;
+  width: 100%;
+  max-width: 500px;
+  max-height: 85vh;
+  overflow-y: auto;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  position: relative;
+  animation: slideUp 0.3s ease-out;
+}
+
+@media (min-width: 768px) {
+  .salonPopupOverlay {
+    align-items: center;
+    justify-content: flex-start;
+    padding-left: 20px;
+  }
+
+  .salonPopupCard {
+    border-radius: 20px;
+    max-width: 450px;
+    max-height: 90vh;
+    animation: slideInLeft 0.3s ease-out;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.popupClose {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.1);
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s;
+}
+
+.popupClose:hover {
+  background: rgba(0, 0, 0, 0.2);
+  transform: scale(1.1);
+}
+.fixed-marker-icon,
+.fixed-user-icon {
+  transition: none !important;
+}
+
+.leaflet-zoom-animated .fixed-marker-icon,
+.leaflet-zoom-animated .fixed-user-icon {
+  will-change: transform;
 }
 
 /* Side Panel for Selected Salon */
