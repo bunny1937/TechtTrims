@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import styles from "../../../styles/Auth.module.css";
+import styles from "../../../styles/Auth/UserAuth.module.css";
 
 export default function UserLoginPage() {
   const router = useRouter();
@@ -140,13 +140,6 @@ export default function UserLoginPage() {
               Login as Salon
             </button>
           </p>
-        </div>
-
-        {/* Demo credentials for testing */}
-        <div className={styles.demoInfo}>
-          <h4>Demo Account:</h4>
-          <p>Email: demo@gmail.com</p>
-          <p>Password: demo123</p>
         </div>
       </div>
     </div>
