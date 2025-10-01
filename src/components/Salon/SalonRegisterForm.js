@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { MapPin, Clock, Store, Scissors, Star } from "lucide-react";
+import styles from "../../styles/SalonRegister.module.css";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 
@@ -88,7 +89,7 @@ const SalonRegisterForm = () => {
       if (!formData.address) errors.address = "Address is required";
     }
 
-    if (step === 3) {
+    if (step === 4) {
       const enabledServices = Object.values(formData.services).some(
         (service) => service.enabled
       );
@@ -211,6 +212,11 @@ const SalonRegisterForm = () => {
     if (validateStep(currentStep)) {
       setCurrentStep(currentStep + 1);
     }
+    if (!validateStep(currentStep)) {
+      console.log("Validation failed at step", currentStep, validationErrors);
+      return;
+    }
+    console.log("Form Data at Step", currentStep, formData);
   };
 
   const handlePrevStep = () => {
@@ -271,7 +277,7 @@ const SalonRegisterForm = () => {
         );
 
         // Redirect to dashboard or login
-        // window.location.href = "/salons/dashboard";
+        window.location.href = "/auth/salon/login";
       } else {
         const error = await response.json();
         alert(`Registration failed: ${error.message}`);
@@ -283,23 +289,23 @@ const SalonRegisterForm = () => {
   };
 
   const services = [
-    { key: "Haircut", label: "Haircut", icon: Scissors, defaultPrice: "200" },
-    { key: "Shave", label: "Shave", icon: Scissors, defaultPrice: "100" },
+    { key: "haircut", label: "Haircut", icon: Scissors, defaultPrice: "200" },
+    { key: "shave", label: "Shave", icon: Scissors, defaultPrice: "100" },
     {
-      key: "Hair Wash",
+      key: "hairWash",
       label: "Hair Wash",
       icon: Scissors,
       defaultPrice: "150",
     },
     {
-      key: "Hair Styling",
+      key: "hairStyling",
       label: "Hair Styling",
       icon: Scissors,
       defaultPrice: "300",
     },
-    { key: "Facial", label: "Facial", icon: Star, defaultPrice: "500" },
+    { key: "facial", label: "Facial", icon: Star, defaultPrice: "500" },
     {
-      key: "Hair Color",
+      key: "hairColor",
       label: "Hair Color",
       icon: Scissors,
       defaultPrice: "800",
@@ -316,815 +322,475 @@ const SalonRegisterForm = () => {
   }
 
   return (
-    <>
-      <div
-        className={`min-h-screen transition-all duration-500 ${
-          isDarkMode
-            ? "bg-[var(--dark-background-primary)]"
-            : "bg-[var(--background-primary)]"
-        }`}
-      >
-        {/* Dark Mode Toggle */}
-        <div className="absolute top-4 right-4 z-50">
-          <button
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className={`p-3 rounded-full transition-all duration-300 ${
-              isDarkMode
-                ? "bg-[var(--dark-gold-primary)] text-gray-900 hover:opacity-90"
-                : "bg-gray-800 text-white hover:bg-gray-700"
-            }`}
-          >
-            {isDarkMode ? "☀️" : "🌙"}
-          </button>
-        </div>
+    <div
+      className={styles.container}
+      data-theme={isDarkMode ? "dark" : "light"}
+    >
+      {/* Header */}
+      <div className={styles.header}>
+        <h1 className={styles.headerTitle}>Register Your Salon</h1>
+        <p className={styles.headerSubtitle}>
+          Join our platform and start getting more customers
+        </p>
+      </div>
 
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="text-center mb-8 animate-fadeIn">
-              <div
-                className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
-                  isDarkMode
-                    ? "bg-[var(--dark-gold-primary)]"
-                    : "bg-[var(--gold-primary)]"
-                }`}
-              >
-                <Store className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-4xl font-bold mb-2 gold-gradient-text">
-                Register Your Salon
-              </h1>
-              <p
-                className={`text-lg ${
-                  isDarkMode ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
-                Join our platform and start getting more customers
-              </p>
-            </div>
-
-            {/* Progress Steps */}
-            <div className="flex items-center justify-center mb-8">
-              {[1, 2, 3, 4].map((step) => (
-                <React.Fragment key={step}>
-                  <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${
-                      currentStep >= step
-                        ? isDarkMode
-                          ? "bg-[var(--dark-gold-primary)] text-[var(--contrast-dark)]"
-                          : "bg-[var(--gold-primary)] text-[var(--contrast-dark)]"
-                        : isDarkMode
-                        ? "bg-gray-700 text-gray-400"
-                        : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    {step}
-                  </div>
-                  {step < 4 && (
-                    <div
-                      className={`w-12 h-1 mx-2 transition-all duration-300 ${
-                        currentStep > step
-                          ? isDarkMode
-                            ? "bg-[var(--dark-gold-primary)]"
-                            : "bg-[var(--gold-primary)]"
-                          : isDarkMode
-                          ? "bg-gray-700"
-                          : "bg-gray-200"
-                      }`}
-                    />
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
-
-            {/* Registration Form */}
+      {/* Progress Steps */}
+      <div className={styles.progressSteps}>
+        {[1, 2, 3, 4].map((step) => (
+          <React.Fragment key={step}>
             <div
-              className={`card rounded-3xl   p-8 backdrop-blur-sm transition-all duration-500 ${
-                isDarkMode
-                  ? "bg-gray-800/80 border border-gray-700"
-                  : "bg-white/90 border border-amber-200"
-              }`}
+              className={styles.stepCircle}
+              style={{
+                background:
+                  currentStep >= step ? "var(--primary)" : "var(--gray-400)",
+                color: currentStep >= step ? "var(--black)" : "var(--black)",
+              }}
             >
-              <div className="space-y-8">
-                {/* Step 1: Owner Details */}
-                {currentStep === 1 && (
-                  <div className="animate-slideIn">
-                    <h2
-                      className={`text-2xl font-bold mb-6 flex items-center ${
-                        isDarkMode ? "text-yellow-400" : "text-amber-600"
-                      }`}
-                    >
-                      Owner Details
-                    </h2>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label
-                          className={`form-label ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Full Name
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Your full name"
-                          value={formData.fullName}
-                          onChange={(e) =>
-                            handleInputChange("fullName", e.target.value)
-                          }
-                          className={`w-full form-input rounded-xl transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                            isDarkMode
-                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                          } ${
-                            validationErrors.fullName ? "border-red-500" : ""
-                          }`}
-                        />
-                        {validationErrors.fullName && (
-                          <p className="text-red-500 text-sm">
-                            {validationErrors.fullName}
-                          </p>
-                        )}
-                      </div>
+              {step}
+            </div>
+            {step < 4 && (
+              <div
+                className={styles.stepLine}
+                style={{
+                  background:
+                    currentStep > step ? "var(--primary)" : "var(--gray-400)",
+                }}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
 
-                      <div className="space-y-2">
-                        <label
-                          className={`form-label ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Mobile Number
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="tel"
-                            placeholder="+91 9876543210"
-                            value={formData.phone}
-                            onChange={(e) =>
-                              handleInputChange("phone", e.target.value)
-                            }
-                            className={`w-full form-input pl-11 pr-4 rounded-xl transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                            } ${
-                              validationErrors.phone ? "border-red-500" : ""
-                            }`}
-                          />
-                        </div>
-                        {validationErrors.phone && (
-                          <p className="text-red-500 text-sm">
-                            {validationErrors.phone}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className={`form-label ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Email
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="email"
-                            placeholder="your.email@example.com"
-                            value={formData.email}
-                            onChange={(e) =>
-                              handleInputChange("email", e.target.value)
-                            }
-                            className={`w-full form-input pl-11 pr-4 rounded-xl transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                            } ${
-                              validationErrors.email ? "border-red-500" : ""
-                            }`}
-                          />
-                        </div>
-                        {validationErrors.email && (
-                          <p className="text-red-500 text-sm">
-                            {validationErrors.email}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className={`form-label ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Password
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="password"
-                            placeholder="Create a strong password"
-                            value={formData.password}
-                            onChange={(e) =>
-                              handleInputChange("password", e.target.value)
-                            }
-                            className={`w-full form-input pl-11 pr-4 rounded-xl transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                            } ${
-                              validationErrors.password ? "border-red-500" : ""
-                            }`}
-                          />
-                        </div>
-                        {validationErrors.password && (
-                          <p className="text-red-500 text-sm">
-                            {validationErrors.password}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 2: Salon Details */}
-                {currentStep === 2 && (
-                  <div className="animate-slideIn">
-                    <h2
-                      className={`text-2xl font-bold mb-6 flex items-center ${
-                        isDarkMode ? "text-yellow-400" : "text-amber-600"
-                      }`}
-                    >
-                      <Store className="w-6 h-6 mr-3" />
-                      Salon Details
-                    </h2>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label
-                          className={`form-label ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Salon Name
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Your salon name"
-                          value={formData.salonName}
-                          onChange={(e) =>
-                            handleInputChange("salonName", e.target.value)
-                          }
-                          className={`w-full form-input rounded-xl transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                            isDarkMode
-                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                          } ${
-                            validationErrors.salonName ? "border-red-500" : ""
-                          }`}
-                        />
-                        {validationErrors.salonName && (
-                          <p className="text-red-500 text-sm">
-                            {validationErrors.salonName}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className={`form-label ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Location Pin
-                        </label>
-                        <div className="relative">
-                          <MapPin
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          />
-                          <button
-                            type="button"
-                            className={`w-full pl-11 pr-4 py-3 rounded-xl border transition-all duration-300 text-left form-input ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
-                                : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
-                            } ${
-                              validationErrors.location ? "border-red-500" : ""
-                            }`}
-                            onClick={() => setShowLocationPicker(true)}
-                          >
-                            {formData.locationData
-                              ? formData.locationData.address
-                              : "Set exact location on map"}
-                          </button>
-                          {validationErrors.location && (
-                            <p className="text-red-500 text-sm">
-                              {validationErrors.location}
-                            </p>
-                          )}
-                          {showLocationPicker && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                              <div className="bg-white rounded-xl p-6 shadow-xl relative w-full max-w-2xl">
-                                <button
-                                  className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-                                  onClick={() => setShowLocationPicker(false)}
-                                >
-                                  ✕
-                                </button>
-                                <LocationPicker
-                                  onLocationSelect={handleLocationSelect}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="md:col-span-2 space-y-2">
-                        <label
-                          className={`form-label ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Address
-                        </label>
-                        <textarea
-                          placeholder="Complete address with landmarks"
-                          value={formData.address}
-                          onChange={(e) =>
-                            handleInputChange("address", e.target.value)
-                          }
-                          rows={3}
-                          className={`w-full form-input rounded-xl transition-all duration-300 resize-none focus:ring-2 focus:ring-opacity-50 ${
-                            isDarkMode
-                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                          } ${
-                            validationErrors.address ? "border-red-500" : ""
-                          }`}
-                        />
-                        {validationErrors.address && (
-                          <p className="text-red-500 text-sm">
-                            {validationErrors.address}
-                          </p>
-                        )}
-                      </div>
-                      <input
-                        type="hidden"
-                        name="latitude"
-                        value={formData.latitude || ""}
-                      />
-                      <input
-                        type="hidden"
-                        name="longitude"
-                        value={formData.longitude || ""}
-                      />
-
-                      <div className="space-y-2">
-                        <label
-                          className={`form-label ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Opening Time
-                        </label>
-                        <div className="relative">
-                          <Clock
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          />
-                          <input
-                            type="time"
-                            value={formData.openingTime}
-                            onChange={(e) =>
-                              handleInputChange("openingTime", e.target.value)
-                            }
-                            className={`w-full form-input pl-11 pr-4 rounded-xl transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-white focus:border-yellow-500 focus:ring-yellow-500"
-                                : "bg-white border-gray-300 text-gray-900 focus:border-amber-500 focus:ring-amber-500"
-                            }`}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className={`form-label ${
-                            isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}
-                        >
-                          Closing Time
-                        </label>
-                        <div className="relative">
-                          <Clock
-                            className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          />
-                          <input
-                            type="time"
-                            value={formData.closingTime}
-                            onChange={(e) =>
-                              handleInputChange("closingTime", e.target.value)
-                            }
-                            className={`w-full form-input pl-11 pr-4 rounded-xl transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                              isDarkMode
-                                ? "bg-gray-700 border-gray-600 text-white focus:border-yellow-500 focus:ring-yellow-500"
-                                : "bg-white border-gray-300 text-gray-900 focus:border-amber-500 focus:ring-amber-500"
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {/* Step 3: Barber Management */}
-                {currentStep === 3 && (
-                  <div className="animate-slideIn">
-                    <h2
-                      className={`text-2xl font-bold mb-6 flex items-center ${
-                        isDarkMode ? "text-yellow-400" : "text-amber-600"
-                      }`}
-                    >
-                      <div className="w-6 h-6 mr-3" />
-                      Add Your Barbers
-                    </h2>
-
-                    <div className="space-y-6">
-                      {formData.barbers.map((barber, index) => (
-                        <div
-                          key={index}
-                          className={`p-6 rounded-xl border-2 transition-all duration-300 ${
-                            isDarkMode
-                              ? "border-gray-600 bg-gray-700/50"
-                              : "border-gray-200 bg-gray-50"
-                          }`}
-                        >
-                          <div className="flex justify-between items-center mb-4">
-                            <h3
-                              className={`font-semibold ${
-                                isDarkMode ? "text-white" : "text-gray-900"
-                              }`}
-                            >
-                              Barber {index + 1}
-                            </h3>
-                            {formData.barbers.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeBarber(index)}
-                                className="text-red-500 hover:text-red-700"
-                              >
-                                ✕
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="grid md:grid-cols-2 gap-4">
-                            <input
-                              type="text"
-                              placeholder="Barber Name"
-                              value={barber.name}
-                              onChange={(e) =>
-                                handleBarberChange(
-                                  index,
-                                  "name",
-                                  e.target.value
-                                )
-                              }
-                              className={`w-full px-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                                isDarkMode
-                                  ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                              }`}
-                            />
-
-                            <input
-                              type="number"
-                              placeholder="Years of Experience"
-                              value={barber.experience}
-                              onChange={(e) =>
-                                handleBarberChange(
-                                  index,
-                                  "experience",
-                                  e.target.value
-                                )
-                              }
-                              className={`w-full px-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                                isDarkMode
-                                  ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                              }`}
-                            />
-                          </div>
-
-                          <div className="mt-4">
-                            <label
-                              className={`block text-sm font-medium mb-2 ${
-                                isDarkMode ? "text-gray-300" : "text-gray-700"
-                              }`}
-                            >
-                              Specializations
-                            </label>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                              {[
-                                "Haircut",
-                                "Shaving",
-                                "Hair Styling",
-                                "Beard Trim",
-                                "Hair Color",
-                                "Facial",
-                              ].map((skill) => (
-                                <label
-                                  key={skill}
-                                  className="flex items-center"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={barber.skills.includes(skill)}
-                                    onChange={(e) =>
-                                      handleBarberSkillChange(
-                                        index,
-                                        skill,
-                                        e.target.checked
-                                      )
-                                    }
-                                    className={`mr-2 ${
-                                      isDarkMode
-                                        ? "text-yellow-500 focus:ring-yellow-500"
-                                        : "text-amber-500 focus:ring-amber-500"
-                                    }`}
-                                  />
-                                  <span
-                                    className={`text-sm ${
-                                      isDarkMode
-                                        ? "text-gray-300"
-                                        : "text-gray-700"
-                                    }`}
-                                  >
-                                    {skill}
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="mt-4">
-                            <label
-                              className={`block text-sm font-medium mb-2 ${
-                                isDarkMode ? "text-gray-300" : "text-gray-700"
-                              }`}
-                            >
-                              Bio/Accomplishments
-                            </label>
-                            <textarea
-                              placeholder="Describe barber's achievements, awards, etc."
-                              value={barber.bio}
-                              onChange={(e) =>
-                                handleBarberChange(index, "bio", e.target.value)
-                              }
-                              rows={2}
-                              className={`w-full px-4 py-3 rounded-xl border transition-all duration-300 focus:ring-2 focus:ring-opacity-50 resize-none ${
-                                isDarkMode
-                                  ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                              }`}
-                            />
-                          </div>
-                        </div>
-                      ))}
-
-                      <button
-                        type="button"
-                        onClick={addBarber}
-                        className={`w-full py-3 border-2 border-dashed rounded-xl transition-all duration-300 ${
-                          isDarkMode
-                            ? "border-gray-600 text-gray-400 hover:border-yellow-500 hover:text-yellow-400"
-                            : "border-gray-300 text-gray-600 hover:border-amber-500 hover:text-amber-600"
-                        }`}
-                      >
-                        + Add Another Barber
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {/* Step 3: Services */}
-                {currentStep === 4 && (
-                  <div className="animate-slideIn">
-                    <h2
-                      className={`text-2xl font-bold mb-6 flex items-center ${
-                        isDarkMode ? "text-yellow-400" : "text-amber-600"
-                      }`}
-                    >
-                      <Scissors className="w-6 h-6 mr-3" />
-                      Basic Services & Pricing
-                    </h2>
-
-                    {validationErrors.services && (
-                      <p className="text-red-500 text-sm mb-4">
-                        {validationErrors.services}
-                      </p>
-                    )}
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {services.map((service) => {
-                        const Icon = service.icon;
-                        return (
-                          <div
-                            key={service.key}
-                            className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                              formData.services[service.key].enabled
-                                ? isDarkMode
-                                  ? "border-yellow-500 bg-yellow-500/10"
-                                  : "border-amber-500 bg-amber-50"
-                                : isDarkMode
-                                ? "border-gray-600 bg-gray-700/50 hover:border-gray-500"
-                                : "border-gray-200 bg-gray-50 hover:border-gray-300"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    formData.services[service.key].enabled
-                                  }
-                                  onChange={(e) =>
-                                    handleServiceChange(
-                                      service.key,
-                                      "enabled",
-                                      e.target.checked
-                                    )
-                                  }
-                                  className={`w-5 h-5 rounded transition-all duration-300 ${
-                                    isDarkMode
-                                      ? "text-yellow-500 focus:ring-yellow-500 bg-gray-700 border-gray-600"
-                                      : "text-amber-500 focus:ring-amber-500"
-                                  }`}
-                                />
-                                <Icon
-                                  className={`w-5 h-5 ml-3 ${
-                                    formData.services[service.key].enabled
-                                      ? isDarkMode
-                                        ? "text-yellow-400"
-                                        : "text-amber-600"
-                                      : isDarkMode
-                                      ? "text-gray-400"
-                                      : "text-gray-500"
-                                  }`}
-                                />
-                                <span
-                                  className={`ml-2 font-medium ${
-                                    formData.services[service.key].enabled
-                                      ? isDarkMode
-                                        ? "text-white"
-                                        : "text-gray-900"
-                                      : isDarkMode
-                                      ? "text-gray-400"
-                                      : "text-gray-600"
-                                  }`}
-                                >
-                                  {service.label}
-                                </span>
-                              </div>
-                            </div>
-
-                            {formData.services[service.key].enabled && (
-                              <div className="animate-slideIn">
-                                <div className="flex items-center">
-                                  <span
-                                    className={`text-sm font-medium mr-2 ${
-                                      isDarkMode
-                                        ? "text-gray-300"
-                                        : "text-gray-700"
-                                    }`}
-                                  >
-                                    ₹
-                                  </span>
-                                  <input
-                                    type="number"
-                                    placeholder={service.defaultPrice}
-                                    value={formData.services[service.key].price}
-                                    onChange={(e) =>
-                                      handleServiceChange(
-                                        service.key,
-                                        "price",
-                                        e.target.value
-                                      )
-                                    }
-                                    className={`flex-1 form-input px-3 py-2 rounded-lg transition-all duration-300 focus:ring-2 focus:ring-opacity-50 ${
-                                      isDarkMode
-                                        ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
-                                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:ring-amber-500"
-                                    }`}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Navigation Buttons */}
-                <div className="flex justify-between pt-8">
-                  {currentStep > 1 && (
-                    <button
-                      type="button"
-                      onClick={handlePrevStep}
-                      className={`btn btn-secondary`}
-                    >
-                      Previous
-                    </button>
+      {/* Registration Form */}
+      <div className={styles.formCard}>
+        <div className="space-y-8">
+          {/* Step 1: Owner Details */}
+          {currentStep === 1 && (
+            <div className={styles.stepContainer}>
+              <h2 className={styles.stepTitle}>Owner Details</h2>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Your full name"
+                    value={formData.fullName}
+                    onChange={(e) =>
+                      handleInputChange("fullName", e.target.value)
+                    }
+                    className={`${styles.formInput} ${
+                      validationErrors.fullName ? styles.inputError : ""
+                    }`}
+                  />
+                  {validationErrors.fullName && (
+                    <p className={styles.errorText}>
+                      {validationErrors.fullName}
+                    </p>
                   )}
+                </div>
 
-                  {currentStep < 4 ? (
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(currentStep + 1)}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ml-auto ${
-                        isDarkMode
-                          ? "bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 hover:from-yellow-400 hover:to-amber-400"
-                          : "bg-gradient-to-r from-amber-500 to-yellow-600 text-white hover:from-amber-600 hover:to-yellow-700"
-                      }`}
-                    >
-                      Next Step
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleSubmit}
-                      className={`px-8 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ml-auto ${
-                        isDarkMode
-                          ? "bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 hover:from-yellow-400 hover:to-amber-400"
-                          : "bg-gradient-to-r from-amber-500 to-yellow-600 text-white hover:from-amber-600 hover:to-yellow-700"
-                      }`}
-                    >
-                      Register My Salon
-                    </button>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Mobile Number</label>
+                  <input
+                    type="tel"
+                    placeholder="+91 9876543210"
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange("phone", e.target.value)}
+                    className={`${styles.formInput} ${
+                      validationErrors.phone ? styles.inputError : ""
+                    }`}
+                  />
+                  {validationErrors.phone && (
+                    <p className={styles.errorText}>{validationErrors.phone}</p>
+                  )}
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Email</label>
+                  <input
+                    type="email"
+                    placeholder="your.email@example.com"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange("email", e.target.value)}
+                    className={`${styles.formInput} ${
+                      validationErrors.email ? styles.inputError : ""
+                    }`}
+                  />
+                  {validationErrors.email && (
+                    <p className={styles.errorText}>{validationErrors.email}</p>
+                  )}
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Password</label>
+                  <input
+                    type="password"
+                    placeholder="Create a strong password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      handleInputChange("password", e.target.value)
+                    }
+                    className={`${styles.formInput} ${
+                      validationErrors.password ? styles.inputError : ""
+                    }`}
+                  />
+                  {validationErrors.password && (
+                    <p className={styles.errorText}>
+                      {validationErrors.password}
+                    </p>
                   )}
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Sign In Link */}
-              <div className="text-center mt-8 pt-6 border-t border-opacity-20">
-                <p
-                  className={`${
-                    isDarkMode ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  <Link
-                    href="/salons/login"
-                    className={`font-medium transition-colors duration-300 ${
-                      isDarkMode
-                        ? "text-[var(--dark-gold-primary)] hover:opacity-80"
-                        : "text-[var(--gold-primary)] hover:opacity-80"
+          {/* Step 2: Salon Details */}
+          {currentStep === 2 && (
+            <div className={styles.stepContainer}>
+              <h2 className={styles.stepTitle}>
+                <Store className="w-6 h-6" />
+                Salon Details
+              </h2>
+
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Salon Name</label>
+                  <input
+                    type="text"
+                    placeholder="Your salon name"
+                    value={formData.salonName}
+                    onChange={(e) =>
+                      handleInputChange("salonName", e.target.value)
+                    }
+                    className={`${styles.formInput} ${
+                      validationErrors.salonName ? styles.inputError : ""
                     }`}
-                  >
-                    Sign In
-                  </Link>
-                </p>
+                  />
+                  {validationErrors.salonName && (
+                    <p className={styles.errorText}>
+                      {validationErrors.salonName}
+                    </p>
+                  )}
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Location Pin</label>
+                  <div className={styles.inputWithIcon}>
+                    <MapPin className={styles.inputIcon} />
+                    <button
+                      type="button"
+                      className={`${styles.locationButton} ${
+                        validationErrors.location ? styles.inputError : ""
+                      }`}
+                      onClick={() => setShowLocationPicker(true)}
+                    >
+                      {formData.locationData
+                        ? formData.locationData.address
+                        : "Set exact location on map"}
+                    </button>
+                    {validationErrors.location && (
+                      <p className={styles.errorText}>
+                        {validationErrors.location}
+                      </p>
+                    )}
+                    {showLocationPicker && (
+                      <div className={styles.modalOverlay}>
+                        <div className={styles.modalContent}>
+                          <button
+                            className={styles.modalClose}
+                            onClick={() => setShowLocationPicker(false)}
+                          >
+                            ✕
+                          </button>
+                          <LocationPicker
+                            onLocationSelect={handleLocationSelect}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+                  <label className={styles.formLabel}>Address</label>
+                  <textarea
+                    placeholder="Complete address with landmarks"
+                    value={formData.address}
+                    onChange={(e) =>
+                      handleInputChange("address", e.target.value)
+                    }
+                    rows={3}
+                    className={`${styles.textarea} ${
+                      validationErrors.address ? styles.inputError : ""
+                    }`}
+                  />
+                  {validationErrors.address && (
+                    <p className={styles.errorText}>
+                      {validationErrors.address}
+                    </p>
+                  )}
+                </div>
+                <input
+                  type="hidden"
+                  name="latitude"
+                  value={formData.latitude || ""}
+                />
+                <input
+                  type="hidden"
+                  name="longitude"
+                  value={formData.longitude || ""}
+                />
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Opening Time</label>
+                  <div className={styles.inputWithIcon}>
+                    <Clock className={styles.inputIcon} />
+                    <input
+                      type="time"
+                      value={formData.openingTime}
+                      onChange={(e) =>
+                        handleInputChange("openingTime", e.target.value)
+                      }
+                      className={styles.formInput}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Closing Time</label>
+                  <div className={styles.inputWithIcon}>
+                    <Clock className={styles.inputIcon} />
+                    <input
+                      type="time"
+                      value={formData.closingTime}
+                      onChange={(e) =>
+                        handleInputChange("closingTime", e.target.value)
+                      }
+                      className={styles.formInput}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
+          )}
+
+          {/* Step 3: Barber Management */}
+          {currentStep === 3 && (
+            <div className={styles.stepContainer}>
+              <h2 className={styles.stepTitle}>Add Your Barbers</h2>
+
+              <div className="space-y-6">
+                {formData.barbers.map((barber, index) => (
+                  <div key={index} className={styles.barberCard}>
+                    <div className={styles.barberHeader}>
+                      <h3 className={styles.barberTitle}>Barber {index + 1}</h3>
+                      {formData.barbers.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeBarber(index)}
+                          className={styles.removeButton}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <div className={styles.barberInputGrid}>
+                      <input
+                        type="text"
+                        placeholder="Barber Name"
+                        value={barber.name}
+                        onChange={(e) =>
+                          handleBarberChange(index, "name", e.target.value)
+                        }
+                        className={styles.formInput}
+                      />
+
+                      <input
+                        type="number"
+                        placeholder="Years of Experience"
+                        value={barber.experience}
+                        onChange={(e) =>
+                          handleBarberChange(
+                            index,
+                            "experience",
+                            e.target.value
+                          )
+                        }
+                        className={styles.formInput}
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label className={styles.skillsLabel}>
+                        Specializations
+                      </label>
+                      <div className={styles.skillsGrid}>
+                        {[
+                          "Haircut",
+                          "Shaving",
+                          "Hair Styling",
+                          "Beard Trim",
+                          "Hair Color",
+                          "Facial",
+                        ].map((skill) => (
+                          <div key={skill} className={styles.skillCheckbox}>
+                            <input
+                              type="checkbox"
+                              checked={barber.skills.includes(skill)}
+                              onChange={(e) =>
+                                handleBarberSkillChange(
+                                  index,
+                                  skill,
+                                  e.target.checked
+                                )
+                              }
+                            />
+                            <label>{skill}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className={styles.skillsLabel}>
+                        Bio/Accomplishments
+                      </label>
+                      <textarea
+                        placeholder="Describe barber's achievements, awards, etc."
+                        value={barber.bio}
+                        onChange={(e) =>
+                          handleBarberChange(index, "bio", e.target.value)
+                        }
+                        rows={2}
+                        className={styles.textarea}
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addBarber}
+                  className={styles.addBarberButton}
+                >
+                  + Add Another Barber
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Services */}
+          {currentStep === 4 && (
+            <div className={styles.stepContainer}>
+              <h2 className={styles.stepTitle}>
+                <Scissors className="w-6 h-6" />
+                Basic Services & Pricing
+              </h2>
+
+              {validationErrors.services && (
+                <p className={styles.errorText}>{validationErrors.services}</p>
+              )}
+
+              <div className={styles.servicesGrid}>
+                {services.map((service) => {
+                  const Icon = service.icon;
+                  return (
+                    <div
+                      key={service.key}
+                      className={`${styles.serviceCard} ${
+                        formData.services[service.key].enabled
+                          ? styles.active
+                          : ""
+                      }`}
+                    >
+                      <div className={styles.serviceHeader}>
+                        <div className={styles.serviceCheckbox}>
+                          <input
+                            type="checkbox"
+                            checked={formData.services[service.key].enabled}
+                            onChange={(e) =>
+                              handleServiceChange(
+                                service.key,
+                                "enabled",
+                                e.target.checked
+                              )
+                            }
+                          />
+                          <Icon className={styles.serviceIcon} />
+                          <span className={styles.serviceName}>
+                            {service.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      {formData.services[service.key].enabled && (
+                        <div className={styles.priceInput}>
+                          <span className={styles.priceSymbol}>₹</span>
+                          <input
+                            type="number"
+                            placeholder={service.defaultPrice}
+                            value={formData.services[service.key].price}
+                            onChange={(e) =>
+                              handleServiceChange(
+                                service.key,
+                                "price",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Navigation Buttons */}
+          <div className={styles.navigationButtons}>
+            {currentStep > 1 && (
+              <button
+                type="button"
+                onClick={handlePrevStep}
+                className={styles.prevButton}
+              >
+                Previous
+              </button>
+            )}
+
+            {currentStep < 4 ? (
+              <button
+                type="button"
+                onClick={handleNextStep}
+                className={styles.nextButton}
+              >
+                Next Step
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                className={styles.nextButton}
+              >
+                Register My Salon
+              </button>
+            )}
           </div>
         </div>
-        <style jsx>{`
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-              transform: translateY(-20px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
 
-          @keyframes slideIn {
-            from {
-              opacity: 0;
-              transform: translateX(-30px);
-            }
-            to {
-              opacity: 1;
-              transform: translateX(0);
-            }
-          }
-
-          .animate-fadeIn {
-            animation: fadeIn 0.8s ease-out;
-          }
-
-          .animate-slideIn {
-            animation: slideIn 0.6s ease-out;
-          }
-        `}</style>
+        {/* Sign In Link */}
+        <div className={styles.signInSection}>
+          <p className={styles.signInText}>
+            Already registered?{" "}
+            <Link href="/salons/login" className={styles.signInLink}>
+              Sign In
+            </Link>
+          </p>
+        </div>
       </div>
-    </>
+    </div>
   );
 };
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import styles from "../../../styles/Auth.module.css";
+import styles from "../../../styles/Auth/UserAuth.module.css";
 
 export default function UserRegisterPage() {
   const router = useRouter();
