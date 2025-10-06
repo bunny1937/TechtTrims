@@ -448,17 +448,28 @@ export default function SalonDetail({ initialSalon }) {
       console.log("Final user info for booking:", currentUserInfo);
 
       const payload = {
-        salonId: salon._id,
+        salonId: salon.id,
         service: allServices,
         barber: selectedBarberDetails?.name || "Any Available",
         barberId: selectedBarber || null,
         date: selectedDate,
         time: selectedSlot,
         price: totalPrice,
-        // ✅ Use onboarding data if available, otherwise fallback to 'Guest'
         customerName: currentUserInfo?.name || "Guest",
-        customerPhone: currentUserInfo?.phone || currentUserInfo?.mobile || "",
-        user: currentUserInfo,
+        customerPhone:
+          currentUserInfo?.phoneNumber ||
+          currentUserInfo?.phone ||
+          currentUserInfo?.mobile ||
+          "",
+        customerAge: currentUserInfo?.age || null,
+        user: {
+          ...currentUserInfo,
+          phoneNumber:
+            currentUserInfo?.phoneNumber ||
+            currentUserInfo?.phone ||
+            currentUserInfo?.mobile,
+          age: currentUserInfo?.age || null,
+        },
         userId: currentUserInfo?._id || currentUserInfo?.id || null,
       };
 
@@ -986,13 +997,19 @@ export default function SalonDetail({ initialSalon }) {
                       ? chosenService.name
                       : selectedServices,
                     barber: chosenBarber
-                      ? chosenBarber._id ||
-                        chosenBarber._id ||
-                        chosenBarber.name
+                      ? chosenBarber._id || chosenBarber.name
                       : selectedBarber,
                     date: selectedDate,
                     time: selectedSlot,
-                    user: userOnboarding || null,
+                    user: {
+                      ...(userOnboarding || {}),
+                      phoneNumber:
+                        userOnboarding?.phoneNumber ||
+                        userOnboarding?.phone ||
+                        userOnboarding?.mobile ||
+                        "",
+                      age: userOnboarding?.age || null,
+                    },
                   };
                   try {
                     const res = await fetch("/api/bookings", {

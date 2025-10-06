@@ -32,7 +32,30 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res.status(200).json(user);
+    // Return complete user profile with all new fields
+    const userProfile = {
+      _id: user._id,
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      phoneNumber: user.phoneNumber || user.phone,
+      mobile: user.mobile || user.phone || user.phoneNumber,
+      gender: user.gender,
+      age: user.age || null,
+      dateOfBirth: user.dateOfBirth || null,
+      location: user.location || null,
+      role: user.role || "user",
+      bookingHistory: user.bookingHistory || [],
+      preferences: user.preferences || {},
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      isActive: user.isActive,
+      // Keep backward compatibility
+      isPhoneVerified: user.isPhoneVerified || true,
+    };
+
+    res.status(200).json(userProfile);
   } catch (error) {
     console.error("Profile API error:", error);
     res.status(500).json({ message: "Internal server error" });

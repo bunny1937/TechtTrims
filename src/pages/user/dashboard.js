@@ -376,33 +376,54 @@ export default function UserDashboard() {
               <div className={styles.profileForm}>
                 <div className={styles.formGroup}>
                   <label>Name</label>
-                  <input type="text" value={user?.name || ""} readOnly />
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                  />
                 </div>
                 <div className={styles.formGroup}>
                   <label>Email</label>
-                  <input type="email" value={user?.email || ""} readOnly />
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange("email", e.target.value)}
+                  />
                 </div>
                 <div className={styles.formGroup}>
                   <label>Phone</label>
-                  <input type="tel" value={user?.phone || ""} readOnly />
+                  <input
+                    type="tel"
+                    value={formData.phoneNumber || formData.phone}
+                    readOnly
+                  />
                 </div>
                 <div className={styles.formGroup}>
-                  <label>Gender</label>
-                  <input type="text" value={user?.gender || ""} readOnly />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Member Since</label>
+                  <label>Age</label>
                   <input
                     type="text"
                     value={
-                      user?.createdAt
-                        ? new Date(user.createdAt).toLocaleDateString()
-                        : ""
+                      formData.age ? `${formData.age} years` : "Not provided"
                     }
                     readOnly
                   />
                 </div>
+                <div className={styles.formGroup}>
+                  <label>Gender</label>
+                  <input type="text" value={formData.gender} readOnly />
+                </div>
+                {formData.location && (
+                  <div className={styles.formGroup}>
+                    <label>Location</label>
+                    <input
+                      type="text"
+                      value={formData.location.address || "Location set"}
+                      readOnly
+                    />
+                  </div>
+                )}
               </div>
+
               <div className={styles.profileActions}>
                 <p className={styles.note}>
                   📝 Profile editing will be available in future updates

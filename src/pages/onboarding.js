@@ -5,16 +5,20 @@ import styles from "../styles/Onboarding.module.css";
 
 export default function Onboarding() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     name: "",
     gender: "",
-    location: {
-      latitude: null,
-      longitude: null,
-      address: "",
-    },
+    dateOfBirth: "",
+    age: null,
+    phoneNumber: "",
+    isPhoneVerified: false,
+    location: { latitude: null, longitude: null, address: "" },
   });
+  const [currentStep, setCurrentStep] = useState(1); // 5 steps total
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [generatedOtp, setGeneratedOtp] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
   const [locationStatus, setLocationStatus] = useState("pending"); // pending, loading, success, error
 
@@ -111,6 +115,43 @@ export default function Onboarding() {
     setLocationStatus("success");
   };
 
+  const handleSendOtp = () => {
+    // Generate 6-digit OTP (client-side for free solution)
+    const generated = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(generated);
+    setOtpSent(true);
+
+    // Store OTP with expiry (5 minutes)
+    const otpData = {
+      otp: generated,
+      phone: formData.phoneNumber,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+    };
+    localStorage.setItem("tempOtp", JSON.stringify(otpData));
+
+    alert(`OTP sent! (Development mode - OTP: ${generated})`);
+  };
+
+  const handleVerifyOtp = () => {
+    const storedData = JSON.parse(localStorage.getItem("tempOtp"));
+
+    if (!storedData || Date.now() > storedData.expiresAt) {
+      alert("OTP expired! Please request a new one.");
+      setOtpSent(false);
+      setOtp("");
+      return;
+    }
+
+    if (otp === storedData.otp && formData.phoneNumber === storedData.phone) {
+      handleInputChange("isPhoneVerified", true);
+      localStorage.removeItem("tempOtp");
+      alert("Phone verified successfully!");
+      setCurrentStep((prev) => prev + 1);
+    } else {
+      alert("Invalid OTP! Please try again.");
+    }
+  };
+
   const nextStep = () => {
     if (currentStep === 1 && formData.name.trim().length < 2) {
       alert("Please enter a valid name");
@@ -120,12 +161,19 @@ export default function Onboarding() {
       alert("Please select your gender");
       return;
     }
-    if (currentStep === 3 && locationStatus !== "success") {
+    if (currentStep === 3 && (!formData.age || formData.age < 13)) {
+      alert("You must be at least 13 years old");
+      return;
+    }
+    if (currentStep === 4 && !formData.isPhoneVerified) {
+      alert("Please verify your phone number");
+      return;
+    }
+    if (currentStep === 5 && locationStatus !== "success") {
       alert("Please set your location");
       return;
     }
-
-    if (currentStep < 3) {
+    if (currentStep < 5) {
       setCurrentStep((prev) => prev + 1);
     } else {
       completeOnboarding();
@@ -177,10 +225,10 @@ export default function Onboarding() {
             <div className={styles.progressTrack}>
               <div
                 className={styles.progressFill}
-                style={{ width: `${(currentStep / 3) * 100}%` }}
+                style={{ width: `${(currentStep / 5) * 100}%` }}
               ></div>
             </div>
-            <span className={styles.progressText}>{currentStep}/3</span>
+            <span className={styles.progressText}>{currentStep}/5</span>
           </div>
         </div>
 
@@ -243,6 +291,106 @@ export default function Onboarding() {
           )}
 
           {currentStep === 3 && (
+            <div className={styles.step}>
+              <div className={styles.stepIcon}>🎂</div>
+              <h2>When were you born?</h2>
+              <p>We&apos;ll use this to provide age-appropriate services</p>
+              <div className={styles.formGroup}>
+                <input
+                  type="date"
+                  max={
+                    new Date(
+                      new Date().setFullYear(new Date().getFullYear() - 13)
+                    )
+                      .toISOString()
+                      .split("T")[0]
+                  }
+                  value={formData.dateOfBirth}
+                  onChange={(e) => {
+                    const birthDate = new Date(e.target.value);
+                    const today = new Date();
+                    let age = today.getFullYear() - birthDate.getFullYear();
+                    const monthDiff = today.getMonth() - birthDate.getMonth();
+                    if (
+                      monthDiff < 0 ||
+                      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+                    ) {
+                      age--;
+                    }
+                    handleInputChange("dateOfBirth", e.target.value);
+                    handleInputChange("age", age);
+                  }}
+                  className={styles.input}
+                  autoFocus
+                />
+                {formData.age && (
+                  <p className={styles.ageDisplay}>Age: {formData.age} years</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {currentStep === 4 && (
+            <div className={styles.step}>
+              <div className={styles.stepIcon}>📱</div>
+              <h2>Verify your phone number</h2>
+              <p>We&apos;ll send you a verification code</p>
+              <div className={styles.formGroup}>
+                <input
+                  type="tel"
+                  placeholder="Enter 10-digit mobile number"
+                  value={formData.phoneNumber}
+                  onChange={(e) =>
+                    handleInputChange(
+                      "phoneNumber",
+                      e.target.value.replace(/\D/g, "").slice(0, 10)
+                    )
+                  }
+                  className={styles.input}
+                  maxLength="10"
+                  disabled={otpSent}
+                />
+                {!otpSent && (
+                  <button
+                    type="button"
+                    className={styles.sendOtpButton}
+                    onClick={handleSendOtp}
+                    disabled={formData.phoneNumber.length !== 10}
+                  >
+                    Send OTP
+                  </button>
+                )}
+              </div>
+              {otpSent && (
+                <div className={styles.otpSection}>
+                  <input
+                    type="text"
+                    placeholder="Enter 6-digit OTP"
+                    value={otp}
+                    onChange={(e) =>
+                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    className={styles.input}
+                    maxLength="6"
+                    autoFocus
+                  />
+                  <p className={styles.otpNote}>
+                    OTP (for development): {generatedOtp}
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.verifyButton}
+                    onClick={handleVerifyOtp}
+                    disabled={otp.length !== 6}
+                  >
+                    Verify OTP
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentStep === 5 && (
             <div className={styles.step}>
               <div className={styles.stepIcon}>📍</div>
               <h2>Where are you located?</h2>
@@ -348,7 +496,7 @@ export default function Onboarding() {
                 <div className={styles.spinner}></div>
                 Setting up...
               </>
-            ) : currentStep === 3 ? (
+            ) : currentStep === 5 ? (
               "Complete Setup"
             ) : (
               "Next →"

@@ -45,14 +45,22 @@ export default function UserDetailsModal({ user, onClose }) {
                   <strong>Email:</strong> {user.email || "N/A"}
                 </p>
                 <p>
-                  <strong>Phone:</strong> {user.phone}
+                  <strong>Phone:</strong> {user.phoneNumber || user.phone}
+                </p>
+                <p>
+                  <strong>Age:</strong> {user.age ? `${user.age} years` : "N/A"}
                 </p>
                 <p>
                   <strong>Gender:</strong> {user.gender}
                 </p>
+                {user.location && (
+                  <p>
+                    <strong>Location:</strong> {user.location.address || "Set"}
+                  </p>
+                )}
                 <p>
                   <strong>Status:</strong>{" "}
-                  {user.isActive ? "✅ Active" : "❌ Inactive"}
+                  {user.isActive ? "Active" : "Inactive"}
                 </p>
                 <p>
                   <strong>Joined:</strong>{" "}

@@ -28,19 +28,22 @@ export default function UserRegisterPage() {
     if (savedPrefillData) {
       try {
         const data = JSON.parse(savedPrefillData);
-        console.log("Parsed prefill data:", data);
         prefillInfo = {
           name: data.name || "",
           phone: data.phone || "",
+          phoneNumber: data.phoneNumber || data.phone || "",
           gender: data.gender || "",
-          lastBookings: data.lastBookings || "",
+          age: data.age || null,
+          lastBooking: data.lastBookings || {},
           source: "feedback",
         };
         setPrefillData(prefillInfo);
         setFormData((prev) => ({
           ...prev,
           name: data.name || prev.name,
-          phone: data.phone || prev.phone,
+          phone: data.phoneNumber || data.phone || prev.phone,
+          age: data.age || prev.age,
+          gender: data.gender || prev.gender,
         }));
       } catch (error) {
         console.error("Error parsing prefill data:", error);
@@ -85,7 +88,14 @@ export default function UserRegisterPage() {
       }
 
       const registrationData = {
-        ...formData,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        phoneNumber: formData.phone,
+        gender: formData.gender,
+        password: formData.password,
+        age: formData.age || null,
+        dateOfBirth: formData.dateOfBirth || null,
         location: locationData,
       };
 
