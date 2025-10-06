@@ -7,6 +7,7 @@ import styles from "../../styles/SalonDetail.module.css";
 import Image from "next/image";
 import { UserDataManager } from "../../lib/userData";
 import RetryButton from "@/components/RetryButton";
+import ReviewsSection from "@/components/Salon/ReviewSection";
 
 // Dynamic map import to avoid SSR issues
 const MapContainer = dynamic(
@@ -687,6 +688,7 @@ export default function SalonDetail({ initialSalon }) {
           </div>
         </div>
       </motion.section>
+      <ReviewsSection salonId={salon._id} />
 
       {/* Services Section */}
       <motion.section

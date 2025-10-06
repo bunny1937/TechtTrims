@@ -19,6 +19,7 @@ const nextConfig = {
     MONGODB_URI: process.env.MONGODB_URI,
     JWT_SECRET: process.env.JWT_SECRET,
   },
+
   webpack: (config) => {
     // Handle Leaflet in SSR
     config.resolve.fallback = {

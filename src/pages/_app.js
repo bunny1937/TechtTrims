@@ -8,6 +8,7 @@ import styles from "../styles/Home.module.css";
 import { UserDataManager } from "../lib/userData";
 import NetworkStatus from "../components/NetworkStatus";
 import OnboardingLogoutButton from "../components/OnBoardingLogout";
+import GradientBackground from "@/components/Background";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -46,6 +47,7 @@ function MyApp({ Component, pageProps }) {
   return (
     <>
       <NetworkStatus />
+      <GradientBackground />
       {!hideHeader && (
         <header className={styles.header}>
           <div className={styles.headerContent}>
