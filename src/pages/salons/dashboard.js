@@ -279,16 +279,49 @@ export default function DashboardPage() {
                 {bookings.map((b) => (
                   <div key={b._id || b.id} className={styles.bookingCard}>
                     <div className={styles.bookingDetails}>
-                      <h3 className={styles.customerName}>{b.customerName}</h3>
-                      <p className={styles.bookingInfo}>📞 {b.customerPhone}</p>
+                      <h3 className={styles.customerName}>
+                        {b.customerName}
+                        {b.customerAge && (
+                          <span className={styles.customerAge}>
+                            {" "}
+                            ({b.customerAge} yrs)
+                          </span>
+                        )}
+                      </h3>
+
+                      <div className={styles.customerMeta}>
+                        <p className={styles.bookingInfo}>
+                          📞 {b.customerPhone}
+                        </p>
+                        {b.customerGender && (
+                          <p className={styles.bookingInfo}>
+                            {b.customerGender === "Male"
+                              ? "👨"
+                              : b.customerGender === "Female"
+                              ? "👩"
+                              : "👤"}{" "}
+                            {b.customerGender}
+                          </p>
+                        )}
+                      </div>
+
                       <p className={styles.bookingInfo}>✂️ {b.service}</p>
                       {b.barber && (
-                        <p className={styles.bookingInfo}>👤 {b.barber}</p>
+                        <p className={styles.bookingInfo}>💈 {b.barber}</p>
                       )}
                       <p className={styles.bookingInfo}>
                         📅 {b.date} at {b.time}
                       </p>
                       <p className={styles.bookingInfo}>💰 ₹{b.price}</p>
+
+                      {b.customerLocation && b.customerLocation.address && (
+                        <p
+                          className={styles.bookingInfo}
+                          title={b.customerLocation.address}
+                        >
+                          📍 {b.customerLocation.address.substring(0, 30)}...
+                        </p>
+                      )}
                     </div>
 
                     <div className={styles.bookingActions}>

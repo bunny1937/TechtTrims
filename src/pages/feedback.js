@@ -191,6 +191,13 @@ export default function FeedbackPage() {
           <div className={styles.bookingSummary}>
             <h3 className={styles.summaryTitle}>Booking Summary</h3>
             <p className={styles.summaryInfo}>
+              <strong>Customer:</strong> {bookings.customerName}
+              {bookings.customerAge && ` (${bookings.customerAge} years)`}
+            </p>
+            <p className={styles.summaryInfo}>
+              <strong>Phone:</strong> {bookings.customerPhone}
+            </p>
+            <p className={styles.summaryInfo}>
               <strong>Service:</strong> {bookings.service}
             </p>
             {bookings.barber && (

@@ -55,11 +55,19 @@ export default async function handler(req, res) {
         date,
         time,
         customerName: customerName || user?.name || "Guest",
-        customerPhone: customerPhone || user?.phone || user?.mobile || "",
+        customerPhone:
+          customerPhone ||
+          user?.phoneNumber ||
+          user?.phone ||
+          user?.mobile ||
+          "",
+        customerAge: user?.age || null,
+        customerGender: user?.gender || null,
+        customerLocation: user?.location || null,
         price: price || 0,
         paymentStatus: "pending",
         status: "confirmed",
-        userId: null, // Will be set below
+        userId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         feedback: {
@@ -107,19 +115,22 @@ export default async function handler(req, res) {
 
         if (!existingUser) {
           const newUser = {
-            name: user.name || customerName || "Guest",
-            phone: phoneNumber,
-            mobile: phoneNumber,
+            name: user.name || "Guest",
+            mobile: user.phoneNumber || user.mobile,
+            phone: user.phoneNumber || user.phone,
+            phoneNumber: user.phoneNumber || user.mobile,
             email: user.email || null,
             gender: user.gender || "other",
+            age: user.age || null,
+            dateOfBirth: user.dateOfBirth || null,
             location: user.location || null,
             bookingHistory: [bookingId],
             preferences: user.preferences || {},
-            role: "user",
             createdAt: new Date(),
             updatedAt: new Date(),
             isActive: true,
           };
+
           const userResult = await db
             .collection("users")
             .insertOne(newUser, { session });

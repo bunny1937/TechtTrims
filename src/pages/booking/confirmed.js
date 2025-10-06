@@ -42,8 +42,18 @@ export default function BookingConfirmed() {
       <h2 className={styles.heading}>Booking Status</h2>
       <div className={styles.bookingCard}>
         <p className={styles.bookingInfo}>
-          <strong>Booking ID:</strong> {booking._id}
+          <strong>Customer:</strong> {booking.customerName}
+          {booking.customerAge && ` (${booking.customerAge} years)`}
         </p>
+        <p className={styles.bookingInfo}>
+          <strong>Phone:</strong> {booking.customerPhone}
+        </p>
+        {booking.customerLocation && (
+          <p className={styles.bookingInfo}>
+            <strong>Location:</strong> {booking.customerLocation.address}
+          </p>
+        )}
+
         <p>
           <strong>Service:</strong> {booking.service}
         </p>

@@ -73,6 +73,15 @@ export class UserDataManager {
               // Always preserve onboarding location and other critical data
               location: onboarding.location || userData.location,
               gender: userData.gender || onboarding.gender,
+              age: userData.age || onboarding.age || null,
+              dateOfBirth:
+                userData.dateOfBirth || onboarding.dateOfBirth || null,
+              phoneNumber:
+                userData.phoneNumber ||
+                userData.phone ||
+                onboarding.phoneNumber,
+              phone: userData.phone || onboarding.phoneNumber,
+              mobile: userData.mobile || onboarding.phoneNumber,
               preferences: {
                 ...userData.preferences,
                 ...onboarding.preferences,

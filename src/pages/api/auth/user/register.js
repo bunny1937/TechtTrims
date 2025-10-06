@@ -7,7 +7,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { name, email, phone, gender, password } = req.body;
+    const { name, email, phone, gender, password, age, dateOfBirth, location } =
+      req.body;
 
     // Validate required fields
     if (!name || !email || !phone || !gender || !password) {
@@ -77,15 +78,19 @@ export default async function handler(req, res) {
       email,
       phone,
       gender,
+      age: age || null,
+      dateOfBirth: dateOfBirth || null,
+      location: location || null,
       role: "user",
       hashedPassword,
-      bookingHistory: existingBookings.map((booking) => booking._id), // Store booking IDs
+      bookingHistory: [],
       preferences: {},
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       isActive: true,
     };
-
     const result = await db.collection("users").insertOne(newUser);
 
     // Update existing bookings with userId

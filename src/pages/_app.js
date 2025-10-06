@@ -95,7 +95,6 @@ function MyApp({ Component, pageProps }) {
                     whileTap={{ scale: 0.98 }}
                     onClick={() => router.push("/user/dashboard")}
                   >
-                    <span className={styles.buttonIcon}>📅</span>
                     Dashboard
                   </motion.button>
                 )}
@@ -106,7 +105,6 @@ function MyApp({ Component, pageProps }) {
                   whileTap={{ scale: 0.98 }}
                   onClick={() => navigateToAuth("register", "salon")}
                 >
-                  <span className={styles.buttonIcon}>🏪</span>
                   Register Salon
                 </motion.button>
 
