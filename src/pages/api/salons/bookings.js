@@ -16,21 +16,29 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db("techtrims");
 
-    let query = { salonId: new ObjectId(salonId) };
+    const query = { salonId: new ObjectId(salonId) };
 
-    // Add date filtering
-    if (date) {
-      // Specific date
+    // ✅ Include walk-ins (they don't have date field)
+    if (date && date !== "all" && !req.query.includeWalkins) {
       query.date = date;
-    } else if (from) {
-      // From a specific date onwards
-      query.date = { $gte: from };
+    } else if (date && date !== "all" && req.query.includeWalkins) {
+      // For specific date, show both prebook for that date AND walk-ins
+      query.$or = [
+        { date: date },
+        {
+          bookingType: "WALKIN",
+          createdAt: {
+            $gte: new Date(date + "T00:00:00"),
+            $lte: new Date(date + "T23:59:59"),
+          },
+        },
+      ];
     }
 
     const bookings = await db
       .collection("bookings")
       .find(query)
-      .sort({ date: 1, time: 1 }) // Sort by date and time
+      .sort({ createdAt: -1 })
       .toArray();
 
     // Format bookings with additional info

@@ -20,6 +20,7 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedService, setSelectedService] = useState("");
   const [filteredSalons, setFilteredSalons] = useState([]);
+  const [isPrebook, setIsPrebook] = useState(false);
 
   // Dynamic import for map component
   const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
@@ -261,7 +262,7 @@ export default function Home() {
                     {userOnboarding?.location?.address || "you"}{" "}
                   </span>
                 </motion.p>
-{/* <TextMorph/> */}
+                {/* <TextMorph/> */}
                 <motion.div
                   className={styles.heroStats}
                   initial={{ opacity: 0, y: 30 }}
@@ -525,6 +526,7 @@ export default function Home() {
         </div>
       </motion.section>
       ; */}
+        {/* Salons Section with Booking Type Tabs */}
         <motion.section
           className={styles.salonsSection}
           initial={{ opacity: 0, y: 50 }}
@@ -538,77 +540,217 @@ export default function Home() {
                 Handpicked luxury experiences in your area
               </p>
             </div>
-            <div className={styles.viewOptions}>
-              <motion.button
-                className={`${styles.viewToggle} ${
-                  !showMapView ? styles.active : ""
+
+            {/* NEW: Booking Type Tabs */}
+            <div className={styles.bookingTypeTabs}>
+              <button
+                className={`${styles.bookingTypeTab} ${
+                  !isPrebook ? styles.activeTab : ""
                 }`}
-                onClick={() => setShowMapView(false)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
+                onClick={() => setIsPrebook(false)}
               >
-                <span className={styles.viewIcon}>🏗</span>
-                Grid View
-              </motion.button>
-              <motion.button
-                className={`${styles.viewToggle} ${
-                  showMapView ? styles.active : ""
+                <span className={styles.tabIcon}>⚡</span>
+                <span className={styles.tabLabel}>Walk-in</span>
+                <span className={styles.tabBadge}>Instant</span>
+              </button>
+
+              <button
+                className={`${styles.bookingTypeTab} ${
+                  isPrebook ? styles.activeTab : ""
                 }`}
-                onClick={() => setShowMapView(true)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
+                onClick={() => setIsPrebook(true)}
               >
-                <span className={styles.viewIcon}>🗺</span>
-                Map View
-              </motion.button>
+                <span className={styles.tabIcon}>📅</span>
+                <span className={styles.tabLabel}>Pre-book</span>
+                <span className={styles.tabBadge}>Advance</span>
+              </button>
             </div>
+
+            {/* View toggle (only show for pre-book) */}
+            {isPrebook && (
+              <div className={styles.viewOptions}>
+                <motion.button
+                  className={`${styles.viewToggle} ${
+                    !showMapView ? styles.active : ""
+                  }`}
+                  onClick={() => setShowMapView(false)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className={styles.viewIcon}>⊞</span>
+                  Grid View
+                </motion.button>
+
+                <motion.button
+                  className={`${styles.viewToggle} ${
+                    showMapView ? styles.active : ""
+                  }`}
+                  onClick={() => setShowMapView(true)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className={styles.viewIcon}>🗺</span>
+                  Map View
+                </motion.button>
+              </div>
+            )}
           </div>
 
-          {isLoadingSalons ? (
-            <div className={styles.loadingSalons}>
-              <div className={styles.luxurySpinner}>
-                <div className={styles.spinnerRing}></div>
-                <div className={styles.spinnerCore}></div>
+          {/* Conditional Rendering based on Tab */}
+          {!isPrebook ? (
+            // WALK-IN MODE
+            <div className={styles.walkInContainer}>
+              <div className={styles.walkInInfo}>
+                <span className={styles.walkInIcon}>⚡</span>
+                <p>
+                  Select a salon below to see real-time chair availability and
+                  queue status
+                </p>
               </div>
-              <p>Discovering premium salons near you...</p>
-            </div>
-          ) : nearbySalons.length > 0 ? (
-            showMapView ? (
-              <div className={styles.mapContainer}>
-                <SalonMap
-                  salons={nearbySalons}
-                  userLocation={{
-                    lat: userOnboarding?.location?.latitude,
-                    lng: userOnboarding?.location?.longitude,
-                  }}
-                  selectedSalon={selectedSalon}
-                  onSalonSelect={setSelectedSalon}
-                  onBookNow={handleSalonCardClick}
-                  userGender={userOnboarding?.gender}
-                />
-              </div>
-            ) : (
+
               <div className={styles.salonsGrid}>
                 {(filteredSalons.length > 0
                   ? filteredSalons
                   : nearbySalons
-                ).map((salon, index) => {
-                  return (
+                ).map((salon, index) => (
+                  <motion.div
+                    key={salon._id?.oid || salon._id?.toString() || index}
+                    className={styles.salonCard}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.1 * index }}
+                    whileHover={{ y: -12, scale: 1.02 }}
+                    onClick={() => {
+                      const salonId = salon._id?.oid || salon._id;
+                      if (isPrebook) {
+                        // Pre-book mode
+                        router.push(`/salons/${salonId}?mode=prebook`);
+                      } else {
+                        // Walk-in mode - SAME PAGE, just different mode
+                        router.push(`/salons/${salonId}?mode=walkin`);
+                      }
+                    }}
+                  >
+                    {/* Salon Image */}
+                    <div className={styles.salonImageContainer}>
+                      <img
+                        src={
+                          typeof salon.salonImages?.[0] === "string"
+                            ? salon.salonImages[0]
+                            : salon.salonImages?.[0]?.url ||
+                              "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&h=200&fit=crop"
+                        }
+                        alt={`${salon.salonName} Salon`}
+                        className={styles.salonImage}
+                      />
+                      <div className={styles.salonImageOverlay}></div>
+
+                      {/* Walk-in Badge */}
+                      <div className={styles.salonBadges}>
+                        <span
+                          className={`${styles.salonBadge} ${styles.walkInBadge}`}
+                        >
+                          ⚡ Walk-in Ready
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Salon Info */}
+                    <div className={styles.salonInfo}>
+                      <div className={styles.salonHeader}>
+                        <h4 className={styles.salonName}>{salon.salonName}</h4>
+                        <div className={styles.salonRating}>
+                          <span className={styles.ratingStars}>⭐</span>
+                          <span className={styles.ratingNumber}>
+                            {salon.ratings?.overall ?? salon.rating ?? 4.5}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className={styles.salonLocation}>
+                        {salon.location?.address}
+                      </p>
+
+                      <div className={styles.salonMetrics}>
+                        <div className={styles.metric}>
+                          <span className={styles.metricIcon}>📍</span>
+                          <span className={styles.metricValue}>
+                            {salon.distance} km away
+                          </span>
+                        </div>
+                        <div className={styles.metric}>
+                          <span className={styles.metricIcon}>🕐</span>
+                          <span className={styles.metricValue}>Open Now</span>
+                        </div>
+                      </div>
+
+                      {/* Walk-in CTA */}
+                      <motion.button
+                        className={styles.walkInButton}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        View Live Availability
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            // PRE-BOOK MODE (EXISTING INTERFACE)
+            <>
+              {isLoadingSalons ? (
+                <div className={styles.loadingSalons}>
+                  <div className={styles.luxurySpinner}>
+                    <div className={styles.spinnerRing}></div>
+                    <div className={styles.spinnerCore}></div>
+                  </div>
+                  <p>Discovering premium salons near you...</p>
+                </div>
+              ) : nearbySalons.length === 0 ? (
+                <div className={styles.noSalons}>
+                  <p>No salons found in your area</p>
+                </div>
+              ) : showMapView ? (
+                <div className={styles.mapContainer}>
+                  <SalonMap
+                    salons={nearbySalons}
+                    userLocation={{
+                      lat: userOnboarding?.location?.latitude,
+                      lng: userOnboarding?.location?.longitude,
+                    }}
+                    selectedSalon={selectedSalon}
+                    onSalonSelect={setSelectedSalon}
+                    onBookNow={handleSalonCardClick}
+                    userGender={userOnboarding?.gender}
+                  />
+                </div>
+              ) : (
+                <div className={styles.salonsGrid}>
+                  {(filteredSalons.length > 0
+                    ? filteredSalons
+                    : nearbySalons
+                  ).map((salon, index) => (
                     <motion.div
-                      key={salon._id?.$oid || salon._id?.toString() || index}
+                      key={salon._id?.oid || salon._id?.toString() || index}
                       className={styles.salonCard}
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.6, delay: 0.1 * index }}
-                      whileHover={{
-                        y: -12,
-                        scale: 1.02,
-                        transition: { type: "spring", stiffness: 300 },
+                      whileHover={{ y: -12, scale: 1.02 }}
+                      onClick={() => {
+                        const salonId = salon._id?.oid || salon._id;
+                        if (isPrebook) {
+                          // Pre-book mode: use existing flow
+                          handleSalonCardClick(salonId);
+                        } else {
+                          // Walk-in mode: add mode parameter
+                          router.push(`/salons/${salonId}?mode=walkin`);
+                        }
                       }}
-                      onClick={() =>
-                        handleSalonCardClick(salon._id?.$oid || salon._id)
-                      }
                     >
+                      {/* EXISTING PREBOOK SALON CARD CODE - KEEP AS IS */}
                       <div className={styles.salonImageContainer}>
                         <img
                           src={
@@ -617,7 +759,7 @@ export default function Home() {
                               : salon.salonImages?.[0]?.url ||
                                 "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&h=200&fit=crop"
                           }
-                          alt={salon.salonName || "Salon image"}
+                          alt={`${salon.salonName} Salon`}
                           className={styles.salonImage}
                         />
                         <div className={styles.salonImageOverlay}></div>
@@ -643,35 +785,29 @@ export default function Home() {
                       <div className={styles.salonInfo}>
                         <div className={styles.salonHeader}>
                           <h4 className={styles.salonName}>
-                            {highlightText(salon.salonName, searchTerm)}
-                          </h4>{" "}
+                            {salon.salonName}
+                          </h4>
                           <div className={styles.salonRating}>
-                            <span className={styles.ratingStars}>
-                              ⭐⭐⭐⭐⭐
-                            </span>
+                            <span className={styles.ratingStars}>⭐</span>
                             <span className={styles.ratingNumber}>
-                              {(
-                                salon.ratings?.overall ??
-                                salon.rating ??
-                                4.5
-                              ).toFixed(1)}
+                              {salon.ratings?.overall ?? salon.rating ?? 4.5}
                             </span>
                           </div>
                         </div>
 
                         <p className={styles.salonLocation}>
-                          📍 {highlightText(salon.location.address, searchTerm)}
+                          {salon.location?.address}
                         </p>
 
                         <div className={styles.salonMetrics}>
                           <div className={styles.metric}>
-                            <span className={styles.metricIcon}>👥</span>
+                            <span className={styles.metricIcon}>📍</span>
                             <span className={styles.metricValue}>
                               {salon.stats?.totalBookings || 0} bookings
                             </span>
                           </div>
                           <div className={styles.metric}>
-                            <span className={styles.metricIcon}>⏰</span>
+                            <span className={styles.metricIcon}>🕐</span>
                             <span className={styles.metricValue}>Open Now</span>
                           </div>
                         </div>
@@ -679,89 +815,26 @@ export default function Home() {
                         <div className={styles.salonServices}>
                           {salon.topServices
                             ?.slice(0, 3)
-                            .map((service, idx) => {
-                              const isHighlighted =
-                                selectedService &&
-                                service.name
-                                  .toLowerCase()
-                                  .includes(selectedService.toLowerCase());
-                              return (
-                                <span
-                                  key={idx}
-                                  className={`${styles.serviceTag} ${
-                                    isHighlighted
-                                      ? styles.highlightedService
-                                      : ""
-                                  }`}
-                                >
-                                  {highlightText(
-                                    String(service?.name),
-                                    searchTerm
-                                  )}{" "}
-                                  <strong>₹{String(service?.price)}</strong>
-                                </span>
-                              );
-                            })}
+                            .map((service, idx) => (
+                              <span key={idx} className={styles.serviceTag}>
+                                {service.name}
+                              </span>
+                            ))}
                         </div>
 
                         <motion.button
-                          className={styles.salonBookButton}
-                          whileHover={{ scale: 1.02, y: -2 }}
+                          className={styles.bookButton}
+                          whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.98 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSalonCardClick(salon._id);
-                          }}
                         >
-                          <span className={styles.bookButtonIcon}>📅</span>
-                          Book Appointment
-                          <span className={styles.bookButtonArrow}>→</span>
+                          Book Now
                         </motion.button>
                       </div>
                     </motion.div>
-                  );
-                })}
-              </div>
-            )
-          ) : searchTerm || selectedService ? (
-            <div className={styles.noSalons}>
-              <div className={styles.noSalonsIcon}>🔍</div>
-              <h4 className={styles.noSalonsTitle}>No Results Found</h4>
-              <p className={styles.noSalonsText}>
-                No salons found matching &quot;{searchTerm || selectedService}
-                &quot;. Try adjusting your search.
-              </p>
-              <motion.button
-                className={styles.registerSalonButton}
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  setSearchTerm("");
-                  setSelectedService("");
-                }}
-              >
-                <span className={styles.registerIcon}>🔄</span>
-                Clear Filters
-              </motion.button>
-            </div>
-          ) : (
-            <div className={styles.noSalons}>
-              <div className={styles.noSalonsIcon}>🏪</div>
-              <h4 className={styles.noSalonsTitle}>No Premium Salons Found</h4>
-              <p className={styles.noSalonsText}>
-                We couldn&#39;t find any salons in your area. Help us grow by
-                registering your salon!
-              </p>
-              <motion.button
-                className={styles.registerSalonButton}
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => navigateToAuth("register", "salon")}
-              >
-                <span className={styles.registerIcon}>✨</span>
-                Register Your Salon
-              </motion.button>
-            </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </motion.section>
         ;{/* Testimonials Section */}

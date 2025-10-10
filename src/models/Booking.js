@@ -3,42 +3,66 @@ import mongoose from "mongoose";
 
 const BookingSchema = new mongoose.Schema(
   {
-    salonId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Salon",
+    salonId: { type: ObjectId, required: true, index: true },
+    customerName: { type: String, required: true },
+    service: { type: String, required: true },
+    barberId: { type: ObjectId, ref: "Barber", required: true, index: true },
+    date: { type: String, required: true, index: true },
+    time: { type: String, required: true },
+
+    // NEW FIELDS FOR WALKIN WORKFLOW
+    bookingType: {
+      type: String,
+      enum: ["WALKIN_ONLINE"],
+      default: "WALKIN_ONLINE",
+      index: true,
+    },
+
+    // Queue & Status Management
+    queueStatus: {
+      type: String,
+      enum: ["RED", "ORANGE", "GREEN", "EXPIRED", "COMPLETED"],
+      default: "RED",
+    },
+    queuePosition: { type: Number, default: null },
+
+    // Unique Booking Identifier & QR
+    bookingCode: {
+      type: String,
+      unique: true,
       required: true,
       index: true,
     },
-    customerName: { type: String, required: true },
-    customerPhone: { type: String, required: true },
-    service: { type: String, required: true }, // Change from serviceId to service (string)
-    barber: { type: String, default: null }, // Change from staffId to barber (string)
-    date: { type: String, required: true }, // Your DB uses string dates like "2025-09-25"
-    time: { type: String, required: true }, // Your DB uses string times like "14:00"
-    price: { type: Number, default: 0 },
-    paymentStatus: {
-      type: String,
-      enum: ["pending", "partial", "paid"],
-      default: "pending",
-    },
+    qrCodeUrl: { type: String },
+
+    // Expiry Management
+    expiresAt: { type: Date, required: true },
+    arrivedAt: { type: Date, default: null },
+    isExpired: { type: Boolean, default: false },
+
+    // Service Duration Tracking
+    estimatedDuration: { type: Number, required: true }, // in minutes
+    actualDuration: { type: Number, default: null },
+    serviceStartedAt: { type: Date, default: null },
+    serviceEndedAt: { type: Date, default: null },
+
+    // Barber Selection Tracking
+    selectedDuration: { type: Number, default: null },
+
+    // Real-time Updates
+    lastUpdated: { type: Date, default: Date.now },
+
+    // Previous status tracking
     status: {
-      type: String,
       enum: [
-        "requested",
-        "confirmed", // Your DB uses "confirmed" not "accepted"
+        "confirmed",
+        "arrived",
+        "in_service",
         "completed",
         "cancelled",
+        "expired",
       ],
       default: "confirmed",
-    },
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-    feedback: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {},
     },
   },
   { timestamps: true }

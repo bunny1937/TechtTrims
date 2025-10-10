@@ -18,6 +18,163 @@
     display: block;
   }
 }
+/* Time Modal */
+.timeInput {
+  margin: 20px 0;
+}
+
+.timeInput label {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.timeButtons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.timeOption {
+  padding: 12px 20px;
+  background: #f5f5f5;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.timeOption:hover {
+  border-color: #667eea;
+}
+
+.timeOption.selected {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.customTime {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.timeNumberInput {
+  width: 80px;
+  padding: 8px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 18px;
+  text-align: center;
+}
+
+.modalSubtext {
+  text-align: center;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+/* Barber Accordions */
+.unassignedSection {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: #fff3cd;
+  border-radius: 12px;
+}
+
+.barbersSection {
+  margin-top: 20px;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.barberAccordion {
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.barberSummary {
+  padding: 16px 20px;
+  background: #f5f5f5;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 18px;
+  list-style: none;
+}
+
+.barberSummary::-webkit-details-marker {
+  display: none;
+}
+
+.barberName {
+  color: #333;
+}
+
+.bookingBadge {
+  background: #f44336;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.barberBookings {
+  padding: 16px;
+  background: white;
+}
+
+.noBookings {
+  text-align: center;
+  color: #999;
+  padding: 20px;
+}
+
+.barberActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.timeBtn,
+.pauseBtn,
+.doneBtn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.timeBtn {
+  background: #2196f3;
+  color: white;
+}
+
+.pauseBtn {
+  background: #ff9800;
+  color: white;
+}
+
+.doneBtn {
+  background: #4caf50;
+  color: white;
+}
 
 /* Mobile Sidebar Overlay */
 .mobileOverlay {

@@ -429,6 +429,143 @@
   background: var(--border-color);
   margin: var(--space-2) 0;
 }
+/* Booking Type Tabs */
+.bookingTypeTabs {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0;
+  justify-content: center;
+}
+
+.bookingTypeTab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--background-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bookingTypeTab:hover {
+  border-color: var(--gold-primary);
+  transform: translateY(-2px);
+}
+
+.bookingTypeTab.activeTab {
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  border-color: var(--gold-primary);
+  color: var(--contrast-dark);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
+}
+
+.tabIcon {
+  font-size: 20px;
+}
+
+.tabLabel {
+  font-weight: 600;
+}
+
+.tabBadge {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.activeTab .tabBadge {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Walk-in Container */
+.walkInContainer {
+  margin-top: 30px;
+}
+
+.walkInInfo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  margin-bottom: 30px;
+  color: white;
+}
+
+.walkInIcon {
+  font-size: 24px;
+}
+
+.walkInInfo p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.walkInBadge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  animation: pulse 2s infinite;
+}
+
+.walkInButton {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.walkInButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .bookingTypeTabs {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .bookingTypeTab {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .walkInInfo {
+    flex-direction: column;
+    text-align: center;
+  }
+}
 
 /* Hero Section */
 .heroSection {

@@ -63,143 +63,127 @@ export default async function handler(req, res) {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_APP_PASSWORD,
       },
+      // ADD THESE OPTIONS
+      tls: {
+        rejectUnauthorized: false,
+      },
     });
 
     // ✅ SEND EMAIL
+    // In forgot-password.js - Update the email HTML
     const mailOptions = {
-      from: `"TechTrims" <${process.env.GMAIL_USER}>`,
+      from: `"TechTrims Support" <${process.env.GMAIL_USER}>`,
       to: normalizedEmail,
-      subject: "🔐 Reset Your TechTrims Password",
+      subject: "Password Reset - TechTrims",
+      // ADD THESE HEADERS
+      headers: {
+        "X-Priority": "1",
+        "X-MSMail-Priority": "High",
+        Importance: "high",
+        "X-Mailer": "TechTrims Mailer",
+        "Reply-To": process.env.GMAIL_USER,
+      }, // Simpler subject (no emojis)
       html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { 
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-              line-height: 1.6; 
-              color: #333; 
-              background: #f4f4f4;
-            }
-            .container { 
-              max-width: 600px; 
-              margin: 40px auto; 
-              background: white;
-              border-radius: 12px;
-              overflow: hidden;
-              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            }
-            .header { 
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-              padding: 40px 30px; 
-              text-align: center; 
-            }
-            .header h1 { 
-              color: white; 
-              font-size: 28px;
-              font-weight: 700;
-              margin: 0;
-            }
-            .content { 
-              padding: 40px 30px; 
-            }
-            .content p { 
-              margin-bottom: 20px;
-              color: #555;
-              font-size: 16px;
-            }
-            .button-container {
-              text-align: center;
-              margin: 30px 0;
-            }
-            .button { 
-              display: inline-block; 
-              padding: 16px 40px; 
-              background: #667eea; 
-              color: white !important; 
-              text-decoration: none; 
-              border-radius: 8px; 
-              font-weight: 600;
-              font-size: 16px;
-              transition: background 0.3s;
-            }
-            .link-box {
-              background: #f8f9fa;
-              padding: 15px;
-              border-radius: 6px;
-              margin: 20px 0;
-              word-break: break-all;
-              font-size: 13px;
-              color: #667eea;
-              border: 1px solid #e9ecef;
-            }
-            .warning {
-              background: #fff3cd;
-              border-left: 4px solid #ffc107;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
-            .warning p {
-              margin: 0;
-              color: #856404;
-              font-size: 14px;
-            }
-            .footer { 
-              text-align: center; 
-              padding: 20px 30px;
-              background: #f8f9fa;
-              font-size: 13px; 
-              color: #999; 
-            }
-            .security-note {
-              font-size: 13px;
-              color: #6c757d;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #e9ecef;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🔐 Password Reset Request</h1>
-            </div>
-            <div class="content">
-              <p>Hi <strong>${user.name}</strong>,</p>
-              <p>We received a request to reset your password for your TechTrims account.</p>
-              
-              <div class="button-container">
-                <a href="${resetLink}" class="button">Reset My Password</a>
-              </div>
-              
-              <p style="text-align: center; color: #999; font-size: 14px;">or copy and paste this link:</p>
-              <div class="link-box">${resetLink}</div>
-              
-              <div class="warning">
-                <p><strong>⚠️ Important:</strong> This link expires in 1 hour and can only be used once.</p>
-              </div>
-              
-              <div class="security-note">
-                <p><strong>Didn't request this?</strong></p>
-                <p>If you didn't request a password reset, please ignore this email. Your password will remain unchanged.</p>
-                <p style="margin-top: 10px;">For security reasons, this reset link will only work once and expires after 1 hour.</p>
-              </div>
-              
-              <p style="margin-top: 30px;">Best regards,<br><strong>TechTrims Team</strong></p>
-            </div>
-            <div class="footer">
-              <p>© ${new Date().getFullYear()} TechTrims. All rights reserved.</p>
-              <p style="margin-top: 5px;">This is an automated email, please do not reply.</p>
-            </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
+      <div style="max-width: 600px; margin: 20px auto; background: white; border: 1px solid #ddd;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">TechTrims</h1>
+        </div>
+        
+        <!-- Content -->
+        <div style="padding: 30px;">
+          <p style="font-size: 16px;">Hello ${user.name},</p>
+          
+          <p style="font-size: 16px;">You requested to reset your password for your TechTrims account.</p>
+          
+          <p style="text-align: center; margin: 30px 0;">
+            <a href="${resetLink}" 
+               style="display: inline-block; 
+                      padding: 14px 32px; 
+                      background: #667eea; 
+                      color: white; 
+                      text-decoration: none; 
+                      border-radius: 6px; 
+                      font-size: 16px;
+                      font-weight: 600;">
+              Reset Password
+            </a>
+          </p>
+          
+          <p style="font-size: 14px; color: #666;">
+            If the button doesn't work, copy and paste this link into your browser:
+          </p>
+          
+          <p style="font-size: 13px; 
+                    color: #667eea; 
+                    word-break: break-all; 
+                    background: #f5f5f5; 
+                    padding: 12px; 
+                    border-radius: 4px; 
+                    border: 1px solid #e0e0e0;">
+            ${resetLink}
+          </p>
+          
+          <div style="background: #fff3cd; 
+                      border-left: 4px solid #ffc107; 
+                      padding: 12px; 
+                      margin: 20px 0; 
+                      border-radius: 4px;">
+            <p style="margin: 0; font-size: 14px; color: #856404;">
+              <strong>Important:</strong> This link expires in 1 hour and can only be used once.
+            </p>
           </div>
-        </body>
-        </html>
-      `,
+          
+          <p style="font-size: 14px; color: #666; margin-top: 25px;">
+            If you did not request this password reset, please ignore this email. 
+            Your password will not be changed.
+          </p>
+          
+          <p style="font-size: 14px; color: #666; margin-top: 20px;">
+            Best regards,<br>
+            <strong>TechTrims Team</strong>
+          </p>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background: #f5f5f5; 
+                    padding: 20px; 
+                    text-align: center; 
+                    border-top: 1px solid #ddd;">
+          <p style="margin: 0; font-size: 12px; color: #999;">
+            &copy; ${new Date().getFullYear()} TechTrims. All rights reserved.
+          </p>
+          <p style="margin: 5px 0 0 0; font-size: 12px; color: #999;">
+            This is an automated message, please do not reply to this email.
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `,
+      // ADD PLAIN TEXT VERSION (helps with spam filters)
+      text: `
+Hello ${user.name},
+
+You requested to reset your password for your TechTrims account.
+
+Click here to reset your password:
+${resetLink}
+
+This link expires in 1 hour and can only be used once.
+
+If you did not request this password reset, please ignore this email.
+
+Best regards,
+TechTrims Team
+  `,
     };
 
     await transporter.sendMail(mailOptions);
