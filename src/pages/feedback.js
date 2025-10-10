@@ -23,12 +23,18 @@ export default function FeedbackPage() {
       const response = await fetch(`/api/bookings/${bookingId}`);
       if (response.ok) {
         const data = await response.json();
-        setBooking(data.booking); // Fix: access booking from response
+        console.log("API Response:", data); // ✅ Debug log
+
+        // Handle different API response formats
+        const bookingData = data.booking || data;
+        setBooking(bookingData);
       } else {
         console.error("Failed to fetch booking:", response.status);
+        alert("Failed to load booking details");
       }
     } catch (error) {
       console.error("Error fetching booking:", error);
+      alert("Error loading booking: " + error.message);
     }
   }, [bookingId]);
 

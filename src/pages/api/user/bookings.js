@@ -96,9 +96,13 @@ export default async function handler(req, res) {
     }
 
     // Get salon names for bookings
+    // Get salon names AND barber names for bookings
     const bookingsWithSalons = await Promise.all(
       finalBookings.map(async (booking) => {
         let salonName = "Unknown Salon";
+        let barberName = null;
+
+        // Get salon name
         if (booking.salonId) {
           try {
             const salonObjectId =
@@ -123,10 +127,37 @@ export default async function handler(req, res) {
           }
         }
 
+        // ✅ Get barber name if barberId exists
+        if (booking.barberId) {
+          try {
+            const barberObjectId =
+              typeof booking.barberId === "string"
+                ? new ObjectId(booking.barberId)
+                : booking.barberId;
+
+            const barber = await db
+              .collection("barbers")
+              .findOne({ _id: barberObjectId }, { projection: { name: 1 } });
+            barberName = barber?.name || null;
+          } catch (error) {
+            console.error(
+              "Error fetching barber for booking:",
+              booking._id,
+              error
+            );
+          }
+        }
+
+        // Use existing barber field if barberName not found
+        if (!barberName && booking.barber) {
+          barberName = booking.barber;
+        }
+
         return {
           ...booking,
           _id: booking._id.toString(),
           salonName,
+          barberName,
         };
       })
     );

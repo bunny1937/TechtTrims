@@ -1,3 +1,4 @@
+//pages/salons/dashboard.js
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import OwnerSidebar from "../../components/OwnerSidebar";
@@ -7,6 +8,13 @@ export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [salon, setSalon] = useState(null);
+  const [barbers, setBarbers] = useState([]);
+  const [showScanner, setShowScanner] = useState(false);
+  const [manualCode, setManualCode] = useState("");
+  const [showTimeModal, setShowTimeModal] = useState(false);
+  const [timeEstimate, setTimeEstimate] = useState(30);
+  const [bookingToStart, setBookingToStart] = useState(null);
+  const [scanResult, setScanResult] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,8 +34,10 @@ export default function DashboardPage() {
         dateParam = `&date=${dateString}`;
       }
 
+      // ✅ Add bookingType=all to include walk-ins
       const response = await fetch(
-        `/api/salons/bookings?salonId=${salonId}${dateParam}`,
+        `/api/salons/bookings?salonId=${salonId}${dateParam}&includeWalkins=true`,
+
         { cache: "no-store", headers: { "Content-Type": "application/json" } }
       );
 
@@ -43,6 +53,17 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const loadBarbers = useCallback(async (salonId) => {
+    try {
+      const response = await fetch(`/api/salons/barbers?salonId=${salonId}`);
+      if (!response.ok) throw new Error("Failed to fetch barbers");
+      const data = await response.json();
+      setBarbers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error loading barbers:", err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!router.isReady) return;
     const salonSession = localStorage.getItem("salonSession");
@@ -53,6 +74,7 @@ export default function DashboardPage() {
     const salonData = JSON.parse(salonSession);
     setSalon(salonData);
     loadBookings(salonData._id, selectedDate);
+    loadBarbers(salonData._id);
   }, [router, router.isReady, loadBookings, selectedDate]);
 
   // Handle date change
@@ -93,27 +115,94 @@ export default function DashboardPage() {
       day: "numeric",
     });
   };
-
-  const updateBookingStatus = async (bookingId, status) => {
+  const handleVerifyArrival = async (bookingCode) => {
     try {
+      const res = await fetch("/api/walkin/verify-arrival", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingCode,
+          salonId: salon._id,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setScanResult({
+          success: true,
+          message: `✅ ${data.booking.customerName} checked in!`,
+          queuePosition: data.booking.queuePosition,
+        });
+        // Refresh bookings
+        loadBookings();
+      } else {
+        setScanResult({
+          success: false,
+          message: data.message,
+        });
+      }
+    } catch (error) {
+      setScanResult({
+        success: false,
+        message: "Error verifying booking",
+      });
+    }
+  };
+
+  const updateBookingStatus = async (
+    bookingId,
+    newStatus,
+    estimatedTime = null
+  ) => {
+    try {
+      const queueStatusMap = {
+        confirmed: "RED",
+        arrived: "ORANGE",
+        started: "GREEN",
+        completed: "COMPLETED",
+      };
+
+      const payload = {
+        bookingId,
+        status: newStatus,
+        queueStatus: queueStatusMap[newStatus],
+      };
+
+      // ✅ Add time estimate if starting service
+      if (newStatus === "started" && estimatedTime) {
+        payload.estimatedDuration = estimatedTime;
+      }
+
       const response = await fetch("/api/bookings/update-status", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, status }),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
         setBookings((prev) =>
           prev.map((b) =>
             (b._id || b.id) === bookingId
-              ? { ...b, status, updatedAt: new Date() }
+              ? {
+                  ...b,
+                  status: newStatus,
+                  queueStatus: queueStatusMap[newStatus],
+                  estimatedDuration: estimatedTime || b.estimatedDuration,
+                  updatedAt: new Date(),
+                }
               : b
           )
         );
+
+        if (salon) {
+          loadBookings(salon._id, selectedDate);
+        }
       } else {
         alert("Failed to update booking");
       }
-    } catch {
+    } catch (error) {
+      console.error("Error updating status:", error);
       alert("Error updating booking");
     }
   };
@@ -169,6 +258,156 @@ export default function DashboardPage() {
           <div className={styles.card}>
             <h1 className={styles.salonTitle}>{salon?.salonName}</h1>
             <p className={styles.salonOwner}>Owner: {salon?.ownerName}</p>
+            <div className={styles.headerActions}>
+              <button
+                onClick={() => setShowScanner(true)}
+                className={styles.scannerBtn}
+              >
+                📷 Scan QR / Enter Code
+              </button>
+              {showScanner && (
+                <div className={styles.scannerModal}>
+                  <div className={styles.scannerContent}>
+                    <button
+                      onClick={() => {
+                        setShowScanner(false);
+                        setScanResult(null);
+                        setManualCode("");
+                      }}
+                      className={styles.closeModal}
+                    >
+                      ✕
+                    </button>
+
+                    <h2>Check-in Customer</h2>
+
+                    {!scanResult ? (
+                      <>
+                        <div className={styles.manualInput}>
+                          <input
+                            type="text"
+                            placeholder="Enter booking code (e.g., ST-3842N)"
+                            value={manualCode}
+                            onChange={(e) =>
+                              setManualCode(e.target.value.toUpperCase())
+                            }
+                            className={styles.codeInput}
+                          />
+                          <button
+                            onClick={() => handleVerifyArrival(manualCode)}
+                            disabled={!manualCode}
+                            className={styles.verifyBtn}
+                          >
+                            Verify & Check-in
+                          </button>
+                        </div>
+
+                        <div className={styles.divider}>OR</div>
+
+                        <div className={styles.qrScanner}>
+                          <p>📷 QR Scanner Coming Soon</p>
+                          <p className={styles.note}>
+                            For now, manually enter the code shown on
+                            customer&apos;s screen
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div
+                        className={`${styles.result} ${
+                          scanResult.success ? styles.success : styles.error
+                        }`}
+                      >
+                        <p>{scanResult.message}</p>
+                        {scanResult.success && (
+                          <p className={styles.queueInfo}>
+                            Queue Position: #{scanResult.queuePosition}
+                          </p>
+                        )}
+                        <button
+                          onClick={() => {
+                            setScanResult(null);
+                            setManualCode("");
+                          }}
+                          className={styles.scanAgainBtn}
+                        >
+                          Check-in Another Customer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {/* Time Estimate Modal */}
+              {showTimeModal && (
+                <div className={styles.scannerModal}>
+                  <div className={styles.scannerContent}>
+                    <button
+                      onClick={() => {
+                        setShowTimeModal(false);
+                        setBookingToStart(null);
+                        setTimeEstimate(30);
+                      }}
+                      className={styles.closeModal}
+                    >
+                      ✕
+                    </button>
+
+                    <h2>⏱️ Estimate Service Time</h2>
+                    <p className={styles.modalSubtext}>
+                      For: <strong>{bookingToStart?.customerName}</strong>
+                    </p>
+
+                    <div className={styles.timeInput}>
+                      <label>How long will this service take?</label>
+                      <div className={styles.timeButtons}>
+                        {[15, 20, 30, 45, 60].map((mins) => (
+                          <button
+                            key={mins}
+                            onClick={() => setTimeEstimate(mins)}
+                            className={`${styles.timeOption} ${
+                              timeEstimate === mins ? styles.selected : ""
+                            }`}
+                          >
+                            {mins} mins
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className={styles.customTime}>
+                        <input
+                          type="number"
+                          value={timeEstimate}
+                          onChange={(e) =>
+                            setTimeEstimate(parseInt(e.target.value) || 30)
+                          }
+                          min="5"
+                          max="120"
+                          className={styles.timeNumberInput}
+                        />
+                        <span>minutes</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={async () => {
+                        await updateBookingStatus(
+                          bookingToStart._id,
+                          "started",
+                          timeEstimate
+                        );
+                        setShowTimeModal(false);
+                        setBookingToStart(null);
+                        setTimeEstimate(30);
+                      }}
+                      className={styles.verifyBtn}
+                    >
+                      Start Service ({timeEstimate} mins)
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Date Picker Section */}
@@ -275,100 +514,166 @@ export default function DashboardPage() {
                 </button>
               </div>
             ) : (
-              <div className={styles.bookingsGrid}>
-                {bookings.map((b) => (
-                  <div key={b._id || b.id} className={styles.bookingCard}>
-                    <div className={styles.bookingDetails}>
-                      <h3 className={styles.customerName}>
-                        {b.customerName}
-                        {b.customerAge && (
-                          <span className={styles.customerAge}>
-                            {" "}
-                            ({b.customerAge} yrs)
-                          </span>
-                        )}
-                      </h3>
-
-                      <div className={styles.customerMeta}>
-                        <p className={styles.bookingInfo}>
-                          📞 {b.customerPhone}
-                        </p>
-                        {b.customerGender && (
-                          <p className={styles.bookingInfo}>
-                            {b.customerGender === "Male"
-                              ? "👨"
-                              : b.customerGender === "Female"
-                              ? "👩"
-                              : "👤"}{" "}
-                            {b.customerGender}
-                          </p>
-                        )}
-                      </div>
-
-                      <p className={styles.bookingInfo}>✂️ {b.service}</p>
-                      {b.barber && (
-                        <p className={styles.bookingInfo}>💈 {b.barber}</p>
-                      )}
-                      <p className={styles.bookingInfo}>
-                        📅 {b.date} at {b.time}
-                      </p>
-                      <p className={styles.bookingInfo}>💰 ₹{b.price}</p>
-
-                      {b.customerLocation && b.customerLocation.address && (
-                        <p
-                          className={styles.bookingInfo}
-                          title={b.customerLocation.address}
-                        >
-                          📍 {b.customerLocation.address.substring(0, 30)}...
-                        </p>
-                      )}
-                    </div>
-
-                    <div className={styles.bookingActions}>
-                      <span
-                        className={`${styles.statusBadge} ${getStatusClassName(
-                          b.status
-                        )}`}
-                      >
-                        {b.status}
-                      </span>
-
-                      <div className={styles.actionButtons}>
-                        {b.status === "confirmed" && (
-                          <button
-                            onClick={() =>
-                              updateBookingStatus(b._id, "started")
-                            }
-                            className={styles.actionButton}
+              <div>
+                {/* Unassigned Bookings */}
+                {bookings.filter((b) => !b.barberId).length > 0 && (
+                  <div className={styles.unassignedSection}>
+                    <h3 className={styles.sectionTitle}>
+                      ⏳ Pending Assignment
+                    </h3>
+                    <div className={styles.bookingsGrid}>
+                      {bookings
+                        .filter((b) => !b.barberId)
+                        .map((b) => (
+                          <div
+                            key={b._id || b.id}
+                            className={styles.bookingCard}
                           >
-                            Start Service
-                          </button>
-                        )}
-                        {b.status === "started" && (
-                          <button
-                            onClick={() =>
-                              updateBookingStatus(b._id, "completed")
-                            }
-                            className={styles.actionButton}
-                          >
-                            Mark Done
-                          </button>
-                        )}
-                        {b.status !== "cancelled" &&
-                          b.status !== "completed" && (
-                            <button
-                              onClick={() =>
-                                updateBookingStatus(b._id, "cancelled")
-                              }
-                              className={`${styles.actionButton} ${styles.cancelButton}`}
-                            >
-                              Cancel
-                            </button>
-                          )}
-                      </div>
+                            <div className={styles.bookingDetails}>
+                              <h3 className={styles.customerName}>
+                                {b.customerName}
+                              </h3>
+                              <p className={styles.bookingInfo}>
+                                📞 {b.customerPhone}
+                              </p>
+                              <p className={styles.bookingInfo}>
+                                ✂️ {b.service}
+                              </p>
+                              <p className={styles.bookingInfo}>
+                                📅 {b.date || "Walk-in"}{" "}
+                                {b.time && `at ${b.time}`}
+                              </p>
+                              {b.price && (
+                                <p className={styles.bookingInfo}>
+                                  💰 ₹{b.price}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                     </div>
                   </div>
-                ))}
+                )}
+
+                {/* Barbers Accordions - ONLY ONE SECTION */}
+                <div className={styles.barbersSection}>
+                  <h3 className={styles.sectionTitle}>💈 Barbers</h3>
+                  {barbers.map((barber) => {
+                    const barberBookings = bookings.filter(
+                      (b) => b.barberId === barber._id
+                    );
+                    return (
+                      <details
+                        key={barber._id}
+                        className={styles.barberAccordion}
+                      >
+                        <summary className={styles.barberSummary}>
+                          <span className={styles.barberName}>
+                            {barber.name}
+                          </span>
+                          {barberBookings.length > 0 && (
+                            <span className={styles.bookingBadge}>
+                              {barberBookings.length}
+                            </span>
+                          )}
+                        </summary>
+
+                        <div className={styles.barberBookings}>
+                          {barberBookings.length === 0 ? (
+                            <p className={styles.noBookings}>No bookings</p>
+                          ) : (
+                            barberBookings.map((b) => (
+                              <div
+                                key={b._id || b.id}
+                                className={styles.bookingCard}
+                              >
+                                <div className={styles.bookingDetails}>
+                                  <h3 className={styles.customerName}>
+                                    {b.customerName}
+                                    {b.customerAge && (
+                                      <span className={styles.customerAge}>
+                                        {" "}
+                                        ({b.customerAge} yrs)
+                                      </span>
+                                    )}
+                                  </h3>
+                                  <p className={styles.bookingInfo}>
+                                    📞 {b.customerPhone}
+                                  </p>
+                                  <p className={styles.bookingInfo}>
+                                    ✂️ {b.service}
+                                  </p>
+                                  <p className={styles.bookingInfo}>
+                                    📅 {b.date || "Walk-in"}{" "}
+                                    {b.time && `at ${b.time}`}
+                                  </p>
+                                  {b.price && (
+                                    <p className={styles.bookingInfo}>
+                                      💰 ₹{b.price}
+                                    </p>
+                                  )}
+                                  <span
+                                    className={`${
+                                      styles.statusBadge
+                                    } ${getStatusClassName(b.status)}`}
+                                  >
+                                    {b.queueStatus || b.status}
+                                  </span>
+                                </div>
+
+                                <div className={styles.barberActions}>
+                                  {b.status === "confirmed" && (
+                                    <button
+                                      onClick={() =>
+                                        updateBookingStatus(b._id, "arrived")
+                                      }
+                                      className={styles.arrivedBtn}
+                                    >
+                                      Mark Arrived
+                                    </button>
+                                  )}
+
+                                  {b.status === "arrived" && (
+                                    <button
+                                      onClick={() => {
+                                        setBookingToStart(b);
+                                        setShowTimeModal(true);
+                                      }}
+                                      className={styles.startBtn}
+                                    >
+                                      Start Service
+                                    </button>
+                                  )}
+
+                                  <button className={styles.timeBtn}>
+                                    +5min
+                                  </button>
+                                  <button className={styles.timeBtn}>
+                                    +10min
+                                  </button>
+                                  <button className={styles.pauseBtn}>
+                                    Pause
+                                  </button>
+
+                                  {b.status === "started" && (
+                                    <button
+                                      onClick={() =>
+                                        updateBookingStatus(b._id, "completed")
+                                      }
+                                      className={styles.doneBtn}
+                                    >
+                                      Done
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </details>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

@@ -58,7 +58,6 @@ export default async function handler(req, res) {
 
     const barberQuery = {
       _id: { $in: barberObjectIds },
-      isAvailable: true,
     };
 
     console.log("Barber query:", JSON.stringify(barberQuery, null, 2));

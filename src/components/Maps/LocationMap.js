@@ -107,7 +107,6 @@ const LocationMap = ({ salonLocation, userLocation, salonName, address }) => {
         calculateDirectRoute();
       }
     } catch (error) {
-      console.log("Advanced routing failed, using direct route");
       calculateDirectRoute();
     } finally {
       setLoading(false);

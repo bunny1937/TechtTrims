@@ -47,7 +47,6 @@ function MyApp({ Component, pageProps }) {
   return (
     <>
       <NetworkStatus />
-      <GradientBackground />
       {!hideHeader && (
         <header className={styles.header}>
           <div className={styles.headerContent}>

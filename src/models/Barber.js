@@ -7,23 +7,53 @@ const BarberSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Salon",
       required: true,
-      index: true,
     },
     name: { type: String, required: true },
-    experience: { type: Number, default: 0 }, // years
-    skills: [{ type: String }], // specializations
+    experience: { type: Number, default: 0 },
+    skills: [{ type: String }],
     bio: { type: String, default: "" },
     photo: { type: String, default: "" },
     isAvailable: { type: Boolean, default: true },
-    workingHours: {
-      start: { type: String, default: "09:00" },
-      end: { type: String, default: "21:00" },
+
+    // ============ NEW FIELDS FOR WALK-IN SYSTEM ============
+    chairNumber: {
+      type: Number,
+      required: true,
+      index: true,
     },
+
+    currentStatus: {
+      type: String,
+      enum: ["AVAILABLE", "OCCUPIED", "BREAK"],
+      default: "AVAILABLE",
+    },
+
+    currentBookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WalkinBooking",
+      default: null,
+    },
+
+    currentServiceStartTime: {
+      type: Date,
+      default: null,
+    },
+
+    currentServiceEndTime: {
+      type: Date,
+      default: null,
+    },
+
+    queueLength: {
+      type: Number,
+      default: 0,
+    },
+    // ============ END NEW FIELDS ============
+
+    // Keep existing fields
     totalBookings: { type: Number, default: 0 },
-    rating: { type: Number, default: 5.0, min: 0, max: 5 },
-    accomplishments: [{ type: String }],
+    rating: { type: Number, default: 5.0 },
     earnings: { type: Number, default: 0 },
-    lastActiveAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
