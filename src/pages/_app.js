@@ -16,8 +16,10 @@ function MyApp({ Component, pageProps }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Don't show header on onboarding pages
-  const hideHeader = router.pathname.startsWith("/onboarding");
+  // Don't show header on onboarding AND auth pages
+  const hideHeader =
+    router.pathname.startsWith("/onboarding") ||
+    router.pathname.startsWith("/auth/");
 
   useEffect(() => {
     // Check theme preference
@@ -87,6 +89,7 @@ function MyApp({ Component, pageProps }) {
                   </span>
                 </motion.button>
 
+                {/* ✅ SHOW DASHBOARD ONLY IF LOGGED IN */}
                 {UserDataManager.isLoggedIn() && (
                   <motion.button
                     className={`${styles.actionButton} ${styles.bookingButton}`}
@@ -98,52 +101,81 @@ function MyApp({ Component, pageProps }) {
                   </motion.button>
                 )}
 
-                <motion.button
-                  className={`${styles.actionButton} ${styles.ownerButton}`}
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => navigateToAuth("register", "salon")}
-                >
-                  Register Salon
-                </motion.button>
-
-                <div className={styles.loginDropdown}>
+                {/* ✅ SHOW LOGOUT ONLY IF LOGGED IN */}
+                {UserDataManager.isLoggedIn() && (
                   <motion.button
-                    className={`${styles.actionButton} ${styles.loginButton}`}
+                    className={`${styles.actionButton} ${styles.logoutButton}`}
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowLoginMenu(!showLoginMenu)}
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to logout?")) {
+                        localStorage.removeItem("userToken");
+                        localStorage.removeItem("authenticatedUserData");
+                        localStorage.removeItem("salonToken");
+                        localStorage.removeItem("salonSession");
+                        localStorage.removeItem("ownerToken");
+
+                        alert("Logged out successfully!");
+                        window.location.href = "/";
+                      }
+                    }}
                   >
-                    <span className={styles.buttonIcon}>👤</span>
-                    Login
-                    <span className={styles.dropdownArrow}>▼</span>
+                    Logout
                   </motion.button>
-                  {showLoginMenu && (
-                    <motion.div
-                      className={styles.loginMenu}
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ duration: 0.2 }}
+                )}
+
+                {/* ✅ SHOW REGISTER SALON ONLY IF NOT LOGGED IN */}
+                {!UserDataManager.isLoggedIn() && (
+                  <motion.button
+                    className={`${styles.actionButton} ${styles.ownerButton}`}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => navigateToAuth("register", "salon")}
+                  >
+                    Register Salon
+                  </motion.button>
+                )}
+
+                {/* ✅ SHOW LOGIN ONLY IF NOT LOGGED IN */}
+                {!UserDataManager.isLoggedIn() && (
+                  <div className={styles.loginDropdown}>
+                    <motion.button
+                      className={`${styles.actionButton} ${styles.loginButton}`}
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setShowLoginMenu(!showLoginMenu)}
                     >
-                      <button
-                        onClick={() => {
-                          router.push("/auth/user/login");
-                          setShowLoginMenu(false);
-                        }}
+                      <span className={styles.buttonIcon}>👤</span>
+                      Login
+                      <span className={styles.dropdownArrow}>▼</span>
+                    </motion.button>
+                    {showLoginMenu && (
+                      <motion.div
+                        className={styles.loginMenu}
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.2 }}
                       >
-                        👤 User Login
-                      </button>
-                      <button
-                        onClick={() => {
-                          navigateToAuth("login", "salon");
-                          setShowLoginMenu(false);
-                        }}
-                      >
-                        🏪 Salon Login
-                      </button>
-                    </motion.div>
-                  )}
-                </div>
+                        <button
+                          onClick={() => {
+                            router.push("/auth/user/login");
+                            setShowLoginMenu(false);
+                          }}
+                        >
+                          👤 User Login
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigateToAuth("login", "salon");
+                            setShowLoginMenu(false);
+                          }}
+                        >
+                          🏪 Salon Login
+                        </button>
+                      </motion.div>
+                    )}
+                  </div>
+                )}
               </div>
             </nav>
 
@@ -183,6 +215,8 @@ function MyApp({ Component, pageProps }) {
                   <button className={styles.mobileNavLink}>Salons</button>
                   <button className={styles.mobileNavLink}>About</button>
                   <div className={styles.mobileNavDivider}></div>
+
+                  {/* Show Dashboard if logged in */}
                   {UserDataManager.isLoggedIn() && (
                     <button
                       className={styles.mobileNavLink}
@@ -194,33 +228,62 @@ function MyApp({ Component, pageProps }) {
                       Dashboard
                     </button>
                   )}
-                  <button
-                    className={styles.mobileNavLink}
-                    onClick={() => {
-                      router.push("/auth/user/login");
-                      setIsMobileMenuOpen(false);
-                    }}
-                  >
-                    👤 User Login
-                  </button>
-                  <button
-                    className={styles.mobileNavLink}
-                    onClick={() => {
-                      navigateToAuth("login", "salon");
-                      setIsMobileMenuOpen(false);
-                    }}
-                  >
-                    🏪 Salon Login
-                  </button>
-                  <button
-                    className={styles.mobileNavLink}
-                    onClick={() => {
-                      navigateToAuth("register", "salon");
-                      setIsMobileMenuOpen(false);
-                    }}
-                  >
-                    🏪 Register Salon
-                  </button>
+
+                  {/* Show Login options only if NOT logged in */}
+                  {!UserDataManager.isLoggedIn() && (
+                    <>
+                      <button
+                        className={styles.mobileNavLink}
+                        onClick={() => {
+                          router.push("/auth/user/login");
+                          setIsMobileMenuOpen(false);
+                        }}
+                      >
+                        👤 User Login
+                      </button>
+                      <button
+                        className={styles.mobileNavLink}
+                        onClick={() => {
+                          navigateToAuth("login", "salon");
+                          setIsMobileMenuOpen(false);
+                        }}
+                      >
+                        🏪 Salon Login
+                      </button>
+                      <button
+                        className={styles.mobileNavLink}
+                        onClick={() => {
+                          navigateToAuth("register", "salon");
+                          setIsMobileMenuOpen(false);
+                        }}
+                      >
+                        🏪 Register Salon
+                      </button>
+                    </>
+                  )}
+
+                  {/* Show Logout if logged in */}
+                  {UserDataManager.isLoggedIn() && (
+                    <button
+                      className={styles.mobileNavLink}
+                      onClick={() => {
+                        if (
+                          window.confirm("Are you sure you want to logout?")
+                        ) {
+                          localStorage.removeItem("userToken");
+                          localStorage.removeItem("authenticatedUserData");
+                          localStorage.removeItem("salonToken");
+                          localStorage.removeItem("salonSession");
+                          localStorage.removeItem("ownerToken");
+
+                          alert("Logged out successfully!");
+                          window.location.href = "/";
+                        }
+                      }}
+                    >
+                      Logout
+                    </button>
+                  )}
                 </div>
               </motion.div>
             )}

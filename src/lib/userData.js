@@ -158,6 +158,13 @@ export class UserDataManager {
   static clearAllData() {
     if (typeof window === "undefined") return;
     // Nuclear option - clear everything except hasOnboarded
+    localStorage.removeItem("userToken");
+    localStorage.removeItem("authenticatedUserData");
+    localStorage.removeItem("salonToken");
+    localStorage.removeItem("salonSession");
+    localStorage.removeItem("ownerToken");
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("adminData");
     const hasOnboarded = localStorage.getItem("hasOnboarded");
     const userOnboardingData = localStorage.getItem("userOnboardingData");
 
@@ -175,7 +182,10 @@ export class UserDataManager {
     if (typeof window === "undefined") return false;
     const userToken = localStorage.getItem("userToken");
     const authenticatedUserData = localStorage.getItem("authenticatedUserData");
-    return !!(userToken && authenticatedUserData);
+    const salonToken = localStorage.getItem("salonToken");
+    const salonSession = localStorage.getItem("salonSession");
+    // User is logged in if ANY auth token exists
+    return !!(userToken || authenticatedUserData || salonToken || salonSession);
   }
 
   static preserveUserInfoForBooking(bookingData) {
@@ -200,7 +210,12 @@ export class UserDataManager {
 
   static isLoggedIn() {
     if (typeof window === "undefined") return false;
-    return !!localStorage.getItem("userToken");
+    const userToken = localStorage.getItem("userToken");
+    const authenticatedUserData = localStorage.getItem("authenticatedUserData");
+    const salonToken = localStorage.getItem("salonToken");
+    const salonSession = localStorage.getItem("salonSession");
+    // Check ANY authentication
+    return !!(userToken || authenticatedUserData || salonToken || salonSession);
   }
 
   static hasOnboarded() {

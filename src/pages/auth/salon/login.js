@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../../styles/Auth/SalonAuth.module.css";
 
@@ -9,6 +9,17 @@ export default function SalonLogin() {
     password: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Only redirect if already logged in as salon
+    const salonToken = localStorage.getItem("salonToken");
+    const salonSession = localStorage.getItem("salonSession");
+
+    if (salonToken || salonSession) {
+      router.push("/salons/dashboard");
+    }
+    // DO NOT check onboarding - salon owners can login anytime
+  }, [router]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -21,15 +32,18 @@ export default function SalonLogin() {
         body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
-
       if (response.ok) {
-        // Store salon session
-        localStorage.setItem("salonSession", JSON.stringify(data.salon));
+        const data = await response.json(); // ✅ ONLY ONE PARSE
         localStorage.setItem("salonToken", data.token);
-        router.push("/salons/dashboard");
+        localStorage.setItem("salonSession", JSON.stringify(data.salon));
+
+        alert(`Welcome back, ${data.salon.salonName}!`);
+
+        // Force redirect to salon dashboard
+        window.location.href = "/salons/dashboard";
       } else {
-        alert(data.message || "Login failed");
+        const error = await response.json();
+        alert(error.message || "Login failed");
       }
     } catch (error) {
       alert("Login error: " + error.message);
