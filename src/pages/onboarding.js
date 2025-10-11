@@ -213,6 +213,16 @@ export default function Onboarding() {
       </div>
 
       <div className={styles.onboardingCard}>
+        <div className={styles.loginPrompt}>
+          <p className={styles.loginText}>Already have an account?</p>
+          <button
+            type="button"
+            onClick={() => router.push("/auth/user/login")}
+            className={styles.loginLink}
+          >
+            Sign In
+          </button>
+        </div>
         <div className={styles.header}>
           <h1 className={styles.title}>
             Welcome to <span className={styles.goldText}>TechTrims</span>

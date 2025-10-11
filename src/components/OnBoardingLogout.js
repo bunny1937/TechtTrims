@@ -18,7 +18,7 @@ export default function OnboardingLogoutButton() {
 
       // Show button only if onboarded but not logged in
       const isOnboarded = hasOnboarded === "true";
-      const isLoggedIn = !!(userToken && authenticatedUserData);
+      const isLoggedIn = !!(userToken || authenticatedUserData);
 
       setShowButton(isOnboarded && !isLoggedIn);
 

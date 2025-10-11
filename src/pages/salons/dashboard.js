@@ -23,6 +23,11 @@ export default function DashboardPage() {
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const loadBookings = useCallback(async (salonId, dateString) => {
     try {
       setLoading(true);
@@ -34,10 +39,8 @@ export default function DashboardPage() {
         dateParam = `&date=${dateString}`;
       }
 
-      // ✅ Add bookingType=all to include walk-ins
       const response = await fetch(
         `/api/salons/bookings?salonId=${salonId}${dateParam}&includeWalkins=true`,
-
         { cache: "no-store", headers: { "Content-Type": "application/json" } }
       );
 
@@ -76,6 +79,18 @@ export default function DashboardPage() {
     loadBookings(salonData._id, selectedDate);
     loadBarbers(salonData._id);
   }, [router, router.isReady, loadBookings, selectedDate]);
+
+  // ✅ Only this check can come after all hooks
+  if (!mounted) {
+    return (
+      <div className={styles.loadingContainer}>
+        <div className={styles.loadingContent}>
+          <div className={styles.spinner}></div>
+          <p className={styles.loadingText}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Handle date change
   const handleDateChange = (newDate) => {

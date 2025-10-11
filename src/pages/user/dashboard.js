@@ -102,10 +102,25 @@ export default function UserDashboard() {
   };
 
   const handleLogout = () => {
+    // Confirm logout
     if (window.confirm("Are you sure you want to logout?")) {
+      // Clear ALL authentication data
       UserDataManager.clearUserData();
+
+      // Force clear to ensure clean state
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("userToken");
+        localStorage.removeItem("authenticatedUserData");
+        localStorage.removeItem("salonToken");
+        localStorage.removeItem("ownerToken");
+      }
+
+      localStorage.setItem("hasOnboarded", "true");
+
       alert("Logged out successfully!");
-      router.push("/");
+
+      // Force redirect to home page
+      window.location.href = "/";
     }
   };
 

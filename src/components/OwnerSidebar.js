@@ -22,11 +22,19 @@ export default function OwnerSidebar({ closeSidebar }) {
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to logout?")) {
+      // Clear all salon/owner authentication data
       localStorage.removeItem("ownerToken");
       localStorage.removeItem("salonToken");
       localStorage.removeItem("salonSession");
+      localStorage.removeItem("adminToken");
+      localStorage.removeItem("adminData");
+
       alert("Logged out successfully!");
-      router.push("/auth/salon/login");
+
+      // Redirect to HOME page (/)
+      router.push("/").then(() => {
+        window.location.href = "/";
+      });
     }
   };
 
