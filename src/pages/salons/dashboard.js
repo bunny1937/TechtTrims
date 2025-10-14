@@ -4,6 +4,33 @@ import { useRouter } from "next/router";
 import OwnerSidebar from "../../components/OwnerSidebar";
 import styles from "../../styles/SalonDashboard.module.css";
 
+// Time Remaining Component
+function TimeRemaining({ endTime }) {
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const end = new Date(endTime);
+      const diff = Math.max(0, Math.floor((end - now) / 1000 / 60));
+
+      if (diff === 0) {
+        setTimeLeft("Time Up! ⏰");
+      } else if (diff <= 5) {
+        setTimeLeft(`${diff}m left (ending soon!)`);
+      } else {
+        setTimeLeft(`${diff}m remaining`);
+      }
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 30000);
+    return () => clearInterval(interval);
+  }, [endTime]);
+
+  return <span>{timeLeft}</span>;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -22,10 +49,93 @@ export default function DashboardPage() {
     new Date().toISOString().split("T")[0]
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
-
+  const [serviceTimers, setServiceTimers] = useState({});
+  const [pausedBarbers, setPausedBarbers] = useState(new Set());
   const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // Service time notification system
+  useEffect(() => {
+    const activeBookings = bookings.filter(
+      (b) => b.status === "started" && b.serviceEndTime
+    );
+
+    const checkTimers = () => {
+      const now = new Date();
+
+      activeBookings.forEach((booking) => {
+        const endTime = new Date(booking.serviceEndTime);
+        const timeLeft = Math.floor((endTime - now) / 1000 / 60); // minutes
+
+        // 5 minutes warning
+        if (timeLeft === 5 && !serviceTimers[`${booking.id}_5min`]) {
+          playNotificationSound();
+          showNotification(
+            `⏰ 5 Minutes Left!`,
+            `Service for ${booking.customerName} ending soon`
+          );
+          setServiceTimers((prev) => ({
+            ...prev,
+            [`${booking.id}_5min`]: true,
+          }));
+        }
+
+        // 2 minutes warning
+        if (timeLeft === 2 && !serviceTimers[`${booking.id}_2min`]) {
+          playNotificationSound();
+          showNotification(
+            `⏰ 2 Minutes Left!`,
+            `Service for ${booking.customerName} almost done`
+          );
+          setServiceTimers((prev) => ({
+            ...prev,
+            [`${booking.id}_2min`]: true,
+          }));
+        }
+
+        // Service completed
+        if (timeLeft === 0 && !serviceTimers[`${booking.id}_done`]) {
+          playNotificationSound();
+          showNotification(
+            `✅ Time's Up!`,
+            `Mark ${booking.customerName}'s service as Done or add more time`
+          );
+          setServiceTimers((prev) => ({
+            ...prev,
+            [`${booking.id}_done`]: true,
+          }));
+        }
+      });
+    };
+
+    const interval = setInterval(checkTimers, 30000); // Check every 30 seconds
+    checkTimers(); // Initial check
+
+    return () => clearInterval(interval);
+  }, [bookings, serviceTimers]);
+
+  // Notification helpers
+  const playNotificationSound = () => {
+    const audio = new Audio("/notification.mp3"); // Add notification sound to public folder
+    audio.play().catch((e) => console.log("Audio play failed:", e));
+  };
+
+  const showNotification = (title, body) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, { body, icon: "/logo.png" });
+    } else {
+      alert(`${title}\n${body}`);
+    }
+  };
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
   }, []);
 
   const loadBookings = useCallback(async (salonId, dateString) => {
@@ -146,11 +256,13 @@ export default function DashboardPage() {
       if (data.success) {
         setScanResult({
           success: true,
-          message: `✅ ${data.booking.customerName} checked in!`,
+          message: `${data.booking.customerName} checked in!`,
           queuePosition: data.booking.queuePosition,
         });
-        // Refresh bookings
-        loadBookings();
+        // Refresh bookings with proper parameters
+        if (salon && salon.id) {
+          await loadBookings(salon.id, selectedDate);
+        }
       } else {
         setScanResult({
           success: false,
@@ -222,6 +334,105 @@ export default function DashboardPage() {
     }
   };
 
+  const handleAddTime = async (bookingId, additionalMinutes) => {
+    try {
+      const booking = bookings.find(
+        (b) => b._id === bookingId || b.id === bookingId
+      );
+      if (!booking) {
+        console.error("Booking not found:", bookingId);
+        alert("Booking not found");
+        return;
+      }
+
+      const newEstimatedDuration =
+        (booking.estimatedDuration || 30) + additionalMinutes;
+
+      // Use _id if available, fallback to id
+      const actualBookingId = booking._id || booking.id;
+
+      const response = await fetch("/api/bookings/add-time", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingId: actualBookingId,
+          additionalMinutes,
+          newEstimatedDuration,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Update local state
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.id === bookingId
+              ? {
+                  ...b,
+                  estimatedDuration: newEstimatedDuration,
+                  serviceEndTime: data.newEndTime,
+                }
+              : b
+          )
+        );
+
+        alert(
+          `Added ${additionalMinutes} minutes. New duration: ${newEstimatedDuration} mins`
+        );
+
+        // Refresh bookings
+        if (salon && salon.id) {
+          await loadBookings(salon.id, selectedDate);
+        }
+      } else {
+        alert("Failed to add time");
+      }
+    } catch (error) {
+      console.error("Error adding time:", error);
+      alert("Error adding time");
+    }
+  };
+
+  const handleTogglePause = async (barberId, barberName) => {
+    const isPaused = pausedBarbers.has(barberId);
+
+    try {
+      const response = await fetch("/api/barber/toggle-pause", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          barberId,
+          isPaused: !isPaused,
+        }),
+      });
+
+      if (response.ok) {
+        setPausedBarbers((prev) => {
+          const newSet = new Set(prev);
+          if (isPaused) {
+            newSet.delete(barberId);
+            alert(`${barberName}'s queue resumed`);
+          } else {
+            newSet.add(barberId);
+            alert(`${barberName}'s queue paused`);
+          }
+          return newSet;
+        });
+
+        // Refresh bookings
+        if (salon && salon.id) {
+          await loadBookings(salon.id, selectedDate);
+        }
+      } else {
+        alert("Failed to toggle pause");
+      }
+    } catch (error) {
+      console.error("Error toggling pause:", error);
+      alert("Error toggling pause");
+    }
+  };
+
   if (loading && !salon) {
     return (
       <div className={styles.loadingContainer}>
@@ -283,6 +494,16 @@ export default function DashboardPage() {
               {showScanner && (
                 <div className={styles.scannerModal}>
                   <div className={styles.scannerContent}>
+                    <div className={styles.checkinHeader}>
+                      <h2 className={styles.checkinTitle}>Check-in Customer</h2>
+                      <button
+                        onClick={() => setShowScanner(false)}
+                        className={styles.closeModal}
+                      >
+                        ✕
+                      </button>
+                    </div>
+
                     <button
                       onClick={() => {
                         setShowScanner(false);
@@ -551,9 +772,13 @@ export default function DashboardPage() {
                               <p className={styles.bookingInfo}>
                                 📞 {b.customerPhone}
                               </p>
-                              <p className={styles.bookingInfo}>
-                                ✂️ {b.service}
-                              </p>
+                              <p className={styles.bookingInfo}>{b.service}</p>
+                              {b.status === "started" && b.serviceEndTime && (
+                                <p className={styles.timeRemaining}>
+                                  ⏱ <TimeRemaining endTime={b.serviceEndTime} />
+                                </p>
+                              )}
+
                               <p className={styles.bookingInfo}>
                                 📅 {b.date || "Walk-in"}{" "}
                                 {b.time && `at ${b.time}`}
@@ -616,8 +841,18 @@ export default function DashboardPage() {
                                     📞 {b.customerPhone}
                                   </p>
                                   <p className={styles.bookingInfo}>
-                                    ✂️ {b.service}
+                                    {b.service}
                                   </p>
+                                  {b.status === "started" &&
+                                    b.serviceEndTime && (
+                                      <p className={styles.timeRemaining}>
+                                        ⏱{" "}
+                                        <TimeRemaining
+                                          endTime={b.serviceEndTime}
+                                        />
+                                      </p>
+                                    )}
+
                                   <p className={styles.bookingInfo}>
                                     📅 {b.date || "Walk-in"}{" "}
                                     {b.time && `at ${b.time}`}
@@ -652,6 +887,9 @@ export default function DashboardPage() {
                                     <button
                                       onClick={() => {
                                         setBookingToStart(b);
+                                        setTimeEstimate(
+                                          b.estimatedDuration || 30
+                                        );
                                         setShowTimeModal(true);
                                       }}
                                       className={styles.startBtn}
@@ -660,14 +898,39 @@ export default function DashboardPage() {
                                     </button>
                                   )}
 
-                                  <button className={styles.timeBtn}>
+                                  <button
+                                    className={styles.timeBtn}
+                                    onClick={() =>
+                                      handleAddTime(b._id || b.id, 5)
+                                    }
+                                  >
                                     +5min
                                   </button>
-                                  <button className={styles.timeBtn}>
+                                  <button
+                                    className={styles.timeBtn}
+                                    onClick={() =>
+                                      handleAddTime(b._id || b.id, 10)
+                                    }
+                                  >
                                     +10min
                                   </button>
-                                  <button className={styles.pauseBtn}>
-                                    Pause
+
+                                  <button
+                                    className={`${styles.pauseBtn} ${
+                                      pausedBarbers.has(barber._id || barber.id)
+                                        ? styles.pausedBtn
+                                        : ""
+                                    }`}
+                                    onClick={() =>
+                                      handleTogglePause(
+                                        barber._id || barber.id,
+                                        barber.name
+                                      )
+                                    }
+                                  >
+                                    {pausedBarbers.has(barber._id || barber.id)
+                                      ? "▶ Resume"
+                                      : "⏸ Pause"}
                                   </button>
 
                                   {b.status === "started" && (

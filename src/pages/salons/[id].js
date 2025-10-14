@@ -1,7 +1,7 @@
 // pages/salons/[id].js
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import styles from "../../styles/SalonDetail.module.css";
 import Image from "next/image";
@@ -47,14 +47,11 @@ export default function SalonDetail({ initialSalon }) {
   const [userOnboarding, setUserOnboarding] = useState(null);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-  const [otpMobile, setOtpMobile] = useState("");
-  const [sseMessages, setSseMessages] = useState([]);
   const [regName, setRegName] = useState("");
   const [regMobile, setRegMobile] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [bookingError, setBookingError] = useState(null);
+  const [currentStep, setCurrentStep] = useState(1); // 1: Services, 2: Barbers, 3: Date/Time (prebook only)
 
   useEffect(() => {
     // Only run once when component mounts
@@ -129,6 +126,26 @@ export default function SalonDetail({ initialSalon }) {
       selectedTime
     );
   }, [selectedServices, selectedTime]);
+
+  const isSalonOpen = () => {
+    if (!salon?.operatingHours && !salon?.openingHours) return true; // Default open if no hours
+
+    const now = new Date();
+    const currentDay = now
+      .toLocaleDateString("en-US", { weekday: "long" })
+      .toLowerCase(); // ✅ valid + works correctly
+
+    const currentTime = now.getHours() * 100 + now.getMinutes();
+
+    const hours = salon.operatingHours?.[currentDay] || salon.openingHours;
+
+    if (!hours || hours.closed) return false;
+
+    const openTime = parseInt(hours.open?.replace(":", "") || "0900");
+    const closeTime = parseInt(hours.close?.replace(":", "") || "2100");
+
+    return currentTime >= openTime && currentTime < closeTime;
+  };
 
   useEffect(() => {
     if (selectedServices.length > 0 && salon?._id) {
@@ -282,9 +299,27 @@ export default function SalonDetail({ initialSalon }) {
       if (exists) {
         return prev.filter((s) => s.name !== service.name);
       } else {
+        setTimeout(() => setCurrentStep(2), 1000); // 🔥 THIS LINE
         return [...prev, service];
       }
     });
+  };
+
+  // 🔥 Auto-flip on barber selection (prebook only)
+  const handleBarberClick = (barberId) => {
+    const barberState = barberStates?.find((b) => b.barberId === barberId);
+
+    if (barberState?.isPaused) {
+      alert(
+        "This barber is temporarily unavailable. Please select another barber."
+      );
+      return;
+    }
+
+    setSelectedBarber(barberId);
+    if (bookingMode === "prebook") {
+      setTimeout(() => setCurrentStep(3), 1000); // 🔥 THIS LINE
+    }
   };
 
   const handleTimeClick = (time) => {
@@ -328,7 +363,6 @@ export default function SalonDetail({ initialSalon }) {
     }
   };
 
-  // const handleBooking = async () => {
   //   if (selectedServices.length === 0) {
   //     alert("Please select at least one service");
   //     return;
@@ -501,6 +535,7 @@ export default function SalonDetail({ initialSalon }) {
           salonId: salon?._id || id,
           barberId: selectedBarber,
           service: allServices,
+          price: totalPrice,
           customerName: currentUserInfo?.name || "Guest",
           customerPhone:
             currentUserInfo?.phone || currentUserInfo?.mobile || "",
@@ -642,62 +677,6 @@ export default function SalonDetail({ initialSalon }) {
     }
   };
 
-  const sendOtpForRegistration = async (mobile) => {
-    try {
-      const res = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setOtpSent(true);
-        setOtpMobile(mobile);
-        // For dev we get OTP in response; in prod SMS is sent.
-        setOtpCode(data.otp || "");
-        alert("OTP sent (dev): " + (data.otp || "---"));
-      } else {
-        alert("OTP send failed: " + (data.message || res.statusText));
-      }
-    } catch (e) {
-      console.error(e);
-      alert("OTP send failed");
-    }
-  };
-
-  const verifyOtpAndRegister = async (mobile, otp) => {
-    try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile, otp }),
-      });
-      const data = await res.json();
-      if (!res.ok)
-        return alert("OTP verify failed: " + (data.message || res.statusText));
-      // if user present, set onboarding; else open registration form
-      if (data.user) {
-        setUserOnboarding({
-          name: data.user.name,
-          mobile: data.user.mobile,
-          email: data.user.email,
-        });
-        alert("Verified and signed in");
-        setShowRegistrationModal(false);
-      } else {
-        // No existing user: fill registration modal fields
-        setRegName(regName || "");
-        setRegMobile(mobile);
-        setShowRegistrationModal(true);
-      }
-      setOtpSent(false);
-      setOtpCode("");
-    } catch (e) {
-      console.error(e);
-      alert("OTP verify failed");
-    }
-  };
-
   return (
     <div className={styles.container}>
       {bookingError && (
@@ -761,14 +740,14 @@ export default function SalonDetail({ initialSalon }) {
         </div>
 
         <div className={styles.salonBasicInfo}>
-          <div className={styles.ratingSection}>
+          {/* <div className={styles.ratingSection}>
             <div className={styles.mainRating}>
               ⭐ {salon.ratings.overall.toFixed(1)}
             </div>
             <div className={styles.reviewCount}>
               ({salon.ratings.totalReviews} reviews)
             </div>
-          </div>
+          </div> */}
 
           <div className={styles.locationInfo}>
             <p>📍 {salon.location.address}</p>
@@ -800,350 +779,445 @@ export default function SalonDetail({ initialSalon }) {
       <ReviewsSection salonId={salon._id} />
 
       {/* Services Section */}
-      <motion.section
-        className={styles.servicesSection}
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.2 }}
-      >
-        <h3 className={styles.sectionTitle}>Services & Pricing</h3>
-        <div className={styles.servicesGrid}>
-          {getFilteredServices().map((service, index) => (
-            <motion.div
-              key={index}
-              className={`${styles.serviceCard} ${
-                selectedServices.find((s) => s.name === service.name)
-                  ? styles.selected
-                  : ""
-              }`}
-              onClick={() => {
-                console.log("Service clicked:", service.name);
-                handleServiceClick(service);
-                console.log("Current selectedServices:", service);
-              }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <h4 className={styles.serviceName}>{service.name}</h4>
-              <p className={styles.servicePrice}>₹{service.price}</p>
-              <p className={styles.serviceDuration}>{service.duration} min</p>
-              <p className={styles.serviceGender}>
-                {service.gender.join(", ")}
-              </p>
-            </motion.div>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* Barber Selection Section */}
-
-      {selectedServices.length > 0 && (
-        <motion.section
-          className={styles.barbersSection}
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
+      {/* Booking Progress Steps */}
+      <div className={styles.bookingProgressBar}>
+        <div
+          className={`${styles.progressStep} ${
+            currentStep >= 1 ? styles.active : ""
+          }`}
         >
-          <h3 className={styles.sectionTitle}>Choose Your Barber</h3>
+          <span className={styles.stepNumber}>1</span>
+          <span className={styles.stepLabel}>Services</span>
+        </div>
+        <div className={styles.progressLine}></div>
+        <div
+          className={`${styles.progressStep} ${
+            currentStep >= 2 ? styles.active : ""
+          }`}
+        >
+          <span className={styles.stepNumber}>2</span>
+          <span className={styles.stepLabel}>Barber</span>
+        </div>
+        {bookingMode === "prebook" && (
+          <>
+            <div className={styles.progressLine}></div>
+            <div
+              className={`${styles.progressStep} ${
+                currentStep >= 3 ? styles.active : ""
+              }`}
+            >
+              <span className={styles.stepNumber}>3</span>
+              <span className={styles.stepLabel}>Date & Time</span>
+            </div>
+          </>
+        )}
+      </div>
 
-          {availableBarbers.length > 0 ? (
-            <div className={styles.barbersGrid}>
-              {availableBarbers.map((barber) => {
-                // ✅ Find real-time state for walk-in mode
-                const barberState =
-                  bookingMode === "walkin"
-                    ? barberStates.find(
-                        (b) => b.barberId === barber._id.toString()
-                      )
-                    : null;
-
-                return (
+      {/* Stepped Booking Card */}
+      <div className={styles.bookingCard}>
+        <AnimatePresence mode="wait">
+          {/* Step 1: Services */}
+          {currentStep === 1 && (
+            <motion.div
+              key="step1"
+              initial={{ rotateY: 90, opacity: 0 }}
+              animate={{ rotateY: 0, opacity: 1 }}
+              exit={{ rotateY: -90, opacity: 0 }}
+              transition={{
+                duration: 0.8,
+                ease: [0.43, 0.13, 0.23, 0.96],
+              }}
+              className={styles.cardContent}
+            >
+              <h3 className={styles.cardTitle}>Select Services</h3>
+              <div className={styles.servicesGrid}>
+                {getFilteredServices().map((service, index) => (
                   <motion.div
-                    key={barber._id}
-                    className={`${styles.barberCard} ${
-                      selectedBarber === barber._id ? styles.selected : ""
+                    key={index}
+                    className={`${styles.serviceCard} ${
+                      selectedServices.find((s) => s.name === service.name)
+                        ? styles.selected
+                        : ""
                     }`}
-                    onClick={() => setSelectedBarber(barber._id)}
-                    whileHover={{ scale: 1.03 }}
+                    onClick={() => handleServiceClick(service)}
+                    whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    {/* ✅ Walk-in Mode: Show real-time status badge */}
-                    {bookingMode === "walkin" && barberState && (
-                      <div className={styles.walkInStatusBadge}>
-                        {barberState.status === "AVAILABLE" && (
-                          <span className={styles.availableNow}>
-                            ✅ Available Now
-                          </span>
-                        )}
-                        {barberState.status === "OCCUPIED" && (
-                          <span className={styles.occupiedNow}>
-                            🟢 Busy ({barberState.timeLeft}m left)
-                          </span>
-                        )}
-                        {barberState.queueCount > 0 && (
-                          <span className={styles.queueBadge}>
-                            {barberState.queueCount} in queue
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Barber Photo */}
-                    <div className={styles.barberPhoto}>
-                      <img
-                        src={barber.photo || "/default-barber.png"}
-                        alt={barber.name}
-                        className={styles.barberImage}
-                      />
-                    </div>
-
-                    {/* Barber Info */}
-                    <h4 className={styles.barberName}>{barber.name}</h4>
-                    <p className={styles.barberExperience}>
-                      {barber.experience} years experience
+                    <h4 className={styles.serviceName}>{service.name}</h4>
+                    <p className={styles.servicePrice}>₹{service.price}</p>
+                    <p className={styles.serviceDuration}>
+                      {service.duration} min
                     </p>
-
-                    {/* Rating */}
-                    {barber.rating && (
-                      <p className={styles.barberRating}>
-                        ⭐ {barber.rating}/5
-                      </p>
-                    )}
-
-                    {/* Skills */}
-                    {barber.skills && barber.skills.length > 0 && (
-                      <div className={styles.barberSkills}>
-                        {barber.skills.slice(0, 3).map((skill, idx) => (
-                          <span key={idx} className={styles.skillChip}>
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* ✅ Walk-in: Show wait time estimate at bottom */}
-                    {bookingMode === "walkin" && barberState && (
-                      <div className={styles.waitEstimate}>
-                        {barberState.status === "AVAILABLE" ? (
-                          <span className={styles.noWait}>No Wait</span>
-                        ) : (
-                          <span className={styles.waitTime}>
-                            ~
-                            {barberState.timeLeft + barberState.queueCount * 45}{" "}
-                            mins
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </motion.div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8 bg-blue-50 rounded-lg">
-              <h4 className="text-lg font-semibold text-blue-800 mb-2">
-                Salon Will Assign Best Available Barber
-              </h4>
-              <p className="text-blue-600">
-                No specialized barbers are currently available for the selected
-                services, but the salon will assign the best available barber
-                for your appointment.
-              </p>
-            </div>
-          )}
-        </motion.section>
-      )}
-      {/* ✅ Walk-in Mode: Real-Time Status Dashboard */}
-      {/* ✅ Walk-in Mode: Real-Time Status Dashboard */}
-      {bookingMode === "walkin" && (
-        <motion.section
-          className={styles.realTimeStatus}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h3 className={styles.statusTitle}>📊 Live Salon Status</h3>
-
-          <div className={styles.statusGrid}>
-            <div className={styles.statusCard}>
-              <div className={styles.statusIcon}>🟢</div>
-              <div className={styles.statusValue}>
-                {salonStats.totalServing}
-              </div>
-              <div className={styles.statusLabel}>Serving Now</div>
-              {barberStates
-                .filter((b) => b.status === "OCCUPIED")
-                .map((b) => (
-                  <div key={b.barberId} className={styles.miniInfo}>
-                    {b.name}: {b.timeLeft}m
-                  </div>
                 ))}
-            </div>
-
-            <div className={styles.statusCard}>
-              <div className={styles.statusIcon}>🟠</div>
-              <div className={styles.statusValue}>
-                {salonStats.totalWaiting}
               </div>
-              <div className={styles.statusLabel}>In Queue</div>
-            </div>
+              {/* <div className={styles.cardActions}>
+              <button
+                className={styles.nextButton}
+                disabled={selectedServices.length === 0}
+                onClick={() => setCurrentStep(2)}
+              >
+                Next: Choose Barber →
+              </button>
+            </div> */}
+            </motion.div>
+          )}
 
-            <div className={styles.statusCard}>
-              <div className={styles.statusIcon}>🔴</div>
-              <div className={styles.statusValue}>{salonStats.totalBooked}</div>
-              <div className={styles.statusLabel}>Booked (Not Arrived)</div>
-            </div>
+          {/* Step 2: Barbers + Status (Walk-in only shows status here) */}
+          {currentStep === 2 && (
+            <motion.div
+              key="step2"
+              initial={{ rotateY: 90, opacity: 0 }}
+              animate={{ rotateY: 0, opacity: 1 }}
+              exit={{ rotateY: -90, opacity: 0 }}
+              transition={{
+                duration: 0.5,
+                ease: [0.43, 0.13, 0.23, 0.96],
+              }}
+              className={styles.cardContent}
+            >
+              <h3 className={styles.cardTitle}>Choose Your Barber</h3>
+              {availableBarbers.length > 0 ? (
+                <div className={styles.barbersGrid}>
+                  {availableBarbers.map((barber) => {
+                    const barberState =
+                      bookingMode === "walkin"
+                        ? barberStates.find(
+                            (b) => b.barberId === barber._id.toString()
+                          )
+                        : null;
 
-            <div className={styles.statusCard}>
-              <div className={styles.statusIcon}>⏱️</div>
-              <div className={styles.statusValue}>
-                ~{salonStats.avgWaitTime} min
-              </div>
-              <div className={styles.statusLabel}>Avg Wait</div>
-            </div>
-          </div>
+                    return (
+                      <motion.div
+                        key={barber._id}
+                        className={`${styles.barberCard} ${
+                          selectedBarber === barber._id ? styles.selected : ""
+                        }`}
+                        onClick={() => handleBarberClick(barber._id)}
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {bookingMode === "walkin" && barberState && (
+                          <div className={styles.walkInStatusBadge}>
+                            {barberState.isPaused ? (
+                              <span className={styles.pausedBadge}>
+                                ⏸ Queue Paused
+                              </span>
+                            ) : (
+                              <>
+                                {barberState.status === "AVAILABLE" && (
+                                  <span className={styles.availableNow}>
+                                    ✅ Available Now
+                                  </span>
+                                )}
+                                {barberState.status === "OCCUPIED" && (
+                                  <span className={styles.occupiedNow}>
+                                    🟢 Busy ({barberState.timeLeft}m left)
+                                  </span>
+                                )}
+                                {barberState.queueCount > 0 && (
+                                  <span className={styles.queueBadge}>
+                                    {barberState.queueCount} in queue
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
 
-          {/* Chair Visualization */}
-          <div className={styles.chairsSection}>
-            <h4 className={styles.chairsTitle}>💈 Barber Chairs</h4>
-            <div className={styles.chairsGrid}>
-              {barberStates.map((barber, index) => (
-                <div key={barber.barberId} className={styles.chairItem}>
-                  <div
-                    className={`${styles.chair} ${
-                      barber.status === "AVAILABLE"
-                        ? styles.available
-                        : barber.status === "OCCUPIED"
-                        ? styles.occupied
-                        : styles.available
-                    }`}
-                  >
-                    <div className={styles.chairIcon}>💺</div>
-                    <div
-                      className={`${styles.chairStatus} ${
-                        barber.status === "AVAILABLE"
-                          ? styles.green
-                          : barber.status === "OCCUPIED"
-                          ? styles.orange
-                          : styles.green
-                      }`}
-                    >
-                      ●
-                    </div>
-                  </div>
-                  <p className={styles.chairLabel}>
-                    Chair #{barber.chairNumber || index + 1}
-                  </p>
-                  <p className={styles.chairBarber}>{barber.name}</p>
+                        <div className={styles.barberPhoto}>
+                          <img
+                            src={barber.photo || "/default-barber.png"}
+                            alt={barber.name}
+                            className={styles.barberImage}
+                          />
+                        </div>
 
-                  {barber.status === "AVAILABLE" ? (
-                    <span className={styles.chairBadge}>Available</span>
-                  ) : (
-                    <div className={styles.chairBusy}>
-                      <span className={styles.chairBadgeOccupied}>
-                        In Service
-                      </span>
-                      <p className={styles.chairCustomer}>
-                        {barber.currentCustomer}
-                      </p>
-                      <p className={styles.chairTime}>
-                        ~{barber.timeLeft}m left
-                      </p>
-                      {barber.queueCount > 0 && (
-                        <p className={styles.chairQueue}>
-                          {barber.queueCount} waiting
+                        <h4 className={styles.barberName}>{barber.name}</h4>
+                        <p className={styles.barberExperience}>
+                          {barber.experience} years experience
                         </p>
+
+                        {barber.rating && (
+                          <p className={styles.barberRating}>
+                            ⭐ {barber.rating}/5
+                          </p>
+                        )}
+
+                        {/* {barber.skills && barber.skills.length > 0 && (
+                          <div className={styles.barberSkills}>
+                            {barber.skills.slice(0, 3).map((skill, idx) => (
+                              <span key={idx} className={styles.skillChip}>
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
+                        )} */}
+
+                        {/* ✅ Walk-in: Show wait time estimate at bottom */}
+                        {bookingMode === "walkin" && barberState && (
+                          <div className={styles.waitEstimate}>
+                            {barberState.isPaused ? (
+                              <span className={styles.pausedWait}>
+                                Temporarily Unavailable
+                              </span>
+                            ) : barberState.status === "AVAILABLE" ? (
+                              <span className={styles.noWait}>No Wait</span>
+                            ) : (
+                              <span className={styles.waitTime}>
+                                ~
+                                {barberState.timeLeft +
+                                  barberState.queueCount * 45}{" "}
+                                mins
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-blue-50 rounded-lg">
+                  <h4 className="text-lg font-semibold text-blue-800 mb-2">
+                    Salon Will Assign Best Available Barber
+                  </h4>
+                </div>
+              )}{" "}
+              {/* Chair Visualization */}
+              <div className={styles.chairsSection}>
+                {/* <h4 className={styles.chairsTitle}>💈 Barber Chairs</h4> */}
+                <div className={styles.chairsGrid}>
+                  {barberStates.map((barber, index) => (
+                    <div key={barber.barberId} className={styles.chairItem}>
+                      <div
+                        className={`${styles.chair} ${
+                          barber.status === "AVAILABLE"
+                            ? styles.available
+                            : barber.status === "OCCUPIED"
+                            ? styles.occupied
+                            : styles.available
+                        }`}
+                      >
+                        <div className={styles.chairIcon}>💺</div>
+                        <div
+                          className={`${styles.chairStatus} ${
+                            barber.isPaused
+                              ? styles.paused
+                              : barber.status === "AVAILABLE"
+                              ? styles.green
+                              : barber.status === "OCCUPIED"
+                              ? styles.orange
+                              : styles.green
+                          }`}
+                        >
+                          {barber.isPaused ? "⏸" : "●"}
+                        </div>
+                      </div>
+                      <p className={styles.chairLabel}>Chair #{index + 1}</p>
+                      <p className={styles.chairBarber}>{barber.name}</p>
+
+                      {barber.isPaused ? (
+                        <div className={styles.chairPaused}>
+                          <span className={styles.chairBadgePaused}>
+                            ⏸ Queue Paused
+                          </span>
+                          <p className={styles.pausedMessage}>
+                            Barber is temporarily unavailable
+                          </p>
+                        </div>
+                      ) : barber.status === "AVAILABLE" ? (
+                        <span className={styles.chairBadge}>Available</span>
+                      ) : (
+                        <div className={styles.chairBusy}>
+                          <span className={styles.chairBadgeOccupied}>
+                            In Service
+                          </span>
+                          <p className={styles.chairCustomer}>
+                            {barber.currentCustomer}
+                          </p>
+                          <p className={styles.chairTime}>
+                            ~{barber.timeLeft}m left
+                          </p>
+                          {barber.queueCount > 0 && (
+                            <p className={styles.chairQueue}>
+                              {barber.queueCount} waiting
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
+                  ))}
+                </div>
+              </div>
+              {/* Walk-in: Show real-time status below barbers */}
+              {bookingMode === "walkin" && (
+                <motion.section
+                  className={styles.realTimeStatus}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <h3 className={styles.statusTitle}>📊 Live Salon Status</h3>
+
+                  <div className={styles.statusGrid}>
+                    <div className={styles.statusCard}>
+                      <div className={styles.statusIcon}>🟢</div>
+                      <div className={styles.statusValue}>
+                        {salonStats.totalServing}
+                      </div>
+                      <div className={styles.statusLabel}>Serving Now</div>
+                      {barberStates
+                        .filter((b) => b.status === "OCCUPIED")
+                        .map((b) => (
+                          <div key={b.barberId} className={styles.miniInfo}>
+                            {b.name}: {b.timeLeft}m
+                          </div>
+                        ))}
+                    </div>
+
+                    <div className={styles.statusCard}>
+                      <div className={styles.statusIcon}>🟠</div>
+                      <div className={styles.statusValue}>
+                        {salonStats.totalWaiting}
+                      </div>
+                      <div className={styles.statusLabel}>In Queue</div>
+                    </div>
+
+                    <div className={styles.statusCard}>
+                      <div className={styles.statusIcon}>🔴</div>
+                      <div className={styles.statusValue}>
+                        {salonStats.totalBooked}
+                      </div>
+                      <div className={styles.statusLabel}>
+                        Booked (Not Arrived)
+                      </div>
+                    </div>
+
+                    <div className={styles.statusCard}>
+                      <div className={styles.statusIcon}>⏱️</div>
+                      <div className={styles.statusValue}>
+                        ~{salonStats.avgWaitTime} min
+                      </div>
+                      <div className={styles.statusLabel}>Avg Wait</div>
+                    </div>
+                  </div>
+
+                  {/* Legend */}
+                  {/* <div className={styles.statusLegend}>
+                    <div className={styles.legendItem}>
+                      <span className={`${styles.legendDot} ${styles.green}`}>
+                        ●
+                      </span>
+                      <span>Available</span>
+                    </div>
+                    <div className={styles.legendItem}>
+                      <span className={`${styles.legendDot} ${styles.orange}`}>
+                        ●
+                      </span>
+                      <span>In Service</span>
+                    </div>
+                    <div className={styles.legendItem}>
+                      <span className={`${styles.legendDot} ${styles.red}`}>
+                        ●
+                      </span>
+                      <span>Booked</span>
+                    </div>
+                  </div> */}
+                </motion.section>
+              )}
+              <div className={styles.cardActions}>
+                <button
+                  className={styles.prevButton}
+                  onClick={() => setCurrentStep(1)}
+                >
+                  ← Back
+                </button>
+                <div className={styles.bookButtonContainer}>
+                  <button
+                    onClick={handleBooking}
+                    disabled={
+                      selectedServices.length === 0 ||
+                      !selectedBarber ||
+                      (bookingMode === "prebook" && !selectedSlot) ||
+                      (bookingMode === "walkin" && !isSalonOpen())
+                    }
+                    className={`${styles.bookButton} ${
+                      selectedServices.length === 0 ||
+                      !selectedBarber ||
+                      (bookingMode === "prebook" && !selectedSlot) ||
+                      (bookingMode === "walkin" && !isSalonOpen())
+                        ? styles.disabled
+                        : ""
+                    }`}
+                  >
+                    {bookingMode === "walkin" && !isSalonOpen()
+                      ? "Salon is Closed"
+                      : bookingMode === "walkin"
+                      ? "Book Walk-in Now"
+                      : "Book Appointment"}
+                    {availableBarbers.length === 0 &&
+                      selectedServices.length > 0 && (
+                        <small className={styles.buttonSubtext}>
+                          (Salon will assign barber)
+                        </small>
+                      )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 3: Date & Time (Pre-book only) */}
+          {currentStep === 3 && bookingMode === "prebook" && (
+            <motion.section
+              className={styles.bookingSection}
+              initial={{ opacity: 0, rotateY: 90 }}
+              animate={{ opacity: 1, rotateY: 0 }}
+              exit={{ opacity: 0, rotateY: -90 }}
+              transition={{ duration: 0.8, ease: [0.43, 0.13, 0.23, 0.96] }}
+              style={{ transformOrigin: "left center" }}
+            >
+              <h3 className={styles.sectionTitle}>Select Date & Time</h3>
+              <div className={styles.dateTimePicker}>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className={styles.dateInput}
+                />
+                <div className={styles.timeSlots}>
+                  {selectedDate ? (
+                    timeSlots.length === 0 ? (
+                      <div>No slots available for selected date</div>
+                    ) : (
+                      <div className={styles.timeSlotsWrapper}>
+                        {timeSlots.map((slot, idx) => (
+                          <button
+                            key={idx}
+                            className={`${styles.timeSlot} ${
+                              selectedSlot === slot.time ? styles.selected : ""
+                            } ${!slot.available ? styles.disabled : ""}`}
+                            onClick={() => {
+                              console.log("Slot clicked:", slot.time);
+                              handleTimeClick(slot.time);
+                              console.log("Current selectedSlot:", slot.time);
+                            }}
+                            disabled={!slot.available} // ✅ ensure unavailable slots can’t be clicked
+                          >
+                            {slot.time}
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    <p>Please select a date</p>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div className={styles.statusLegend}>
-            <div className={styles.legendItem}>
-              <span className={`${styles.legendDot} ${styles.green}`}>●</span>
-              <span>Available</span>
-            </div>
-            <div className={styles.legendItem}>
-              <span className={`${styles.legendDot} ${styles.orange}`}>●</span>
-              <span>In Service</span>
-            </div>
-            <div className={styles.legendItem}>
-              <span className={`${styles.legendDot} ${styles.red}`}>●</span>
-              <span>Booked</span>
-            </div>
-          </div>
-        </motion.section>
-      )}
-      {selectedServices.length > 0 && availableBarbers.length === 0 && (
-        <motion.section
-          className={styles.noBarbersSection}
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-        >
-          <div className="text-center py-8 bg-yellow-50 rounded-lg">
-            <h3 className="text-lg font-semibold text-yellow-800 mb-2">
-              No Specialized Barbers Available
-            </h3>
-            <p className="text-yellow-600">
-              Sorry, no barbers are currently available for the selected
-              services. Please try different services or contact the salon
-              directly.
-            </p>
-          </div>
-        </motion.section>
-      )}
-
-      {/* Date & Time Selection - Only for Pre-book Mode */}
-      {bookingMode === "prebook" && (
-        <motion.section
-          className={styles.bookingSection}
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-        >
-          <h3 className={styles.sectionTitle}>Select Date & Time</h3>
-          <div className={styles.dateTimePicker}>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className={styles.dateInput}
-            />
-            <div className={styles.timeSlots}>
-              {selectedDate ? (
-                timeSlots.length === 0 ? (
-                  <div>No slots available for selected date</div>
-                ) : (
-                  <div className={styles.timeSlotsWrapper}>
-                    {timeSlots.map((slot, idx) => (
-                      <button
-                        key={idx}
-                        className={`${styles.timeSlot} ${
-                          selectedSlot === slot.time ? styles.selected : ""
-                        } ${!slot.available ? styles.disabled : ""}`}
-                        onClick={() => {
-                          console.log("Slot clicked:", slot.time);
-                          handleTimeClick(slot.time);
-                          console.log("Current selectedSlot:", slot.time);
-                        }}
-                        disabled={!slot.available} // ✅ ensure unavailable slots can’t be clicked
-                      >
-                        {slot.time}
-                      </button>
-                    ))}
-                  </div>
-                )
-              ) : (
-                <p>Please select a date</p>
-              )}
-            </div>
-          </div>
-        </motion.section>
-      )}
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Map Section */}
       {salon.location.latitude && salon.location.longitude && (
@@ -1171,31 +1245,6 @@ export default function SalonDetail({ initialSalon }) {
       )}
 
       {/* Book Appointment Button */}
-      <div className={styles.bookButtonContainer}>
-        <button
-          onClick={handleBooking}
-          disabled={
-            selectedServices.length === 0 ||
-            !selectedBarber ||
-            (bookingMode === "prebook" && !selectedSlot)
-          }
-          className={`${styles.bookButton} ${
-            selectedServices.length === 0 ||
-            !selectedBarber ||
-            (bookingMode === "prebook" && !selectedSlot)
-              ? styles.disabled
-              : ""
-          }`}
-        >
-          {bookingMode === "walkin" ? "Book Walk-in Now" : "Book Appointment"}
-          Book Appointment
-          {availableBarbers.length === 0 && selectedServices.length > 0 && (
-            <small className={styles.buttonSubtext}>
-              (Salon will assign barber)
-            </small>
-          )}
-        </button>
-      </div>
 
       {/* Booking Modal */}
       {/* Registration Modal - shown after booking if user not onboarded */}

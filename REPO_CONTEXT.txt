@@ -47,8 +47,16 @@ next.config.js
 next.config.mjs
 package.json
 postcss.config.mjs
+public/favicon.ico
 public/file.svg
 public/globe.svg
+public/icons/cut-icon.svg
+public/icons/location-icon.svg
+public/icons/salon-icon.svg
+public/images/barber-placeholder.jpg
+public/images/logo.png
+public/images/salon-placeholder.jpg
+public/maps/usericon.png
 public/next.svg
 public/vercel.svg
 public/window.svg
@@ -59,7 +67,19 @@ src/components/Admin/StatsCards.js
 src/components/Admin/UserDetailsModal.js
 src/components/Background.js
 src/components/Background.module.css
+src/components/Booking/BarberSelection.js
+src/components/Booking/BookingConfirmation.js
+src/components/Booking/BookingForm.js
+src/components/Booking/TimeSlots.js
+src/components/Common/DarkModeToggle.js
+src/components/Common/ErrorMessage.js
+src/components/Common/LoadingSpinner.js
+src/components/Common/Modal.js
+src/components/Common/StarRating.js
+src/components/Common/SuccessMessage.js
 src/components/FullBG.js
+src/components/Layout/Footer.js
+src/components/Layout/Header.js
 src/components/Layout/Layout.js
 src/components/Maps/LocationMap.js
 src/components/Maps/LocationPicker.js
@@ -119,6 +139,7 @@ src/pages/api/admin/users/[id]/bookings.js
 src/pages/api/admin/users/index.js
 src/pages/api/auth/admin/login.js
 src/pages/api/auth/forgot-password.js
+src/pages/api/auth/logout.js
 src/pages/api/auth/reset-password.js
 src/pages/api/auth/salon/login.js
 src/pages/api/auth/salon/register.js
@@ -130,11 +151,17 @@ src/pages/api/barber/service-control.js
 src/pages/api/barber/update-status.js
 src/pages/api/bookings.js
 src/pages/api/bookings/[id].js
+src/pages/api/bookings/cancel.js
 src/pages/api/bookings/create.js
+src/pages/api/bookings/history.js
 src/pages/api/bookings/status/[id].js
 src/pages/api/bookings/update-status.js
 src/pages/api/bookings/update.js
+src/pages/api/bookings/user.js
+src/pages/api/feedback/create.js
+src/pages/api/feedback/salon-ratings.js
 src/pages/api/maps/geocode.js
+src/pages/api/maps/nearby.js
 src/pages/api/maps/reverse.js
 src/pages/api/ping.js
 src/pages/api/salon/notifications.js
@@ -154,6 +181,9 @@ src/pages/api/salons/services/[id].js
 src/pages/api/salons/services/index.js
 src/pages/api/salons/staff/[id].js
 src/pages/api/salons/staff/index.js
+src/pages/api/salons/update.js
+src/pages/api/services/index.js
+src/pages/api/services/prices.js
 src/pages/api/user/bookings.js
 src/pages/api/user/payments.js
 src/pages/api/user/profile.js
@@ -184,15 +214,20 @@ src/pages/salons/services/[id].js
 src/pages/salons/services/index.js
 src/pages/salons/staff/[id].js
 src/pages/salons/staff/index.js
+src/pages/styles/Booking.module.css
+src/pages/styles/components/Header.module.css
+src/pages/styles/components/Modal.module.css
+src/pages/styles/components/SalonCard.module.css
+src/pages/styles/Dashboard.module.css
 src/pages/styles/globals.css
 src/pages/styles/Home.module.css
 src/pages/styles/Onboarding.module.css
 src/pages/styles/Owner.module.css
+src/pages/styles/Salon.module.css
+src/pages/styles/SalonCard.module.css
 src/pages/user/dashboard.js
 src/pages/walkin/barber-select.js
-src/pages/walkin/booking-form.js
 src/pages/walkin/confirmation.js
-src/pages/walkin/salon-select.js
 src/styles/Admin/AdminAnalytics.module.css
 src/styles/Admin/AdminDashboard.module.css
 src/styles/Admin/AdminLayout.module.css
@@ -208,13 +243,20 @@ src/styles/Auth/SalonAuth.module.css
 src/styles/Auth/UserAuth.module.css
 src/styles/Booking.module.css
 src/styles/BookingConfirmed.module.css
+src/styles/components/Header.module.css
+src/styles/components/Modal.module.css
+src/styles/components/SalonCard.module.css
+src/styles/Dashboard.module.css
 src/styles/Feedback.module.css
 src/styles/globals.css
 src/styles/Home.module.css
+src/styles/LocationMap.module.css
 src/styles/Onboarding.module.css
 src/styles/Owner.module.css
 src/styles/OwnerSidebar.module.css
 src/styles/ReviewsSection.module.css
+src/styles/Salon.module.css
+src/styles/SalonCard.module.css
 src/styles/SalonDashboard.module.css
 src/styles/SalonDetail.module.css
 src/styles/SalonDetails.module.css
@@ -1011,93 +1053,6 @@ export default function NetworkStatus() {
         </div>
       </div> */}
     </>
-  );
-}
-</file>
-
-<file path="src/components/OnBoardingLogout.js">
-import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
-import { UserDataManager } from "../lib/userData";
-
-export default function OnboardingLogoutButton() {
-  const [showButton, setShowButton] = useState(false);
-  const [onboardingData, setOnboardingData] = useState(null);
-  const router = useRouter();
-
-  useEffect(() => {
-    const checkOnboardingStatus = () => {
-      const hasOnboarded = localStorage.getItem("hasOnboarded");
-      const userToken = localStorage.getItem("userToken");
-      const authenticatedUserData = localStorage.getItem(
-        "authenticatedUserData"
-      );
-      const onboardingDataStr = localStorage.getItem("userOnboardingData");
-
-      // Show button only if onboarded but not logged in
-      const isOnboarded = hasOnboarded === "true";
-      const isLoggedIn = !!(userToken && authenticatedUserData);
-
-      setShowButton(isOnboarded && !isLoggedIn);
-
-      // Parse onboarding data for display
-      if (onboardingDataStr) {
-        try {
-          setOnboardingData(JSON.parse(onboardingDataStr));
-        } catch (e) {
-          setOnboardingData(null);
-        }
-      }
-    };
-
-    checkOnboardingStatus();
-    const handleStorageChange = () => checkOnboardingStatus();
-    window.addEventListener("storage", handleStorageChange);
-    const interval = setInterval(checkOnboardingStatus, 1000);
-
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
-
-  const handleClearOnboarding = () => {
-    const message = onboardingData?.name
-      ? `Clear data for "${onboardingData.name}" and start fresh?`
-      : "Clear onboarding data and start fresh?";
-
-    if (window.confirm(message)) {
-      // Clear onboarding specific data
-      localStorage.removeItem("hasOnboarded");
-      localStorage.removeItem("userOnboardingData");
-      localStorage.removeItem("userPrefillData");
-
-      alert("✅ Onboarding data cleared! You can now start fresh.");
-      router.push("/onboarding");
-    }
-  };
-
-  if (!showButton) return null;
-
-  return (
-    <div>
-      <div className="bg-white rounded-md shadow-lg border border-gray-200 p-8 max-w-xs">
-        {onboardingData && (
-          <div className="text-xs text-gray-600 mb-2">
-            user:
-            <span className="font-semibold text-gray-800">
-              {onboardingData.name}
-            </span>
-          </div>
-        )}
-        <button
-          onClick={handleClearOnboarding}
-          className="w-full bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
-        >
-          🗑️ Clear
-        </button>
-      </div>
-    </div>
   );
 }
 </file>
@@ -9674,112 +9629,6 @@ export default function WalkinBarberSelect() {
 }
 </file>
 
-<file path="src/pages/walkin/booking-form.js">
-// import { useState } from "react";
-// import { useRouter } from "next/router";
-// import styles from "../../styles/wal";
-
-// export default function WalkinBookingForm() {
-//   const router = useRouter();
-//   const { salonId, barberId } = router.query;
-
-//   const [formData, setFormData] = useState({
-//     customerName: "",
-//     customerPhone: "",
-//     service: "Haircut",
-//     estimatedDuration: 45,
-//   });
-
-//   const [loading, setLoading] = useState(false);
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     setLoading(true);
-
-//     try {
-//       const res = await fetch("/api/walkin/create-booking", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({
-//           salonId,
-//           barberId,
-//           ...formData,
-//         }),
-//       });
-
-//       const data = await res.json();
-
-//       if (data.success) {
-//         // Redirect to confirmation page
-//         router.push(`/walkin/confirmation?bookingId=${data.booking.bookingId}`);
-//       } else {
-//         alert(data.message || "Booking failed");
-//       }
-//     } catch (error) {
-//       console.error("Booking error:", error);
-//       alert("Something went wrong. Please try again.");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   return (
-//     <div className={styles.container}>
-//       <h1 className={styles.title}>Book Your Service</h1>
-
-//       <form onSubmit={handleSubmit} className={styles.form}>
-//         <div className={styles.formGroup}>
-//           <label>Full Name *</label>
-//           <input
-//             type="text"
-//             value={formData.customerName}
-//             onChange={(e) =>
-//               setFormData({ ...formData, customerName: e.target.value })
-//             }
-//             required
-//             placeholder="Enter your name"
-//           />
-//         </div>
-
-//         <div className={styles.formGroup}>
-//           <label>Phone Number *</label>
-//           <input
-//             type="tel"
-//             value={formData.customerPhone}
-//             onChange={(e) =>
-//               setFormData({ ...formData, customerPhone: e.target.value })
-//             }
-//             required
-//             placeholder="10-digit mobile number"
-//             pattern="[0-9]{10}"
-//           />
-//         </div>
-
-//         <div className={styles.formGroup}>
-//           <label>Service *</label>
-//           <select
-//             value={formData.service}
-//             onChange={(e) =>
-//               setFormData({ ...formData, service: e.target.value })
-//             }
-//           >
-//             <option value="Haircut">Haircut</option>
-//             <option value="Shave">Shave</option>
-//             <option value="Hair Styling">Hair Styling</option>
-//             <option value="Beard Trim">Beard Trim</option>
-//             <option value="Hair Color">Hair Color</option>
-//           </select>
-//         </div>
-
-//         <button type="submit" disabled={loading} className={styles.submitBtn}>
-//           {loading ? "Creating Booking..." : "Confirm Booking"}
-//         </button>
-//       </form>
-//     </div>
-//   );
-// }
-</file>
-
 <file path="src/pages/walkin/confirmation.js">
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
@@ -10036,65 +9885,6 @@ export default function WalkinConfirmation() {
     </div>
   );
 }
-</file>
-
-<file path="src/pages/walkin/salon-select.js">
-// import { useState, useEffect } from "react";
-// import { useRouter } from "next/router";
-// import styles from "../../styles/WalkinSalonSelect.module.css";
-
-// export default function WalkinSalonSelect() {
-//   const router = useRouter();
-//   const [salons, setSalons] = useState([]);
-//   const [loading, setLoading] = useState(true);
-
-//   useEffect(() => {
-//     fetchSalons();
-//   }, []);
-
-//   const fetchSalons = async () => {
-//     try {
-//       const res = await fetch("/api/salons");
-//       const data = await res.json();
-//       setSalons(data.salons || []);
-//     } catch (error) {
-//       console.error("Error fetching salons:", error);
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handleSalonSelect = (salonId) => {
-//     router.push(`/walkin/barber-select?salonId=${salonId}`);
-//   };
-
-//   if (loading) {
-//     return <div className={styles.loading}>Loading salons...</div>;
-//   }
-
-//   return (
-//     <div className={styles.container}>
-//       <h1 className={styles.title}>Select a Salon</h1>
-
-//       <div className={styles.salonGrid}>
-//         {salons.map((salon) => (
-//           <div
-//             key={salon._id}
-//             className={styles.salonCard}
-//             onClick={() => handleSalonSelect(salon._id)}
-//           >
-//             <h2>{salon.salonName}</h2>
-//             <p>{salon.address}</p>
-//             <div className={styles.stats}>
-//               <span>⭐ {salon.ratings?.overall || 5.0}</span>
-//               <span>👥 {salon.stats?.totalBookings || 0} bookings</span>
-//             </div>
-//           </div>
-//         ))}
-//       </div>
-//     </div>
-//   );
-// }
 </file>
 
 <file path="src/styles/Admin/AdminAnalytics.module.css">
@@ -15777,6 +15567,93 @@ export default function UserDetailsModal({ user, onClose }) {
 }
 </file>
 
+<file path="src/components/OnBoardingLogout.js">
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { UserDataManager } from "../lib/userData";
+
+export default function OnboardingLogoutButton() {
+  const [showButton, setShowButton] = useState(false);
+  const [onboardingData, setOnboardingData] = useState(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkOnboardingStatus = () => {
+      const hasOnboarded = localStorage.getItem("hasOnboarded");
+      const userToken = localStorage.getItem("userToken");
+      const authenticatedUserData = localStorage.getItem(
+        "authenticatedUserData"
+      );
+      const onboardingDataStr = localStorage.getItem("userOnboardingData");
+
+      // Show button only if onboarded but not logged in
+      const isOnboarded = hasOnboarded === "true";
+      const isLoggedIn = !!(userToken || authenticatedUserData);
+
+      setShowButton(isOnboarded && !isLoggedIn);
+
+      // Parse onboarding data for display
+      if (onboardingDataStr) {
+        try {
+          setOnboardingData(JSON.parse(onboardingDataStr));
+        } catch (e) {
+          setOnboardingData(null);
+        }
+      }
+    };
+
+    checkOnboardingStatus();
+    const handleStorageChange = () => checkOnboardingStatus();
+    window.addEventListener("storage", handleStorageChange);
+    const interval = setInterval(checkOnboardingStatus, 1000);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleClearOnboarding = () => {
+    const message = onboardingData?.name
+      ? `Clear data for "${onboardingData.name}" and start fresh?`
+      : "Clear onboarding data and start fresh?";
+
+    if (window.confirm(message)) {
+      // Clear onboarding specific data
+      localStorage.removeItem("hasOnboarded");
+      localStorage.removeItem("userOnboardingData");
+      localStorage.removeItem("userPrefillData");
+
+      alert("✅ Onboarding data cleared! You can now start fresh.");
+      router.push("/onboarding");
+    }
+  };
+
+  if (!showButton) return null;
+
+  return (
+    <div>
+      <div className="bg-white rounded-md shadow-lg border border-gray-200 p-8 max-w-xs">
+        {onboardingData && (
+          <div className="text-xs text-gray-600 mb-2">
+            user:
+            <span className="font-semibold text-gray-800">
+              {onboardingData.name}
+            </span>
+          </div>
+        )}
+        <button
+          onClick={handleClearOnboarding}
+          className="w-full bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
+        >
+          🗑️ Clear
+        </button>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/lib/auth.js">
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -16719,87 +16596,6 @@ export default async function handler(req, res) {
     console.error("Profile API error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
-}
-</file>
-
-<file path="src/pages/auth/salon/login.js">
-import { useState } from "react";
-import { useRouter } from "next/router";
-import styles from "../../../styles/Auth/SalonAuth.module.css";
-
-export default function SalonLogin() {
-  const router = useRouter();
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const response = await fetch("/api/auth/salon/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Store salon session
-        localStorage.setItem("salonSession", JSON.stringify(data.salon));
-        localStorage.setItem("salonToken", data.token);
-        router.push("/salons/dashboard");
-      } else {
-        alert(data.message || "Login failed");
-      }
-    } catch (error) {
-      alert("Login error: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className={styles.container}>
-      <div className={styles.loginCard}>
-        <h1>Salon Owner Login</h1>
-        <form onSubmit={handleLogin}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={(e) =>
-              setFormData({ ...formData, email: e.target.value })
-            }
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={(e) =>
-              setFormData({ ...formData, password: e.target.value })
-            }
-            required
-          />
-          <button type="submit" disabled={isLoading}>
-            {isLoading ? "Logging in..." : "Login"}
-          </button>
-        </form>
-        <p>
-          Don&#39;t have an account?
-          <a onClick={() => router.push("/auth/salon/register")}>
-            {" "}
-            Register here
-          </a>
-        </p>
-      </div>
-    </div>
-  );
 }
 </file>
 
@@ -18677,480 +18473,6 @@ h6 {
     background: white !important;
     color: black !important;
     box-shadow: none !important;
-  }
-}
-</file>
-
-<file path="src/styles/Onboarding.module.css">
-.container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  position: relative;
-  background: linear-gradient(
-    135deg,
-    var(--background-primary) 0%,
-    var(--background-secondary) 100%
-  );
-}
-
-.background {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.goldOrb {
-  position: absolute;
-  border-radius: 50%;
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  opacity: 0.1;
-  filter: blur(60px);
-}
-
-.goldOrb:first-child {
-  width: 300px;
-  height: 300px;
-  top: -150px;
-  right: -150px;
-  animation: float 8s ease-in-out infinite;
-}
-
-.goldOrb:last-child {
-  width: 200px;
-  height: 200px;
-  bottom: -100px;
-  left: -100px;
-  animation: float 8s ease-in-out infinite reverse;
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-20px) rotate(180deg);
-  }
-}
-
-.onboardingCard {
-  background: var(--background-primary);
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
-  padding: 40px;
-  width: 100%;
-  max-width: 500px;
-  position: relative;
-  z-index: 1;
-  border: 1px solid var(--border-color);
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.title {
-  font-size: 32px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: var(--text-primary);
-}
-
-.goldText {
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-}
-
-.subtitle {
-  color: var(--text-secondary);
-  font-size: 16px;
-  margin-bottom: 30px;
-}
-
-.progressBar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.progressTrack {
-  flex: 1;
-  height: 6px;
-  background: var(--border-color);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 100%;
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-
-.progressText {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--gold-primary);
-  min-width: 30px;
-}
-
-.stepContent {
-  min-height: 300px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.step {
-  text-align: center;
-}
-
-.stepIcon {
-  font-size: 64px;
-  margin-bottom: 24px;
-}
-
-.step h2 {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: var(--text-primary);
-}
-
-.step p {
-  color: var(--text-secondary);
-  margin-bottom: 32px;
-  line-height: 1.5;
-}
-
-.formGroup {
-  margin-bottom: 24px;
-}
-
-.input {
-  width: 100%;
-  padding: 16px 20px;
-  border: 2px solid var(--border-color);
-  border-radius: 12px;
-  font-size: 16px;
-  background: var(--background-primary);
-  color: var(--text-primary);
-  transition: all 0.3s ease;
-  text-align: center;
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--gold-primary);
-  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
-}
-
-.genderOptions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.genderButton {
-  padding: 20px 16px;
-  border: 2px solid var(--border-color);
-  border-radius: 12px;
-  background: var(--background-primary);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.genderButton:hover {
-  border-color: var(--gold-primary);
-  transform: translateY(-2px);
-}
-
-.genderButton.selected {
-  border-color: var(--gold-primary);
-  background: linear-gradient(135deg, var(--gold-primary), var(--gold-dark));
-  color: var(--contrast-dark);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.3);
-}
-
-.genderIcon {
-  font-size: 32px;
-}
-
-.genderButton span {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.locationSection {
-  margin-bottom: 20px;
-}
-
-.locationButton {
-  width: 100%;
-  padding: 16px 20px;
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  color: var(--contrast-dark);
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.locationButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
-}
-
-.divider {
-  text-align: center;
-  margin: 20px 0;
-  position: relative;
-}
-
-.divider::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--border-color);
-}
-
-.divider span {
-  background: var(--background-primary);
-  padding: 0 16px;
-  color: var(--text-secondary);
-  font-size: 14px;
-  position: relative;
-  z-index: 1;
-}
-
-.loadingLocation {
-  text-align: center;
-  padding: 40px 20px;
-}
-
-.loadingLocation p {
-  margin-top: 16px;
-  color: var(--text-secondary);
-}
-
-.locationSuccess {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: rgba(34, 197, 94, 0.1);
-  border: 2px solid var(--success);
-  border-radius: 12px;
-}
-
-.locationIcon {
-  font-size: 24px;
-}
-
-.locationSuccess div {
-  flex: 1;
-}
-
-.locationSuccess h4 {
-  color: var(--success);
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.locationSuccess p {
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin: 0;
-}
-
-.changeLocationButton {
-  padding: 8px 16px;
-  background: transparent;
-  color: var(--gold-primary);
-  border: 1px solid var(--gold-primary);
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.changeLocationButton:hover {
-  background: var(--gold-primary);
-  color: var(--contrast-dark);
-}
-
-.locationError {
-  text-align: center;
-}
-
-.locationError p {
-  color: var(--error);
-  margin-bottom: 16px;
-}
-
-.navigation {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 40px;
-  gap: 16px;
-}
-
-.backButton {
-  padding: 12px 24px;
-  background: transparent;
-  color: var(--text-secondary);
-  border: 2px solid var(--border-color);
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.backButton:hover {
-  border-color: var(--gold-primary);
-  color: var(--gold-primary);
-}
-
-.nextButton {
-  flex: 1;
-  padding: 14px 28px;
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
-  color: var(--contrast-dark);
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.nextButton:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
-}
-
-.nextButton:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-/* Mobile Optimizations */
-@media (max-width: 768px) {
-  .container {
-    padding: 16px;
-  }
-
-  .onboardingCard {
-    padding: 24px;
-    border-radius: 16px;
-  }
-
-  .title {
-    font-size: 28px;
-  }
-
-  .step h2 {
-    font-size: 20px;
-  }
-
-  .stepIcon {
-    font-size: 48px;
-  }
-
-  .genderOptions {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .genderButton {
-    flex-direction: row;
-    justify-content: flex-start;
-    padding: 16px 20px;
-  }
-
-  .navigation {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .backButton {
-    width: 100%;
-    order: 2;
-  }
-
-  .nextButton {
-    order: 1;
   }
 }
 </file>
@@ -21778,6 +21100,101 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 </file>
 
+<file path="src/pages/auth/salon/login.js">
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import styles from "../../../styles/Auth/SalonAuth.module.css";
+
+export default function SalonLogin() {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Only redirect if already logged in as salon
+    const salonToken = localStorage.getItem("salonToken");
+    const salonSession = localStorage.getItem("salonSession");
+
+    if (salonToken || salonSession) {
+      router.push("/salons/dashboard");
+    }
+    // DO NOT check onboarding - salon owners can login anytime
+  }, [router]);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/auth/salon/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        const data = await response.json(); // ✅ ONLY ONE PARSE
+        localStorage.setItem("salonToken", data.token);
+        localStorage.setItem("salonSession", JSON.stringify(data.salon));
+
+        alert(`Welcome back, ${data.salon.salonName}!`);
+
+        // Force redirect to salon dashboard
+        window.location.href = "/salons/dashboard";
+      } else {
+        const error = await response.json();
+        alert(error.message || "Login failed");
+      }
+    } catch (error) {
+      alert("Login error: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.loginCard}>
+        <h1>Salon Owner Login</h1>
+        <form onSubmit={handleLogin}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={formData.email}
+            onChange={(e) =>
+              setFormData({ ...formData, email: e.target.value })
+            }
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={formData.password}
+            onChange={(e) =>
+              setFormData({ ...formData, password: e.target.value })
+            }
+            required
+          />
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? "Logging in..." : "Login"}
+          </button>
+        </form>
+        <p>
+          Don&#39;t have an account?
+          <a onClick={() => router.push("/auth/salon/register")}>
+            {" "}
+            Register here
+          </a>
+        </p>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/pages/salons/book.js">
 // pages/salons/book.js
 import { useRouter } from "next/router";
@@ -21990,6 +21407,509 @@ export default function BookingPage() {
       </div>
     </div>
   );
+}
+</file>
+
+<file path="src/styles/Onboarding.module.css">
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    var(--background-primary) 0%,
+    var(--background-secondary) 100%
+  );
+}
+.loginPrompt {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.loginText {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.loginLink {
+  background: transparent;
+  color: var(--gold-primary);
+  border: 2px solid var(--gold-primary);
+  padding: 8px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.loginLink:hover {
+  background: var(--gold-primary);
+  color: var(--contrast-dark);
+  transform: translateY(-2px);
+}
+
+.background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.goldOrb {
+  position: absolute;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  opacity: 0.1;
+  filter: blur(60px);
+}
+
+.goldOrb:first-child {
+  width: 300px;
+  height: 300px;
+  top: -150px;
+  right: -150px;
+  animation: float 8s ease-in-out infinite;
+}
+
+.goldOrb:last-child {
+  width: 200px;
+  height: 200px;
+  bottom: -100px;
+  left: -100px;
+  animation: float 8s ease-in-out infinite reverse;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(180deg);
+  }
+}
+
+.onboardingCard {
+  background: var(--background-primary);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  width: 100%;
+  max-width: 500px;
+  position: relative;
+  z-index: 1;
+  border: 1px solid var(--border-color);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.goldText {
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 16px;
+  margin-bottom: 30px;
+}
+
+.progressBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 6px;
+  background: var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progressText {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gold-primary);
+  min-width: 30px;
+}
+
+.stepContent {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.step {
+  text-align: center;
+}
+
+.stepIcon {
+  font-size: 64px;
+  margin-bottom: 24px;
+}
+
+.step h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.step p {
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  line-height: 1.5;
+}
+
+.formGroup {
+  margin-bottom: 24px;
+}
+
+.input {
+  width: 100%;
+  padding: 16px 20px;
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  font-size: 16px;
+  background: var(--background-primary);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
+}
+
+.genderOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.genderButton {
+  padding: 20px 16px;
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--background-primary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.genderButton:hover {
+  border-color: var(--gold-primary);
+  transform: translateY(-2px);
+}
+
+.genderButton.selected {
+  border-color: var(--gold-primary);
+  background: linear-gradient(135deg, var(--gold-primary), var(--gold-dark));
+  color: var(--contrast-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.3);
+}
+
+.genderIcon {
+  font-size: 32px;
+}
+
+.genderButton span {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.locationSection {
+  margin-bottom: 20px;
+}
+
+.locationButton {
+  width: 100%;
+  padding: 16px 20px;
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  color: var(--contrast-dark);
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.locationButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
+}
+
+.divider {
+  text-align: center;
+  margin: 20px 0;
+  position: relative;
+}
+
+.divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-color);
+}
+
+.divider span {
+  background: var(--background-primary);
+  padding: 0 16px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.loadingLocation {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.loadingLocation p {
+  margin-top: 16px;
+  color: var(--text-secondary);
+}
+
+.locationSuccess {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 2px solid var(--success);
+  border-radius: 12px;
+}
+
+.locationIcon {
+  font-size: 24px;
+}
+
+.locationSuccess div {
+  flex: 1;
+}
+
+.locationSuccess h4 {
+  color: var(--success);
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.locationSuccess p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0;
+}
+
+.changeLocationButton {
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--gold-primary);
+  border: 1px solid var(--gold-primary);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.changeLocationButton:hover {
+  background: var(--gold-primary);
+  color: var(--contrast-dark);
+}
+
+.locationError {
+  text-align: center;
+}
+
+.locationError p {
+  color: var(--error);
+  margin-bottom: 16px;
+}
+
+.navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 40px;
+  gap: 16px;
+}
+
+.backButton {
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.backButton:hover {
+  border-color: var(--gold-primary);
+  color: var(--gold-primary);
+}
+
+.nextButton {
+  flex: 1;
+  padding: 14px 28px;
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  color: var(--contrast-dark);
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.nextButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
+}
+
+.nextButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .onboardingCard {
+    padding: 24px;
+    border-radius: 16px;
+  }
+
+  .title {
+    font-size: 28px;
+  }
+
+  .step h2 {
+    font-size: 20px;
+  }
+
+  .stepIcon {
+    font-size: 48px;
+  }
+
+  .genderOptions {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .genderButton {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 16px 20px;
+  }
+
+  .navigation {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .backButton {
+    width: 100%;
+    order: 2;
+  }
+
+  .nextButton {
+    order: 1;
+  }
 }
 </file>
 
@@ -23800,219 +23720,6 @@ export default function SalonCard({ salon, gender }) {
 }
 </file>
 
-<file path="src/lib/userData.js">
-// lib/userData.js
-export class UserDataManager {
-  static getStoredUserData() {
-    if (typeof window === "undefined") return null;
-
-    try {
-      // First try to get authenticated user data
-      const userToken = localStorage.getItem("userToken");
-      if (userToken) {
-        const storedUserData = localStorage.getItem("authenticatedUserData");
-        if (storedUserData) {
-          const userData = JSON.parse(storedUserData);
-          // Always preserve onboarding location data for authenticated users
-          const onboardingData = localStorage.getItem("userOnboardingData");
-          if (onboardingData) {
-            try {
-              const onboarding = JSON.parse(onboardingData);
-              return {
-                ...userData,
-                location: onboarding.location || userData.location,
-                preferences: {
-                  ...userData.preferences,
-                  ...onboarding.preferences,
-                },
-              };
-            } catch (e) {
-              return userData;
-            }
-          }
-          return userData;
-        }
-      }
-
-      // Fallback to onboarding data
-      const onboardingData = localStorage.getItem("userOnboardingData");
-      if (onboardingData) return JSON.parse(onboardingData);
-
-      return null;
-    } catch (error) {
-      console.error("Error getting stored user data:", error);
-      return null;
-    }
-  }
-
-  static async fetchAndStoreUserData() {
-    if (typeof window === "undefined") return null;
-
-    const userToken = localStorage.getItem("userToken");
-    if (!userToken) return this.getStoredUserData();
-
-    try {
-      const response = await fetch("/api/user/profile", {
-        headers: { Authorization: `Bearer ${userToken}` },
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        console.log("API user data:", userData);
-
-        // Always merge with onboarding data to preserve location and other fields
-        const onboardingData = localStorage.getItem("userOnboardingData");
-        console.log("Raw onboarding data:", onboardingData);
-
-        let mergedData = userData;
-        if (onboardingData) {
-          try {
-            const onboarding = JSON.parse(onboardingData);
-            console.log("Parsed onboarding data:", onboarding);
-
-            // Merge onboarding data with user data properly
-            mergedData = {
-              ...userData,
-              // Always preserve onboarding location and other critical data
-              location: onboarding.location || userData.location,
-              gender: userData.gender || onboarding.gender,
-              age: userData.age || onboarding.age || null,
-              dateOfBirth:
-                userData.dateOfBirth || onboarding.dateOfBirth || null,
-              phoneNumber:
-                userData.phoneNumber ||
-                userData.phone ||
-                onboarding.phoneNumber,
-              phone: userData.phone || onboarding.phoneNumber,
-              mobile: userData.mobile || onboarding.phoneNumber,
-              preferences: {
-                ...userData.preferences,
-                ...onboarding.preferences,
-              },
-            };
-            console.log("Merged data result:", mergedData);
-          } catch (parseError) {
-            console.error("Error parsing onboarding data:", parseError);
-            mergedData = userData;
-          }
-        }
-
-        // Store the merged data
-        localStorage.setItem(
-          "authenticatedUserData",
-          JSON.stringify(mergedData)
-        );
-
-        // Update booking history after login
-        await this.syncBookingHistory();
-
-        return mergedData;
-      } else {
-        // If API fails, return stored data
-        return this.getStoredUserData();
-      }
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      return this.getStoredUserData();
-    }
-  }
-
-  static async syncBookingHistory() {
-    const userToken = localStorage.getItem("userToken");
-    if (!userToken) return;
-
-    try {
-      await fetch("/api/user/sync-booking-history", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${userToken}` },
-      });
-    } catch (error) {
-      console.error("Error syncing booking history:", error);
-    }
-  }
-
-  static clearUserData() {
-    if (typeof window === "undefined") return;
-    // Clear user-specific data
-    localStorage.removeItem("userToken");
-    localStorage.removeItem("authenticatedUserData");
-    localStorage.removeItem("userPrefillData");
-    localStorage.removeItem("userData");
-
-    // Clear society/member data if exists
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("authUser");
-    localStorage.removeItem("selectedSocietyId");
-
-    // Keep onboarding data for future use
-    console.log("User data cleared successfully");
-  }
-
-  static clearSalonData() {
-    if (typeof window === "undefined") return;
-    // Clear salon-specific data
-    localStorage.removeItem("salonToken");
-    localStorage.removeItem("salonSession");
-    localStorage.removeItem("ownerToken");
-
-    console.log("Salon data cleared successfully");
-  }
-
-  static clearAllData() {
-    if (typeof window === "undefined") return;
-    // Nuclear option - clear everything except hasOnboarded
-    const hasOnboarded = localStorage.getItem("hasOnboarded");
-    const userOnboardingData = localStorage.getItem("userOnboardingData");
-
-    localStorage.clear();
-
-    // Restore onboarding data
-    if (hasOnboarded) localStorage.setItem("hasOnboarded", hasOnboarded);
-    if (userOnboardingData)
-      localStorage.setItem("userOnboardingData", userOnboardingData);
-
-    console.log("All data cleared except onboarding");
-  }
-
-  static isUserLoggedIn() {
-    if (typeof window === "undefined") return false;
-    const userToken = localStorage.getItem("userToken");
-    const authenticatedUserData = localStorage.getItem("authenticatedUserData");
-    return !!(userToken && authenticatedUserData);
-  }
-
-  static preserveUserInfoForBooking(bookingData) {
-    if (typeof window === "undefined") return;
-    const currentUser = this.getStoredUserData();
-    if (currentUser) {
-      // Store prefill data with user info for feedback
-      const prefillData = {
-        name: currentUser.name || "Anonymous",
-        phone: currentUser.phone || "",
-        lastBookings: {
-          salonId: bookingData.salonId,
-          service: bookingData.service,
-          date: bookingData.date,
-          time: bookingData.time,
-        },
-        timestamp: Date.now(),
-      };
-      localStorage.setItem("userPrefillData", JSON.stringify(prefillData));
-    }
-  }
-
-  static isLoggedIn() {
-    if (typeof window === "undefined") return false;
-    return !!localStorage.getItem("userToken");
-  }
-
-  static hasOnboarded() {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("hasOnboarded") === "true";
-  }
-}
-</file>
-
 <file path="src/pages/auth/user/register.js">
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
@@ -24432,595 +24139,231 @@ function getStatusMessage(status) {
 }
 </file>
 
-<file path="src/pages/onboarding.js">
-import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
-import { motion } from "framer-motion";
-import styles from "../styles/Onboarding.module.css";
+<file path="src/lib/userData.js">
+// lib/userData.js
+export class UserDataManager {
+  static getStoredUserData() {
+    if (typeof window === "undefined") return null;
 
-export default function Onboarding() {
-  const router = useRouter();
-  const [formData, setFormData] = useState({
-    name: "",
-    gender: "",
-    dateOfBirth: "",
-    age: null,
-    phoneNumber: "",
-    isPhoneVerified: false,
-    location: { latitude: null, longitude: null, address: "" },
-  });
-  const [currentStep, setCurrentStep] = useState(1); // 5 steps total
-  const [otp, setOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [generatedOtp, setGeneratedOtp] = useState("");
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [locationStatus, setLocationStatus] = useState("pending"); // pending, loading, success, error
-
-  useEffect(() => {
-    // Check if user has already completed onboarding
-    const hasOnboarded = localStorage.getItem("hasOnboarded");
-    if (hasOnboarded) {
-      router.push("/");
-    }
-  }, [router]);
-
-  const handleInputChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const getCurrentLocation = () => {
-    setLocationStatus("loading");
-
-    if (!navigator.geolocation) {
-      setLocationStatus("error");
-      alert("Geolocation is not supported by this browser.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-        console.log("🔍 ACTUAL GPS COORDINATES:", { latitude, longitude });
-
-        try {
-          // Reverse geocoding to get address
-          const response = await fetch("/api/maps/reverse", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat: latitude, lng: longitude }),
-          });
-
-          if (!response.ok) {
-            throw new Error("Failed to reverse geocode");
+    try {
+      // First try to get authenticated user data
+      const userToken = localStorage.getItem("userToken");
+      if (userToken) {
+        const storedUserData = localStorage.getItem("authenticatedUserData");
+        if (storedUserData) {
+          const userData = JSON.parse(storedUserData);
+          // Always preserve onboarding location data for authenticated users
+          const onboardingData = localStorage.getItem("userOnboardingData");
+          if (onboardingData) {
+            try {
+              const onboarding = JSON.parse(onboardingData);
+              return {
+                ...userData,
+                location: onboarding.location || userData.location,
+                preferences: {
+                  ...userData.preferences,
+                  ...onboarding.preferences,
+                },
+              };
+            } catch (e) {
+              return userData;
+            }
           }
-
-          const data = await response.json();
-
-          setFormData((prev) => ({
-            ...prev,
-            location: {
-              latitude,
-              longitude,
-              address: data.address || `${latitude}, ${longitude}`,
-            },
-          }));
-          setLocationStatus("success");
-        } catch (error) {
-          console.error("Error getting address:", error);
-          setFormData((prev) => ({
-            ...prev,
-            location: {
-              latitude,
-              longitude,
-              address: `${latitude}, ${longitude}`,
-            },
-          }));
-          setLocationStatus("success");
+          return userData;
         }
-      },
-      (error) => {
-        console.error("Error getting location:", error);
-        setLocationStatus("error");
-        alert(
-          "Unable to get your location. Please enter manually or try again."
-        );
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 600000,
       }
-    );
-  };
 
-  const handleManualLocation = (address) => {
-    setFormData((prev) => ({
-      ...prev,
-      location: {
-        latitude: null,
-        longitude: null,
-        address,
-      },
-    }));
-    setLocationStatus("success");
-  };
+      // Fallback to onboarding data
+      const onboardingData = localStorage.getItem("userOnboardingData");
+      if (onboardingData) return JSON.parse(onboardingData);
 
-  const handleSendOtp = () => {
-    // Generate 6-digit OTP (client-side for free solution)
-    const generated = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(generated);
-    setOtpSent(true);
-
-    // Store OTP with expiry (5 minutes)
-    const otpData = {
-      otp: generated,
-      phone: formData.phoneNumber,
-      expiresAt: Date.now() + 5 * 60 * 1000,
-    };
-    localStorage.setItem("tempOtp", JSON.stringify(otpData));
-
-    alert(`OTP sent! (Development mode - OTP: ${generated})`);
-  };
-
-  const handleVerifyOtp = () => {
-    const storedData = JSON.parse(localStorage.getItem("tempOtp"));
-
-    if (!storedData || Date.now() > storedData.expiresAt) {
-      alert("OTP expired! Please request a new one.");
-      setOtpSent(false);
-      setOtp("");
-      return;
+      return null;
+    } catch (error) {
+      console.error("Error getting stored user data:", error);
+      return null;
     }
+  }
 
-    if (otp === storedData.otp && formData.phoneNumber === storedData.phone) {
-      handleInputChange("isPhoneVerified", true);
-      localStorage.removeItem("tempOtp");
-      alert("Phone verified successfully!");
-      setCurrentStep((prev) => prev + 1);
-    } else {
-      alert("Invalid OTP! Please try again.");
+  static async fetchAndStoreUserData() {
+    if (typeof window === "undefined") return null;
+
+    const userToken = localStorage.getItem("userToken");
+    if (!userToken) return this.getStoredUserData();
+
+    try {
+      const response = await fetch("/api/user/profile", {
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        console.log("API user data:", userData);
+
+        // Always merge with onboarding data to preserve location and other fields
+        const onboardingData = localStorage.getItem("userOnboardingData");
+        console.log("Raw onboarding data:", onboardingData);
+
+        let mergedData = userData;
+        if (onboardingData) {
+          try {
+            const onboarding = JSON.parse(onboardingData);
+            console.log("Parsed onboarding data:", onboarding);
+
+            // Merge onboarding data with user data properly
+            mergedData = {
+              ...userData,
+              // Always preserve onboarding location and other critical data
+              location: onboarding.location || userData.location,
+              gender: userData.gender || onboarding.gender,
+              age: userData.age || onboarding.age || null,
+              dateOfBirth:
+                userData.dateOfBirth || onboarding.dateOfBirth || null,
+              phoneNumber:
+                userData.phoneNumber ||
+                userData.phone ||
+                onboarding.phoneNumber,
+              phone: userData.phone || onboarding.phoneNumber,
+              mobile: userData.mobile || onboarding.phoneNumber,
+              preferences: {
+                ...userData.preferences,
+                ...onboarding.preferences,
+              },
+            };
+            console.log("Merged data result:", mergedData);
+          } catch (parseError) {
+            console.error("Error parsing onboarding data:", parseError);
+            mergedData = userData;
+          }
+        }
+
+        // Store the merged data
+        localStorage.setItem(
+          "authenticatedUserData",
+          JSON.stringify(mergedData)
+        );
+
+        // Update booking history after login
+        await this.syncBookingHistory();
+
+        return mergedData;
+      } else {
+        // If API fails, return stored data
+        return this.getStoredUserData();
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      return this.getStoredUserData();
     }
-  };
+  }
 
-  const nextStep = () => {
-    if (currentStep === 1 && formData.name.trim().length < 2) {
-      alert("Please enter a valid name");
-      return;
+  static async syncBookingHistory() {
+    const userToken = localStorage.getItem("userToken");
+    if (!userToken) return;
+
+    try {
+      await fetch("/api/user/sync-booking-history", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+    } catch (error) {
+      console.error("Error syncing booking history:", error);
     }
-    if (currentStep === 2 && !formData.gender) {
-      alert("Please select your gender");
-      return;
+  }
+
+  static clearUserData() {
+    if (typeof window === "undefined") return;
+    // Clear user-specific data
+    localStorage.removeItem("userToken");
+    localStorage.removeItem("authenticatedUserData");
+    localStorage.removeItem("userPrefillData");
+    localStorage.removeItem("userData");
+
+    // Clear society/member data if exists
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("authUser");
+    localStorage.removeItem("selectedSocietyId");
+
+    // Keep onboarding data for future use
+    console.log("User data cleared successfully");
+  }
+
+  static clearSalonData() {
+    if (typeof window === "undefined") return;
+    // Clear salon-specific data
+    localStorage.removeItem("salonToken");
+    localStorage.removeItem("salonSession");
+    localStorage.removeItem("ownerToken");
+
+    console.log("Salon data cleared successfully");
+  }
+
+  static clearAllData() {
+    if (typeof window === "undefined") return;
+    // Nuclear option - clear everything except hasOnboarded
+    localStorage.removeItem("userToken");
+    localStorage.removeItem("authenticatedUserData");
+    localStorage.removeItem("salonToken");
+    localStorage.removeItem("salonSession");
+    localStorage.removeItem("ownerToken");
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("adminData");
+    const hasOnboarded = localStorage.getItem("hasOnboarded");
+    const userOnboardingData = localStorage.getItem("userOnboardingData");
+
+    localStorage.clear();
+
+    // Restore onboarding data
+    if (hasOnboarded) localStorage.setItem("hasOnboarded", hasOnboarded);
+    if (userOnboardingData)
+      localStorage.setItem("userOnboardingData", userOnboardingData);
+
+    console.log("All data cleared except onboarding");
+  }
+
+  static isUserLoggedIn() {
+    if (typeof window === "undefined") return false;
+    const userToken = localStorage.getItem("userToken");
+    const authenticatedUserData = localStorage.getItem("authenticatedUserData");
+    const salonToken = localStorage.getItem("salonToken");
+    const salonSession = localStorage.getItem("salonSession");
+    // User is logged in if ANY auth token exists
+    return !!(userToken || authenticatedUserData || salonToken || salonSession);
+  }
+
+  static preserveUserInfoForBooking(bookingData) {
+    if (typeof window === "undefined") return;
+    const currentUser = this.getStoredUserData();
+    if (currentUser) {
+      // Store prefill data with user info for feedback
+      const prefillData = {
+        name: currentUser.name || "Anonymous",
+        phone: currentUser.phone || "",
+        lastBookings: {
+          salonId: bookingData.salonId,
+          service: bookingData.service,
+          date: bookingData.date,
+          time: bookingData.time,
+        },
+        timestamp: Date.now(),
+      };
+      localStorage.setItem("userPrefillData", JSON.stringify(prefillData));
     }
-    if (currentStep === 3 && (!formData.age || formData.age < 13)) {
-      alert("You must be at least 13 years old");
-      return;
-    }
-    if (currentStep === 4 && !formData.isPhoneVerified) {
-      alert("Please verify your phone number");
-      return;
-    }
-    if (currentStep === 5 && locationStatus !== "success") {
-      alert("Please set your location");
-      return;
-    }
-    if (currentStep < 5) {
-      setCurrentStep((prev) => prev + 1);
-    } else {
-      completeOnboarding();
-    }
-  };
+  }
 
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep((prev) => prev - 1);
-    }
-  };
+  static isLoggedIn() {
+    if (typeof window === "undefined") return false;
+    const userToken = localStorage.getItem("userToken");
+    const authenticatedUserData = localStorage.getItem("authenticatedUserData");
+    const salonToken = localStorage.getItem("salonToken");
+    const salonSession = localStorage.getItem("salonSession");
+    // Check ANY authentication
+    return !!(userToken || authenticatedUserData || salonToken || salonSession);
+  }
 
-  const completeOnboarding = () => {
-    setIsLoading(true);
-
-    // Store onboarding data in localStorage
-    localStorage.setItem("userOnboardingData", JSON.stringify(formData));
-    localStorage.setItem("hasOnboarded", "true");
-
-    setTimeout(() => {
-      setIsLoading(false);
-      router.push("/");
-    }, 1500);
-  };
-
-  const stepVariants = {
-    hidden: { opacity: 0, x: 50 },
-    visible: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: -50 },
-  };
-
-  return (
-    <div className={styles.container}>
-      <div className={styles.background}>
-        <div className={styles.goldOrb}></div>
-        <div className={styles.goldOrb}></div>
-      </div>
-
-      <div className={styles.onboardingCard}>
-        <div className={styles.header}>
-          <h1 className={styles.title}>
-            Welcome to <span className={styles.goldText}>TechTrims</span>
-          </h1>
-          <p className={styles.subtitle}>
-            Let&apos;s personalize your experience
-          </p>
-
-          <div className={styles.progressBar}>
-            <div className={styles.progressTrack}>
-              <div
-                className={styles.progressFill}
-                style={{ width: `${(currentStep / 5) * 100}%` }}
-              ></div>
-            </div>
-            <span className={styles.progressText}>{currentStep}/5</span>
-          </div>
-        </div>
-
-        <motion.div
-          key={currentStep}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          variants={stepVariants}
-          transition={{ duration: 0.3 }}
-          className={styles.stepContent}
-        >
-          {currentStep === 1 && (
-            <div className={styles.step}>
-              <div className={styles.stepIcon}>👋</div>
-              <h2>What&apos;s your name?</h2>
-              <p>We&apos;ll use this to personalize your booking experience</p>
-
-              <div className={styles.formGroup}>
-                <input
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  className={styles.input}
-                  autoFocus
-                />
-              </div>
-            </div>
-          )}
-
-          {currentStep === 2 && (
-            <div className={styles.step}>
-              <div className={styles.stepIcon}>⚧️</div>
-              <h2>How do you identify?</h2>
-              <p>This helps us show relevant services and pricing</p>
-
-              <div className={styles.genderOptions}>
-                {["Male", "Female", "Other"].map((gender) => (
-                  <button
-                    key={gender}
-                    type="button"
-                    className={`${styles.genderButton} ${
-                      formData.gender === gender ? styles.selected : ""
-                    }`}
-                    onClick={() => handleInputChange("gender", gender)}
-                  >
-                    <div className={styles.genderIcon}>
-                      {gender === "Male"
-                        ? "👨"
-                        : gender === "Female"
-                        ? "👩"
-                        : "🧑"}
-                    </div>
-                    <span>{gender}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {currentStep === 3 && (
-            <div className={styles.step}>
-              <div className={styles.stepIcon}>🎂</div>
-              <h2>When were you born?</h2>
-              <p>We&apos;ll use this to provide age-appropriate services</p>
-              <div className={styles.formGroup}>
-                <input
-                  type="date"
-                  max={
-                    new Date(
-                      new Date().setFullYear(new Date().getFullYear() - 13)
-                    )
-                      .toISOString()
-                      .split("T")[0]
-                  }
-                  value={formData.dateOfBirth}
-                  onChange={(e) => {
-                    const birthDate = new Date(e.target.value);
-                    const today = new Date();
-                    let age = today.getFullYear() - birthDate.getFullYear();
-                    const monthDiff = today.getMonth() - birthDate.getMonth();
-                    if (
-                      monthDiff < 0 ||
-                      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-                    ) {
-                      age--;
-                    }
-                    handleInputChange("dateOfBirth", e.target.value);
-                    handleInputChange("age", age);
-                  }}
-                  className={styles.input}
-                  autoFocus
-                />
-                {formData.age && (
-                  <p className={styles.ageDisplay}>Age: {formData.age} years</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {currentStep === 4 && (
-            <div className={styles.step}>
-              <div className={styles.stepIcon}>📱</div>
-              <h2>Verify your phone number</h2>
-              <p>We&apos;ll send you a verification code</p>
-              <div className={styles.formGroup}>
-                <input
-                  type="tel"
-                  placeholder="Enter 10-digit mobile number"
-                  value={formData.phoneNumber}
-                  onChange={(e) =>
-                    handleInputChange(
-                      "phoneNumber",
-                      e.target.value.replace(/\D/g, "").slice(0, 10)
-                    )
-                  }
-                  className={styles.input}
-                  maxLength="10"
-                  disabled={otpSent}
-                />
-                {!otpSent && (
-                  <button
-                    type="button"
-                    className={styles.sendOtpButton}
-                    onClick={handleSendOtp}
-                    disabled={formData.phoneNumber.length !== 10}
-                  >
-                    Send OTP
-                  </button>
-                )}
-              </div>
-              {otpSent && (
-                <div className={styles.otpSection}>
-                  <input
-                    type="text"
-                    placeholder="Enter 6-digit OTP"
-                    value={otp}
-                    onChange={(e) =>
-                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
-                    }
-                    className={styles.input}
-                    maxLength="6"
-                    autoFocus
-                  />
-                  <p className={styles.otpNote}>
-                    OTP (for development): {generatedOtp}
-                  </p>
-                  <button
-                    type="button"
-                    className={styles.verifyButton}
-                    onClick={handleVerifyOtp}
-                    disabled={otp.length !== 6}
-                  >
-                    Verify OTP
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {currentStep === 5 && (
-            <div className={styles.step}>
-              <div className={styles.stepIcon}>📍</div>
-              <h2>Where are you located?</h2>
-              <p>We&apos;ll find the best salons near you</p>
-
-              <div className={styles.locationSection}>
-                {locationStatus === "pending" && (
-                  <>
-                    <button
-                      type="button"
-                      className={styles.locationButton}
-                      onClick={getCurrentLocation}
-                    >
-                      <span>📍</span>
-                      Use Current Location
-                    </button>
-
-                    <div className={styles.divider}>
-                      <span>or</span>
-                    </div>
-
-                    <input
-                      type="text"
-                      placeholder="Enter your area/city manually"
-                      className={styles.input}
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter" && e.target.value.trim()) {
-                          handleManualLocation(e.target.value.trim());
-                        }
-                      }}
-                      onBlur={(e) => {
-                        if (e.target.value.trim()) {
-                          handleManualLocation(e.target.value.trim());
-                        }
-                      }}
-                    />
-                  </>
-                )}
-
-                {locationStatus === "loading" && (
-                  <div className={styles.loadingLocation}>
-                    <div className={styles.spinner}></div>
-                    <p>Getting your location...</p>
-                  </div>
-                )}
-
-                {locationStatus === "success" && (
-                  <div className={styles.locationSuccess}>
-                    <div className={styles.locationIcon}>✅</div>
-                    <div>
-                      <h4>Location Set!</h4>
-                      <p>{formData.location.address}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.changeLocationButton}
-                      onClick={() => setLocationStatus("pending")}
-                    >
-                      Change
-                    </button>
-                  </div>
-                )}
-
-                {locationStatus === "error" && (
-                  <div className={styles.locationError}>
-                    <p>Couldn&apos;t get location. Please enter manually:</p>
-                    <input
-                      type="text"
-                      placeholder="Enter your area/city"
-                      className={styles.input}
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter" && e.target.value.trim()) {
-                          handleManualLocation(e.target.value.trim());
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </motion.div>
-
-        <div className={styles.navigation}>
-          {currentStep > 1 && (
-            <button
-              type="button"
-              className={styles.backButton}
-              onClick={prevStep}
-            >
-              ← Back
-            </button>
-          )}
-
-          <button
-            type="button"
-            className={styles.nextButton}
-            onClick={nextStep}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <div className={styles.spinner}></div>
-                Setting up...
-              </>
-            ) : currentStep === 5 ? (
-              "Complete Setup"
-            ) : (
-              "Next →"
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/OwnerSidebar.js">
-import { useRouter } from "next/router";
-import styles from "../styles/OwnerSidebar.module.css";
-
-export default function OwnerSidebar({ closeSidebar }) {
-  const router = useRouter();
-
-  const menuItems = [
-    { icon: "👤", label: "Profile", path: "/salons/profile" },
-    { icon: "📅", label: "Bookings", path: "/salons/bookings" },
-    {
-      icon: "👨‍💼",
-      label: "Barber Management",
-      href: "/salons/barbers",
-      path: "/salons/barbers",
-    },
-    { icon: "👥", label: "Staff", path: "/salons/staff" },
-    { icon: "✂️", label: "Services", path: "/salons/services" },
-    { icon: "💰", label: "Payments", path: "/salons/payments" },
-    { icon: "📈", label: "Analytics", path: "/salons/analytics" },
-    { icon: "⚙️", label: "Settings", path: "/salons/settings" },
-  ];
-
-  const handleLogout = () => {
-    if (window.confirm("Are you sure you want to logout?")) {
-      localStorage.removeItem("ownerToken");
-      localStorage.removeItem("salonToken");
-      localStorage.removeItem("salonSession");
-      alert("Logged out successfully!");
-      router.push("/auth/salon/login");
-    }
-  };
-
-  return (
-    <div className={styles.sidebar}>
-      {/* Logo */}
-      <div className={styles.header}>
-        <div className={styles.logoContainer}>
-          <h2 className={styles.logo}>Tech Trims</h2>
-          <p className={styles.subtitle}>Owner Dashboard</p>
-        </div>
-        {closeSidebar && (
-          <button onClick={closeSidebar} className={styles.closeButton}>
-            ❌
-          </button>
-        )}
-      </div>
-
-      {/* Nav Menu */}
-      <nav className={styles.nav}>
-        {menuItems.map((item) => (
-          <button
-            key={item.path}
-            onClick={() => {
-              router.push(item.path);
-              if (closeSidebar) closeSidebar();
-            }}
-            className={`${styles.navButton} ${
-              router.pathname === item.path
-                ? styles.navButtonActive
-                : styles.navButtonInactive
-            }`}
-          >
-            <span className={styles.navIcon}>{item.icon}</span>
-            <span className={styles.navLabel}>{item.label}</span>
-          </button>
-        ))}
-      </nav>
-
-      {/* Footer */}
-      <div className={styles.footer}>
-        <button onClick={handleLogout} className={styles.logoutButton}>
-          🚪 Logout
-        </button>
-      </div>
-    </div>
-  );
+  static hasOnboarded() {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("hasOnboarded") === "true";
+  }
 }
 </file>
 
@@ -25482,472 +24825,522 @@ export default function UserLoginPage() {
 }
 </file>
 
-<file path="src/pages/user/dashboard.js">
+<file path="src/pages/onboarding.js">
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import styles from "../../styles/User.module.css";
-import Link from "next/link";
-import { UserDataManager } from "../../lib/userData";
+import { motion } from "framer-motion";
+import styles from "../styles/Onboarding.module.css";
 
-export default function UserDashboard() {
+export default function Onboarding() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [bookings, setBookings] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
-    email: "",
-    phone: "",
-    phoneNumber: "",
-    age: "",
     gender: "",
-    location: null,
+    dateOfBirth: "",
+    age: null,
+    phoneNumber: "",
+    isPhoneVerified: false,
+    location: { latitude: null, longitude: null, address: "" },
   });
+  const [currentStep, setCurrentStep] = useState(1); // 5 steps total
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [generatedOtp, setGeneratedOtp] = useState("");
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [locationStatus, setLocationStatus] = useState("pending"); // pending, loading, success, error
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const token = localStorage.getItem("userToken");
-
-        if (!token) {
-          router.push("/auth/user/login");
-          return;
-        }
-
-        setIsLoading(true);
-
-        // Simple profile load
-        try {
-          const userRes = await fetch("/api/user/profile", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-
-          if (userRes.ok) {
-            const userData = await userRes.json();
-            setUser(userData);
-            setFormData({
-              name: userData.name || "",
-              email: userData.email || "",
-              phone: userData.phone || userData.phoneNumber || "",
-              phoneNumber: userData.phoneNumber || userData.phone || "",
-              age: userData.age || "",
-              gender: userData.gender || "",
-              location: userData.location || null,
-            });
-          }
-        } catch (err) {
-          console.error("Profile error:", err);
-        }
-
-        // Simple bookings load
-        try {
-          const bookingsRes = await fetch("/api/user/bookings", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-
-          if (bookingsRes.ok) {
-            const bookingsData = await bookingsRes.json();
-            setBookings(Array.isArray(bookingsData) ? bookingsData : []);
-          }
-        } catch (err) {
-          console.error("Bookings error:", err);
-          setBookings([]);
-        }
-
-        // Simple payments load
-        try {
-          const paymentsRes = await fetch("/api/user/payments", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-
-          if (paymentsRes.ok) {
-            const paymentsData = await paymentsRes.json();
-            setPayments(Array.isArray(paymentsData) ? paymentsData : []);
-          }
-        } catch (err) {
-          console.error("Payments error:", err);
-          setPayments([]);
-        }
-      } catch (error) {
-        console.error("Overall error:", error);
-        setError(error.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadUserData();
+    // Check if user has already completed onboarding
+    const hasOnboarded = localStorage.getItem("hasOnboarded");
+    if (hasOnboarded) {
+      router.push("/");
+    }
   }, [router]);
 
   const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
-  const handleLogout = () => {
-    if (window.confirm("Are you sure you want to logout?")) {
-      UserDataManager.clearUserData();
-      alert("Logged out successfully!");
-      router.push("/");
+  const getCurrentLocation = () => {
+    setLocationStatus("loading");
+
+    if (!navigator.geolocation) {
+      setLocationStatus("error");
+      alert("Geolocation is not supported by this browser.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        console.log("🔍 ACTUAL GPS COORDINATES:", { latitude, longitude });
+
+        try {
+          // Reverse geocoding to get address
+          const response = await fetch("/api/maps/reverse", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat: latitude, lng: longitude }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to reverse geocode");
+          }
+
+          const data = await response.json();
+
+          setFormData((prev) => ({
+            ...prev,
+            location: {
+              latitude,
+              longitude,
+              address: data.address || `${latitude}, ${longitude}`,
+            },
+          }));
+          setLocationStatus("success");
+        } catch (error) {
+          console.error("Error getting address:", error);
+          setFormData((prev) => ({
+            ...prev,
+            location: {
+              latitude,
+              longitude,
+              address: `${latitude}, ${longitude}`,
+            },
+          }));
+          setLocationStatus("success");
+        }
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        setLocationStatus("error");
+        alert(
+          "Unable to get your location. Please enter manually or try again."
+        );
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 600000,
+      }
+    );
+  };
+
+  const handleManualLocation = (address) => {
+    setFormData((prev) => ({
+      ...prev,
+      location: {
+        latitude: null,
+        longitude: null,
+        address,
+      },
+    }));
+    setLocationStatus("success");
+  };
+
+  const handleSendOtp = () => {
+    // Generate 6-digit OTP (client-side for free solution)
+    const generated = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(generated);
+    setOtpSent(true);
+
+    // Store OTP with expiry (5 minutes)
+    const otpData = {
+      otp: generated,
+      phone: formData.phoneNumber,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+    };
+    localStorage.setItem("tempOtp", JSON.stringify(otpData));
+
+    alert(`OTP sent! (Development mode - OTP: ${generated})`);
+  };
+
+  const handleVerifyOtp = () => {
+    const storedData = JSON.parse(localStorage.getItem("tempOtp"));
+
+    if (!storedData || Date.now() > storedData.expiresAt) {
+      alert("OTP expired! Please request a new one.");
+      setOtpSent(false);
+      setOtp("");
+      return;
+    }
+
+    if (otp === storedData.otp && formData.phoneNumber === storedData.phone) {
+      handleInputChange("isPhoneVerified", true);
+      localStorage.removeItem("tempOtp");
+      alert("Phone verified successfully!");
+      setCurrentStep((prev) => prev + 1);
+    } else {
+      alert("Invalid OTP! Please try again.");
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className={styles.loading}>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-        <p>Loading dashboard...</p>
-      </div>
-    );
-  }
+  const nextStep = () => {
+    if (currentStep === 1 && formData.name.trim().length < 2) {
+      alert("Please enter a valid name");
+      return;
+    }
+    if (currentStep === 2 && !formData.gender) {
+      alert("Please select your gender");
+      return;
+    }
+    if (currentStep === 3 && (!formData.age || formData.age < 13)) {
+      alert("You must be at least 13 years old");
+      return;
+    }
+    if (currentStep === 4 && !formData.isPhoneVerified) {
+      alert("Please verify your phone number");
+      return;
+    }
+    if (currentStep === 5 && locationStatus !== "success") {
+      alert("Please set your location");
+      return;
+    }
+    if (currentStep < 5) {
+      setCurrentStep((prev) => prev + 1);
+    } else {
+      completeOnboarding();
+    }
+  };
 
-  if (error) {
-    return (
-      <div className={styles.error}>
-        <p>Error: {error}</p>
-        <button onClick={() => window.location.reload()}>Retry</button>
-      </div>
-    );
-  }
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep((prev) => prev - 1);
+    }
+  };
+
+  const completeOnboarding = () => {
+    setIsLoading(true);
+
+    // Store onboarding data in localStorage
+    localStorage.setItem("userOnboardingData", JSON.stringify(formData));
+    localStorage.setItem("hasOnboarded", "true");
+
+    setTimeout(() => {
+      setIsLoading(false);
+      router.push("/");
+    }, 1500);
+  };
+
+  const stepVariants = {
+    hidden: { opacity: 0, x: 50 },
+    visible: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: -50 },
+  };
 
   return (
-    <div className={styles.dashboard}>
-      <div className={styles.sidebar}>
-        <div className={styles.userProfile}>
-          <h2>Welcome, {user?.name || "User"}</h2>
-          <p>{user?.email || "No email"}</p>
-        </div>
-
-        <nav className={styles.nav}>
-          <button
-            className={`${styles.navItem} ${
-              activeTab === "overview" ? styles.active : ""
-            }`}
-            onClick={() => setActiveTab("overview")}
-          >
-            📊 Overview
-          </button>
-          <button
-            className={`${styles.navItem} ${
-              activeTab === "bookings" ? styles.active : ""
-            }`}
-            onClick={() => setActiveTab("bookings")}
-          >
-            📅 My Bookings
-          </button>
-          <button
-            className={`${styles.navItem} ${
-              activeTab === "payments" ? styles.active : ""
-            }`}
-            onClick={() => setActiveTab("payments")}
-          >
-            💳 Payments
-          </button>
-          <button
-            className={`${styles.navItem} ${
-              activeTab === "feedback" ? styles.active : ""
-            }`}
-            onClick={() => setActiveTab("feedback")}
-          >
-            ⭐ My Reviews
-          </button>
-          <button
-            className={`${styles.navItem} ${
-              activeTab === "profile" ? styles.active : ""
-            }`}
-            onClick={() => setActiveTab("profile")}
-          >
-            👤 Profile
-          </button>
-        </nav>
-
-        <button className={styles.logoutButton} onClick={handleLogout}>
-          🚪 Logout
-        </button>
+    <div className={styles.container}>
+      <div className={styles.background}>
+        <div className={styles.goldOrb}></div>
+        <div className={styles.goldOrb}></div>
       </div>
 
-      <div className={styles.content}>
-        {activeTab === "bookings" && (
-          <div className={styles.bookings}>
-            <h1>My Bookings ({bookings.length})</h1>
-            <div className={styles.bookingsList}>
-              {bookings.map((booking) => (
-                <div key={booking._id} className={styles.bookingCard}>
-                  <div className={styles.bookingHeader}>
-                    <h3>{booking.service}</h3>
-                    <div className={styles.badges}>
-                      <span
-                        className={`${styles.statusBadge} ${
-                          styles[booking.status]
-                        }`}
-                      >
-                        {booking.status}
-                      </span>
-                      {booking.bookingType && (
-                        <span
-                          className={`${styles.typeBadge} ${
-                            booking.bookingType === "WALKIN"
-                              ? styles.walkin
-                              : styles.prebook
-                          }`}
-                        >
-                          {booking.bookingType === "WALKIN"
-                            ? "🚶 Walk-in"
-                            : "📅 Pre-book"}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className={styles.bookingDetails}>
-                    {booking.bookingType === "WALKIN" ? (
-                      <>
-                        <p>
-                          <strong>📅 Date:</strong>{" "}
-                          {booking.createdAt
-                            ? new Date(booking.createdAt).toLocaleDateString()
-                            : "N/A"}
-                        </p>
-                        <p>
-                          <strong>⏰ Time:</strong>{" "}
-                          {booking.createdAt
-                            ? new Date(booking.createdAt).toLocaleTimeString()
-                            : "N/A"}
-                        </p>
-                        <p>
-                          <strong>🏪 Salon:</strong> {booking.salonName}
-                        </p>
-                        <p>
-                          <strong>💈 Barber:</strong>{" "}
-                          {booking.barberName || "Not assigned"}
-                        </p>
-                        <p>
-                          <strong>💰 Price:</strong>{" "}
-                          {booking.price
-                            ? `₹${booking.price}`
-                            : "Paid at salon"}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p>
-                          <strong>📅 Date:</strong> {booking.date}
-                        </p>
-                        <p>
-                          <strong>⏰ Time:</strong> {booking.time}
-                        </p>
-                        <p>
-                          <strong>🏪 Salon:</strong> {booking.salonName}
-                        </p>
-                        {booking.barber && (
-                          <p>
-                            <strong>💈 Barber:</strong> {booking.barber}
-                          </p>
-                        )}
-                        <p>
-                          <strong>💰 Price:</strong> ₹{booking.price || 0}
-                        </p>
-                      </>
-                    )}
-                    {booking.feedback?.ratings?.overall && (
-                      <p>
-                        <strong>⭐ Your Rating:</strong>{" "}
-                        {booking.feedback.ratings.overall}/5
-                      </p>
-                    )}
-                  </div>
-                  {booking.status === "completed" &&
-                    !booking.feedback?.submitted && (
-                      <button
-                        className={styles.feedbackButton}
-                        onClick={() =>
-                          router.push(`/feedback?bookingId=${booking._id}`)
-                        }
-                      >
-                        📝 Give Feedback
-                      </button>
-                    )}
-                </div>
-              ))}
-              {bookings.length === 0 && (
-                <div className={styles.emptyState}>
-                  <p>📅 No bookings found</p>
+      <div className={styles.onboardingCard}>
+        <div className={styles.loginPrompt}>
+          <p className={styles.loginText}>Already have an account?</p>
+          <button
+            type="button"
+            onClick={() => router.push("/auth/user/login")}
+            className={styles.loginLink}
+          >
+            Sign In
+          </button>
+        </div>
+        <div className={styles.header}>
+          <h1 className={styles.title}>
+            Welcome to <span className={styles.goldText}>TechTrims</span>
+          </h1>
+          <p className={styles.subtitle}>
+            Let&apos;s personalize your experience
+          </p>
+
+          <div className={styles.progressBar}>
+            <div className={styles.progressTrack}>
+              <div
+                className={styles.progressFill}
+                style={{ width: `${(currentStep / 5) * 100}%` }}
+              ></div>
+            </div>
+            <span className={styles.progressText}>{currentStep}/5</span>
+          </div>
+        </div>
+
+        <motion.div
+          key={currentStep}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          variants={stepVariants}
+          transition={{ duration: 0.3 }}
+          className={styles.stepContent}
+        >
+          {currentStep === 1 && (
+            <div className={styles.step}>
+              <div className={styles.stepIcon}>👋</div>
+              <h2>What&apos;s your name?</h2>
+              <p>We&apos;ll use this to personalize your booking experience</p>
+
+              <div className={styles.formGroup}>
+                <input
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={formData.name}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  className={styles.input}
+                  autoFocus
+                />
+              </div>
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className={styles.step}>
+              <div className={styles.stepIcon}>⚧️</div>
+              <h2>How do you identify?</h2>
+              <p>This helps us show relevant services and pricing</p>
+
+              <div className={styles.genderOptions}>
+                {["Male", "Female", "Other"].map((gender) => (
                   <button
-                    onClick={() => router.push("/")}
-                    className={styles.bookNowButton}
+                    key={gender}
+                    type="button"
+                    className={`${styles.genderButton} ${
+                      formData.gender === gender ? styles.selected : ""
+                    }`}
+                    onClick={() => handleInputChange("gender", gender)}
                   >
-                    Book Your First Service
+                    <div className={styles.genderIcon}>
+                      {gender === "Male"
+                        ? "👨"
+                        : gender === "Female"
+                        ? "👩"
+                        : "🧑"}
+                    </div>
+                    <span>{gender}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {currentStep === 3 && (
+            <div className={styles.step}>
+              <div className={styles.stepIcon}>🎂</div>
+              <h2>When were you born?</h2>
+              <p>We&apos;ll use this to provide age-appropriate services</p>
+              <div className={styles.formGroup}>
+                <input
+                  type="date"
+                  max={
+                    new Date(
+                      new Date().setFullYear(new Date().getFullYear() - 13)
+                    )
+                      .toISOString()
+                      .split("T")[0]
+                  }
+                  value={formData.dateOfBirth}
+                  onChange={(e) => {
+                    const birthDate = new Date(e.target.value);
+                    const today = new Date();
+                    let age = today.getFullYear() - birthDate.getFullYear();
+                    const monthDiff = today.getMonth() - birthDate.getMonth();
+                    if (
+                      monthDiff < 0 ||
+                      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+                    ) {
+                      age--;
+                    }
+                    handleInputChange("dateOfBirth", e.target.value);
+                    handleInputChange("age", age);
+                  }}
+                  className={styles.input}
+                  autoFocus
+                />
+                {formData.age && (
+                  <p className={styles.ageDisplay}>Age: {formData.age} years</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {currentStep === 4 && (
+            <div className={styles.step}>
+              <div className={styles.stepIcon}>📱</div>
+              <h2>Verify your phone number</h2>
+              <p>We&apos;ll send you a verification code</p>
+              <div className={styles.formGroup}>
+                <input
+                  type="tel"
+                  placeholder="Enter 10-digit mobile number"
+                  value={formData.phoneNumber}
+                  onChange={(e) =>
+                    handleInputChange(
+                      "phoneNumber",
+                      e.target.value.replace(/\D/g, "").slice(0, 10)
+                    )
+                  }
+                  className={styles.input}
+                  maxLength="10"
+                  disabled={otpSent}
+                />
+                {!otpSent && (
+                  <button
+                    type="button"
+                    className={styles.sendOtpButton}
+                    onClick={handleSendOtp}
+                    disabled={formData.phoneNumber.length !== 10}
+                  >
+                    Send OTP
+                  </button>
+                )}
+              </div>
+              {otpSent && (
+                <div className={styles.otpSection}>
+                  <input
+                    type="text"
+                    placeholder="Enter 6-digit OTP"
+                    value={otp}
+                    onChange={(e) =>
+                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    className={styles.input}
+                    maxLength="6"
+                    autoFocus
+                  />
+                  <p className={styles.otpNote}>
+                    OTP (for development): {generatedOtp}
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.verifyButton}
+                    onClick={handleVerifyOtp}
+                    disabled={otp.length !== 6}
+                  >
+                    Verify OTP
                   </button>
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Keep all other tabs as-is */}
-        {activeTab === "overview" && (
-          <div>
-            <div className={styles.overview}>
-              <Link href="/" className={styles.backLink}>
-                Home
-              </Link>
-              <h1>Dashboard Overview</h1>
-            </div>
+          {currentStep === 5 && (
+            <div className={styles.step}>
+              <div className={styles.stepIcon}>📍</div>
+              <h2>Where are you located?</h2>
+              <p>We&apos;ll find the best salons near you</p>
 
-            <div className={styles.stats}>
-              <div className={styles.statCard}>
-                <h3>Total Bookings</h3>
-                <p>{bookings.length}</p>
-              </div>
-              <div className={styles.statCard}>
-                <h3>Upcoming</h3>
-                <p>{bookings.filter((b) => b.status === "confirmed").length}</p>
-              </div>
-              <div className={styles.statCard}>
-                <h3>Completed</h3>
-                <p>{bookings.filter((b) => b.status === "completed").length}</p>
-              </div>
-              <div className={styles.statCard}>
-                <h3>Total Spent</h3>
-                <p>
-                  ₹{payments.reduce((total, p) => total + (p.amount || 0), 0)}
-                </p>
-              </div>
-            </div>
+              <div className={styles.locationSection}>
+                {locationStatus === "pending" && (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.locationButton}
+                      onClick={getCurrentLocation}
+                    >
+                      <span>📍</span>
+                      Use Current Location
+                    </button>
 
-            {/* Recent Bookings */}
-            <div className={styles.recentSection}>
-              <h2>Recent Bookings</h2>
-              {bookings.slice(0, 3).map((booking) => (
-                <div key={booking._id} className={styles.bookingCard}>
-                  <div className={styles.bookingHeader}>
-                    <h3>{booking.service}</h3>
-                    <div className={styles.badges}>
-                      <span
-                        className={`${styles.statusBadge} ${
-                          styles[booking.status]
-                        }`}
-                      >
-                        {booking.status}
-                      </span>
-                      {booking.bookingType && (
-                        <span
-                          className={`${styles.typeBadge} ${
-                            booking.bookingType === "WALKIN"
-                              ? styles.walkin
-                              : styles.prebook
-                          }`}
-                        >
-                          {booking.bookingType === "WALKIN"
-                            ? "🚶 Walk-in"
-                            : "📅 Pre-book"}
-                        </span>
-                      )}
+                    <div className={styles.divider}>
+                      <span>or</span>
                     </div>
-                  </div>
-                  <div className={styles.bookingDetails}>
-                    {booking.bookingType === "WALKIN" ? (
-                      <>
-                        <p>
-                          📅{" "}
-                          {booking.createdAt
-                            ? new Date(booking.createdAt).toLocaleDateString()
-                            : "N/A"}{" "}
-                          at{" "}
-                          {booking.createdAt
-                            ? new Date(booking.createdAt).toLocaleTimeString()
-                            : "N/A"}
-                        </p>
-                        <p>🏪 {booking.salonName}</p>
-                        <p>💈 {booking.barberName || "Not assigned"}</p>
-                      </>
-                    ) : (
-                      <>
-                        <p>
-                          📅 {booking.date} at {booking.time}
-                        </p>
-                        <p>🏪 {booking.salonName}</p>
-                        {booking.barber && <p>💈 {booking.barber}</p>}
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {bookings.length === 0 && (
-                <p className={styles.noData}>
-                  No bookings yet.{" "}
-                  <Link href="/">Book your first service!</Link>
-                </p>
-              )}
-            </div>
-          </div>
-        )}
 
-        {activeTab === "profile" && (
-          <div className={styles.profile}>
-            <h1>Profile Settings</h1>
-            <div className={styles.profileCard}>
-              <div className={styles.profileForm}>
-                <div className={styles.formGroup}>
-                  <label>Name</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Email</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange("email", e.target.value)}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Phone</label>
-                  <input
-                    type="tel"
-                    value={formData.phoneNumber || formData.phone}
-                    readOnly
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Age</label>
-                  <input
-                    type="text"
-                    value={
-                      formData.age ? `${formData.age} years` : "Not provided"
-                    }
-                    readOnly
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Gender</label>
-                  <input type="text" value={formData.gender} readOnly />
-                </div>
-                {formData.location && (
-                  <div className={styles.formGroup}>
-                    <label>Location</label>
                     <input
                       type="text"
-                      value={formData.location.address || "Location set"}
-                      readOnly
+                      placeholder="Enter your area/city manually"
+                      className={styles.input}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && e.target.value.trim()) {
+                          handleManualLocation(e.target.value.trim());
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value.trim()) {
+                          handleManualLocation(e.target.value.trim());
+                        }
+                      }}
+                    />
+                  </>
+                )}
+
+                {locationStatus === "loading" && (
+                  <div className={styles.loadingLocation}>
+                    <div className={styles.spinner}></div>
+                    <p>Getting your location...</p>
+                  </div>
+                )}
+
+                {locationStatus === "success" && (
+                  <div className={styles.locationSuccess}>
+                    <div className={styles.locationIcon}>✅</div>
+                    <div>
+                      <h4>Location Set!</h4>
+                      <p>{formData.location.address}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.changeLocationButton}
+                      onClick={() => setLocationStatus("pending")}
+                    >
+                      Change
+                    </button>
+                  </div>
+                )}
+
+                {locationStatus === "error" && (
+                  <div className={styles.locationError}>
+                    <p>Couldn&apos;t get location. Please enter manually:</p>
+                    <input
+                      type="text"
+                      placeholder="Enter your area/city"
+                      className={styles.input}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && e.target.value.trim()) {
+                          handleManualLocation(e.target.value.trim());
+                        }
+                      }}
                     />
                   </div>
                 )}
               </div>
-              <div className={styles.profileActions}>
-                <p className={styles.note}>
-                  📝 Profile editing will be available in future updates
-                </p>
-              </div>
             </div>
-          </div>
-        )}
+          )}
+        </motion.div>
 
-        {/* Include payments and feedback tabs as they were */}
+        <div className={styles.navigation}>
+          {currentStep > 1 && (
+            <button
+              type="button"
+              className={styles.backButton}
+              onClick={prevStep}
+            >
+              ← Back
+            </button>
+          )}
+
+          <button
+            type="button"
+            className={styles.nextButton}
+            onClick={nextStep}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <div className={styles.spinner}></div>
+                Setting up...
+              </>
+            ) : currentStep === 5 ? (
+              "Complete Setup"
+            ) : (
+              "Next →"
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -27480,6 +26873,94 @@ export default function UserDashboard() {
 }
 </file>
 
+<file path="src/components/OwnerSidebar.js">
+import { useRouter } from "next/router";
+import styles from "../styles/OwnerSidebar.module.css";
+
+export default function OwnerSidebar({ closeSidebar }) {
+  const router = useRouter();
+
+  const menuItems = [
+    { icon: "👤", label: "Profile", path: "/salons/profile" },
+    { icon: "📅", label: "Bookings", path: "/salons/bookings" },
+    {
+      icon: "👨‍💼",
+      label: "Barber Management",
+      href: "/salons/barbers",
+      path: "/salons/barbers",
+    },
+    { icon: "👥", label: "Staff", path: "/salons/staff" },
+    { icon: "✂️", label: "Services", path: "/salons/services" },
+    { icon: "💰", label: "Payments", path: "/salons/payments" },
+    { icon: "📈", label: "Analytics", path: "/salons/analytics" },
+    { icon: "⚙️", label: "Settings", path: "/salons/settings" },
+  ];
+
+  const handleLogout = () => {
+    if (window.confirm("Are you sure you want to logout?")) {
+      // Clear all salon/owner authentication data
+      localStorage.removeItem("ownerToken");
+      localStorage.removeItem("salonToken");
+      localStorage.removeItem("salonSession");
+      localStorage.removeItem("adminToken");
+      localStorage.removeItem("adminData");
+
+      alert("Logged out successfully!");
+
+      // Redirect to HOME page (/)
+      router.push("/").then(() => {
+        window.location.href = "/";
+      });
+    }
+  };
+
+  return (
+    <div className={styles.sidebar}>
+      {/* Logo */}
+      <div className={styles.header}>
+        <div className={styles.logoContainer}>
+          <h2 className={styles.logo}>Tech Trims</h2>
+          <p className={styles.subtitle}>Owner Dashboard</p>
+        </div>
+        {closeSidebar && (
+          <button onClick={closeSidebar} className={styles.closeButton}>
+            ❌
+          </button>
+        )}
+      </div>
+
+      {/* Nav Menu */}
+      <nav className={styles.nav}>
+        {menuItems.map((item) => (
+          <button
+            key={item.path}
+            onClick={() => {
+              router.push(item.path);
+              if (closeSidebar) closeSidebar();
+            }}
+            className={`${styles.navButton} ${
+              router.pathname === item.path
+                ? styles.navButtonActive
+                : styles.navButtonInactive
+            }`}
+          >
+            <span className={styles.navIcon}>{item.icon}</span>
+            <span className={styles.navLabel}>{item.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div className={styles.footer}>
+        <button onClick={handleLogout} className={styles.logoutButton}>
+          🚪 Logout
+        </button>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/Salon/SalonRegisterForm.js">
 import React, { useState, useEffect } from "react";
 import { MapPin, Clock, Store, Scissors, Star } from "lucide-react";
@@ -28280,245 +27761,6 @@ const SalonRegisterForm = () => {
 export default SalonRegisterForm;
 </file>
 
-<file path="src/pages/_app.js">
-// pages/_app.js
-import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
-import { motion } from "framer-motion";
-import "leaflet/dist/leaflet.css";
-import "../styles/globals.css";
-import styles from "../styles/Home.module.css";
-import { UserDataManager } from "../lib/userData";
-import NetworkStatus from "../components/NetworkStatus";
-import OnboardingLogoutButton from "../components/OnBoardingLogout";
-import GradientBackground from "@/components/Background";
-
-function MyApp({ Component, pageProps }) {
-  const router = useRouter();
-  const [showLoginMenu, setShowLoginMenu] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // Don't show header on onboarding pages
-  const hideHeader = router.pathname.startsWith("/onboarding");
-
-  useEffect(() => {
-    // Check theme preference
-    const darkMode = localStorage.getItem("darkMode") === "true";
-    setIsDarkMode(darkMode);
-    if (darkMode) {
-      document.documentElement.setAttribute("data-theme", "dark");
-    }
-  }, []);
-
-  const toggleDarkMode = () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    localStorage.setItem("darkMode", newMode.toString());
-
-    if (newMode) {
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-    }
-  };
-
-  const navigateToAuth = (type, role) => {
-    router.push(`/auth/${role}/${type}`);
-  };
-
-  return (
-    <>
-      <NetworkStatus />
-      {!hideHeader && (
-        <header className={styles.header}>
-          <div className={styles.headerContent}>
-            <motion.div
-              className={styles.logoContainer}
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-            >
-              <div className={styles.logoIcon}>✨</div>
-              <h1 className={styles.logo}>
-                <span className={styles.goldText}>Tech</span>
-                <span className={styles.trimText}>Trims</span>
-              </h1>
-            </motion.div>
-
-            {/* Desktop Navigation */}
-            <nav className={styles.desktopNav}>
-              <div className={styles.navLinks}>
-                <OnboardingLogoutButton />
-                <button className={styles.navLink}>Services</button>
-                <button className={styles.navLink}>Salons</button>
-                <button className={styles.navLink}>About</button>
-              </div>
-
-              <div className={styles.headerActions}>
-                <motion.button
-                  className={styles.themeToggle}
-                  onClick={toggleDarkMode}
-                  whileHover={{ scale: 1.1, rotate: 15 }}
-                  whileTap={{ scale: 0.95 }}
-                  title={
-                    isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
-                  }
-                >
-                  <span className={styles.themeIcon}>
-                    {isDarkMode ? "☀️" : "🌙"}
-                  </span>
-                </motion.button>
-
-                {UserDataManager.isLoggedIn() && (
-                  <motion.button
-                    className={`${styles.actionButton} ${styles.bookingButton}`}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => router.push("/user/dashboard")}
-                  >
-                    Dashboard
-                  </motion.button>
-                )}
-
-                <motion.button
-                  className={`${styles.actionButton} ${styles.ownerButton}`}
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => navigateToAuth("register", "salon")}
-                >
-                  Register Salon
-                </motion.button>
-
-                <div className={styles.loginDropdown}>
-                  <motion.button
-                    className={`${styles.actionButton} ${styles.loginButton}`}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowLoginMenu(!showLoginMenu)}
-                  >
-                    <span className={styles.buttonIcon}>👤</span>
-                    Login
-                    <span className={styles.dropdownArrow}>▼</span>
-                  </motion.button>
-                  {showLoginMenu && (
-                    <motion.div
-                      className={styles.loginMenu}
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <button
-                        onClick={() => {
-                          router.push("/auth/user/login");
-                          setShowLoginMenu(false);
-                        }}
-                      >
-                        👤 User Login
-                      </button>
-                      <button
-                        onClick={() => {
-                          navigateToAuth("login", "salon");
-                          setShowLoginMenu(false);
-                        }}
-                      >
-                        🏪 Salon Login
-                      </button>
-                    </motion.div>
-                  )}
-                </div>
-              </div>
-            </nav>
-
-            {/* Mobile Menu Button */}
-            <button
-              className={styles.mobileMenuButton}
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              <span
-                className={`${styles.hamburgerLine} ${
-                  isMobileMenuOpen ? styles.active : ""
-                }`}
-              ></span>
-              <span
-                className={`${styles.hamburgerLine} ${
-                  isMobileMenuOpen ? styles.active : ""
-                }`}
-              ></span>
-              <span
-                className={`${styles.hamburgerLine} ${
-                  isMobileMenuOpen ? styles.active : ""
-                }`}
-              ></span>
-            </button>
-
-            {/* Mobile Navigation */}
-            {isMobileMenuOpen && (
-              <motion.div
-                className={styles.mobileNav}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className={styles.mobileNavLinks}>
-                  <OnboardingLogoutButton />
-                  <button className={styles.mobileNavLink}>Services</button>
-                  <button className={styles.mobileNavLink}>Salons</button>
-                  <button className={styles.mobileNavLink}>About</button>
-                  <div className={styles.mobileNavDivider}></div>
-                  {UserDataManager.isLoggedIn() && (
-                    <button
-                      className={styles.mobileNavLink}
-                      onClick={() => {
-                        router.push("/user/dashboard");
-                        setIsMobileMenuOpen(false);
-                      }}
-                    >
-                      Dashboard
-                    </button>
-                  )}
-                  <button
-                    className={styles.mobileNavLink}
-                    onClick={() => {
-                      router.push("/auth/user/login");
-                      setIsMobileMenuOpen(false);
-                    }}
-                  >
-                    👤 User Login
-                  </button>
-                  <button
-                    className={styles.mobileNavLink}
-                    onClick={() => {
-                      navigateToAuth("login", "salon");
-                      setIsMobileMenuOpen(false);
-                    }}
-                  >
-                    🏪 Salon Login
-                  </button>
-                  <button
-                    className={styles.mobileNavLink}
-                    onClick={() => {
-                      navigateToAuth("register", "salon");
-                      setIsMobileMenuOpen(false);
-                    }}
-                  >
-                    🏪 Register Salon
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </div>
-        </header>
-      )}
-
-      <Component {...pageProps} />
-    </>
-  );
-}
-
-export default MyApp;
-</file>
-
 <file path="src/pages/api/bookings/create.js">
 import { connectToDatabase, clientPromise } from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
@@ -28728,6 +27970,1085 @@ export default async function handler(req, res) {
 }
 </file>
 
+<file path="src/pages/user/dashboard.js">
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import styles from "../../styles/User.module.css";
+import Link from "next/link";
+import { UserDataManager } from "../../lib/userData";
+
+export default function UserDashboard() {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [bookings, setBookings] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    phoneNumber: "",
+    age: "",
+    gender: "",
+    location: null,
+  });
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const token = localStorage.getItem("userToken");
+
+        if (!token) {
+          router.push("/auth/user/login");
+          return;
+        }
+
+        setIsLoading(true);
+
+        // Simple profile load
+        try {
+          const userRes = await fetch("/api/user/profile", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            setUser(userData);
+            setFormData({
+              name: userData.name || "",
+              email: userData.email || "",
+              phone: userData.phone || userData.phoneNumber || "",
+              phoneNumber: userData.phoneNumber || userData.phone || "",
+              age: userData.age || "",
+              gender: userData.gender || "",
+              location: userData.location || null,
+            });
+          }
+        } catch (err) {
+          console.error("Profile error:", err);
+        }
+
+        // Simple bookings load
+        try {
+          const bookingsRes = await fetch("/api/user/bookings", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (bookingsRes.ok) {
+            const bookingsData = await bookingsRes.json();
+            setBookings(Array.isArray(bookingsData) ? bookingsData : []);
+          }
+        } catch (err) {
+          console.error("Bookings error:", err);
+          setBookings([]);
+        }
+
+        // Simple payments load
+        try {
+          const paymentsRes = await fetch("/api/user/payments", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (paymentsRes.ok) {
+            const paymentsData = await paymentsRes.json();
+            setPayments(Array.isArray(paymentsData) ? paymentsData : []);
+          }
+        } catch (err) {
+          console.error("Payments error:", err);
+          setPayments([]);
+        }
+      } catch (error) {
+        console.error("Overall error:", error);
+        setError(error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [router]);
+
+  const handleInputChange = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLogout = () => {
+    // Confirm logout
+    if (window.confirm("Are you sure you want to logout?")) {
+      // Clear ALL authentication data
+      UserDataManager.clearUserData();
+
+      // Force clear to ensure clean state
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("userToken");
+        localStorage.removeItem("authenticatedUserData");
+        localStorage.removeItem("salonToken");
+        localStorage.removeItem("ownerToken");
+      }
+
+      localStorage.setItem("hasOnboarded", "true");
+
+      alert("Logged out successfully!");
+
+      // Force redirect to home page
+      window.location.href = "/";
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className={styles.loading}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+        <p>Loading dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.error}>
+        <p>Error: {error}</p>
+        <button onClick={() => window.location.reload()}>Retry</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.dashboard}>
+      <div className={styles.sidebar}>
+        <div className={styles.userProfile}>
+          <h2>Welcome, {user?.name || "User"}</h2>
+          <p>{user?.email || "No email"}</p>
+        </div>
+
+        <nav className={styles.nav}>
+          <button
+            className={`${styles.navItem} ${
+              activeTab === "overview" ? styles.active : ""
+            }`}
+            onClick={() => setActiveTab("overview")}
+          >
+            📊 Overview
+          </button>
+          <button
+            className={`${styles.navItem} ${
+              activeTab === "bookings" ? styles.active : ""
+            }`}
+            onClick={() => setActiveTab("bookings")}
+          >
+            📅 My Bookings
+          </button>
+          <button
+            className={`${styles.navItem} ${
+              activeTab === "payments" ? styles.active : ""
+            }`}
+            onClick={() => setActiveTab("payments")}
+          >
+            💳 Payments
+          </button>
+          <button
+            className={`${styles.navItem} ${
+              activeTab === "feedback" ? styles.active : ""
+            }`}
+            onClick={() => setActiveTab("feedback")}
+          >
+            ⭐ My Reviews
+          </button>
+          <button
+            className={`${styles.navItem} ${
+              activeTab === "profile" ? styles.active : ""
+            }`}
+            onClick={() => setActiveTab("profile")}
+          >
+            👤 Profile
+          </button>
+        </nav>
+
+        <button className={styles.logoutButton} onClick={handleLogout}>
+          🚪 Logout
+        </button>
+      </div>
+
+      <div className={styles.content}>
+        {activeTab === "bookings" && (
+          <div className={styles.bookings}>
+            <h1>My Bookings ({bookings.length})</h1>
+            <div className={styles.bookingsList}>
+              {bookings.map((booking) => (
+                <div key={booking._id} className={styles.bookingCard}>
+                  <div className={styles.bookingHeader}>
+                    <h3>{booking.service}</h3>
+                    <div className={styles.badges}>
+                      <span
+                        className={`${styles.statusBadge} ${
+                          styles[booking.status]
+                        }`}
+                      >
+                        {booking.status}
+                      </span>
+                      {booking.bookingType && (
+                        <span
+                          className={`${styles.typeBadge} ${
+                            booking.bookingType === "WALKIN"
+                              ? styles.walkin
+                              : styles.prebook
+                          }`}
+                        >
+                          {booking.bookingType === "WALKIN"
+                            ? "🚶 Walk-in"
+                            : "📅 Pre-book"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={styles.bookingDetails}>
+                    {booking.bookingType === "WALKIN" ? (
+                      <>
+                        <p>
+                          <strong>📅 Date:</strong>{" "}
+                          {booking.createdAt
+                            ? new Date(booking.createdAt).toLocaleDateString()
+                            : "N/A"}
+                        </p>
+                        <p>
+                          <strong>⏰ Time:</strong>{" "}
+                          {booking.createdAt
+                            ? new Date(booking.createdAt).toLocaleTimeString()
+                            : "N/A"}
+                        </p>
+                        <p>
+                          <strong>🏪 Salon:</strong> {booking.salonName}
+                        </p>
+                        <p>
+                          <strong>💈 Barber:</strong>{" "}
+                          {booking.barberName || "Not assigned"}
+                        </p>
+                        <p>
+                          <strong>💰 Price:</strong>{" "}
+                          {booking.price
+                            ? `₹${booking.price}`
+                            : "Paid at salon"}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p>
+                          <strong>📅 Date:</strong> {booking.date}
+                        </p>
+                        <p>
+                          <strong>⏰ Time:</strong> {booking.time}
+                        </p>
+                        <p>
+                          <strong>🏪 Salon:</strong> {booking.salonName}
+                        </p>
+                        {booking.barber && (
+                          <p>
+                            <strong>💈 Barber:</strong> {booking.barber}
+                          </p>
+                        )}
+                        <p>
+                          <strong>💰 Price:</strong> ₹{booking.price || 0}
+                        </p>
+                      </>
+                    )}
+                    {booking.feedback?.ratings?.overall && (
+                      <p>
+                        <strong>⭐ Your Rating:</strong>{" "}
+                        {booking.feedback.ratings.overall}/5
+                      </p>
+                    )}
+                  </div>
+                  {booking.status === "completed" &&
+                    !booking.feedback?.submitted && (
+                      <button
+                        className={styles.feedbackButton}
+                        onClick={() =>
+                          router.push(`/feedback?bookingId=${booking._id}`)
+                        }
+                      >
+                        📝 Give Feedback
+                      </button>
+                    )}
+                </div>
+              ))}
+              {bookings.length === 0 && (
+                <div className={styles.emptyState}>
+                  <p>📅 No bookings found</p>
+                  <button
+                    onClick={() => router.push("/")}
+                    className={styles.bookNowButton}
+                  >
+                    Book Your First Service
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Keep all other tabs as-is */}
+        {activeTab === "overview" && (
+          <div>
+            <div className={styles.overview}>
+              <Link href="/" className={styles.backLink}>
+                Home
+              </Link>
+              <h1>Dashboard Overview</h1>
+            </div>
+
+            <div className={styles.stats}>
+              <div className={styles.statCard}>
+                <h3>Total Bookings</h3>
+                <p>{bookings.length}</p>
+              </div>
+              <div className={styles.statCard}>
+                <h3>Upcoming</h3>
+                <p>{bookings.filter((b) => b.status === "confirmed").length}</p>
+              </div>
+              <div className={styles.statCard}>
+                <h3>Completed</h3>
+                <p>{bookings.filter((b) => b.status === "completed").length}</p>
+              </div>
+              <div className={styles.statCard}>
+                <h3>Total Spent</h3>
+                <p>
+                  ₹{payments.reduce((total, p) => total + (p.amount || 0), 0)}
+                </p>
+              </div>
+            </div>
+
+            {/* Recent Bookings */}
+            <div className={styles.recentSection}>
+              <h2>Recent Bookings</h2>
+              {bookings.slice(0, 3).map((booking) => (
+                <div key={booking._id} className={styles.bookingCard}>
+                  <div className={styles.bookingHeader}>
+                    <h3>{booking.service}</h3>
+                    <div className={styles.badges}>
+                      <span
+                        className={`${styles.statusBadge} ${
+                          styles[booking.status]
+                        }`}
+                      >
+                        {booking.status}
+                      </span>
+                      {booking.bookingType && (
+                        <span
+                          className={`${styles.typeBadge} ${
+                            booking.bookingType === "WALKIN"
+                              ? styles.walkin
+                              : styles.prebook
+                          }`}
+                        >
+                          {booking.bookingType === "WALKIN"
+                            ? "🚶 Walk-in"
+                            : "📅 Pre-book"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={styles.bookingDetails}>
+                    {booking.bookingType === "WALKIN" ? (
+                      <>
+                        <p>
+                          📅{" "}
+                          {booking.createdAt
+                            ? new Date(booking.createdAt).toLocaleDateString()
+                            : "N/A"}{" "}
+                          at{" "}
+                          {booking.createdAt
+                            ? new Date(booking.createdAt).toLocaleTimeString()
+                            : "N/A"}
+                        </p>
+                        <p>🏪 {booking.salonName}</p>
+                        <p>💈 {booking.barberName || "Not assigned"}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p>
+                          📅 {booking.date} at {booking.time}
+                        </p>
+                        <p>🏪 {booking.salonName}</p>
+                        {booking.barber && <p>💈 {booking.barber}</p>}
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {bookings.length === 0 && (
+                <p className={styles.noData}>
+                  No bookings yet.{" "}
+                  <Link href="/">Book your first service!</Link>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "profile" && (
+          <div className={styles.profile}>
+            <h1>Profile Settings</h1>
+            <div className={styles.profileCard}>
+              <div className={styles.profileForm}>
+                <div className={styles.formGroup}>
+                  <label>Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange("email", e.target.value)}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Phone</label>
+                  <input
+                    type="tel"
+                    value={formData.phoneNumber || formData.phone}
+                    readOnly
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Age</label>
+                  <input
+                    type="text"
+                    value={
+                      formData.age ? `${formData.age} years` : "Not provided"
+                    }
+                    readOnly
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Gender</label>
+                  <input type="text" value={formData.gender} readOnly />
+                </div>
+                {formData.location && (
+                  <div className={styles.formGroup}>
+                    <label>Location</label>
+                    <input
+                      type="text"
+                      value={formData.location.address || "Location set"}
+                      readOnly
+                    />
+                  </div>
+                )}
+              </div>
+              <div className={styles.profileActions}>
+                <p className={styles.note}>
+                  📝 Profile editing will be available in future updates
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Include payments and feedback tabs as they were */}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/pages/_app.js">
+// pages/_app.js
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { motion } from "framer-motion";
+import "leaflet/dist/leaflet.css";
+import "../styles/globals.css";
+import styles from "../styles/Home.module.css";
+import { UserDataManager } from "../lib/userData";
+import NetworkStatus from "../components/NetworkStatus";
+import OnboardingLogoutButton from "../components/OnBoardingLogout";
+import GradientBackground from "@/components/Background";
+
+function MyApp({ Component, pageProps }) {
+  const router = useRouter();
+  const [showLoginMenu, setShowLoginMenu] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Don't show header on onboarding AND auth pages
+  const hideHeader =
+    router.pathname.startsWith("/onboarding") ||
+    router.pathname.startsWith("/auth/");
+
+  useEffect(() => {
+    // Check theme preference
+    const darkMode = localStorage.getItem("darkMode") === "true";
+    setIsDarkMode(darkMode);
+    if (darkMode) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    localStorage.setItem("darkMode", newMode.toString());
+
+    if (newMode) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+  };
+
+  const navigateToAuth = (type, role) => {
+    router.push(`/auth/${role}/${type}`);
+  };
+
+  return (
+    <>
+      <NetworkStatus />
+      {!hideHeader && (
+        <header className={styles.header}>
+          <div className={styles.headerContent}>
+            <motion.div
+              className={styles.logoContainer}
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            >
+              <div className={styles.logoIcon}>✨</div>
+              <h1 className={styles.logo}>
+                <span className={styles.goldText}>Tech</span>
+                <span className={styles.trimText}>Trims</span>
+              </h1>
+            </motion.div>
+
+            {/* Desktop Navigation */}
+            <nav className={styles.desktopNav}>
+              <div className={styles.navLinks}>
+                <OnboardingLogoutButton />
+                <button className={styles.navLink}>Services</button>
+                <button className={styles.navLink}>Salons</button>
+                <button className={styles.navLink}>About</button>
+              </div>
+
+              <div className={styles.headerActions}>
+                <motion.button
+                  className={styles.themeToggle}
+                  onClick={toggleDarkMode}
+                  whileHover={{ scale: 1.1, rotate: 15 }}
+                  whileTap={{ scale: 0.95 }}
+                  title={
+                    isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
+                  }
+                >
+                  <span className={styles.themeIcon}>
+                    {isDarkMode ? "☀️" : "🌙"}
+                  </span>
+                </motion.button>
+
+                {/* ✅ SHOW DASHBOARD ONLY IF LOGGED IN */}
+                {UserDataManager.isLoggedIn() && (
+                  <motion.button
+                    className={`${styles.actionButton} ${styles.bookingButton}`}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => router.push("/user/dashboard")}
+                  >
+                    Dashboard
+                  </motion.button>
+                )}
+
+                {/* ✅ SHOW LOGOUT ONLY IF LOGGED IN */}
+                {UserDataManager.isLoggedIn() && (
+                  <motion.button
+                    className={`${styles.actionButton} ${styles.logoutButton}`}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to logout?")) {
+                        localStorage.removeItem("userToken");
+                        localStorage.removeItem("authenticatedUserData");
+                        localStorage.removeItem("salonToken");
+                        localStorage.removeItem("salonSession");
+                        localStorage.removeItem("ownerToken");
+
+                        alert("Logged out successfully!");
+                        window.location.href = "/";
+                      }
+                    }}
+                  >
+                    Logout
+                  </motion.button>
+                )}
+
+                {/* ✅ SHOW REGISTER SALON ONLY IF NOT LOGGED IN */}
+                {!UserDataManager.isLoggedIn() && (
+                  <motion.button
+                    className={`${styles.actionButton} ${styles.ownerButton}`}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => navigateToAuth("register", "salon")}
+                  >
+                    Register Salon
+                  </motion.button>
+                )}
+
+                {/* ✅ SHOW LOGIN ONLY IF NOT LOGGED IN */}
+                {!UserDataManager.isLoggedIn() && (
+                  <div className={styles.loginDropdown}>
+                    <motion.button
+                      className={`${styles.actionButton} ${styles.loginButton}`}
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setShowLoginMenu(!showLoginMenu)}
+                    >
+                      <span className={styles.buttonIcon}>👤</span>
+                      Login
+                      <span className={styles.dropdownArrow}>▼</span>
+                    </motion.button>
+                    {showLoginMenu && (
+                      <motion.div
+                        className={styles.loginMenu}
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <button
+                          onClick={() => {
+                            router.push("/auth/user/login");
+                            setShowLoginMenu(false);
+                          }}
+                        >
+                          👤 User Login
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigateToAuth("login", "salon");
+                            setShowLoginMenu(false);
+                          }}
+                        >
+                          🏪 Salon Login
+                        </button>
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </nav>
+
+            {/* Mobile Menu Button */}
+            <button
+              className={styles.mobileMenuButton}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              <span
+                className={`${styles.hamburgerLine} ${
+                  isMobileMenuOpen ? styles.active : ""
+                }`}
+              ></span>
+              <span
+                className={`${styles.hamburgerLine} ${
+                  isMobileMenuOpen ? styles.active : ""
+                }`}
+              ></span>
+              <span
+                className={`${styles.hamburgerLine} ${
+                  isMobileMenuOpen ? styles.active : ""
+                }`}
+              ></span>
+            </button>
+
+            {/* Mobile Navigation */}
+            {isMobileMenuOpen && (
+              <motion.div
+                className={styles.mobileNav}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className={styles.mobileNavLinks}>
+                  <OnboardingLogoutButton />
+                  <button className={styles.mobileNavLink}>Services</button>
+                  <button className={styles.mobileNavLink}>Salons</button>
+                  <button className={styles.mobileNavLink}>About</button>
+                  <div className={styles.mobileNavDivider}></div>
+
+                  {/* Show Dashboard if logged in */}
+                  {UserDataManager.isLoggedIn() && (
+                    <button
+                      className={styles.mobileNavLink}
+                      onClick={() => {
+                        router.push("/user/dashboard");
+                        setIsMobileMenuOpen(false);
+                      }}
+                    >
+                      Dashboard
+                    </button>
+                  )}
+
+                  {/* Show Login options only if NOT logged in */}
+                  {!UserDataManager.isLoggedIn() && (
+                    <>
+                      <button
+                        className={styles.mobileNavLink}
+                        onClick={() => {
+                          router.push("/auth/user/login");
+                          setIsMobileMenuOpen(false);
+                        }}
+                      >
+                        👤 User Login
+                      </button>
+                      <button
+                        className={styles.mobileNavLink}
+                        onClick={() => {
+                          navigateToAuth("login", "salon");
+                          setIsMobileMenuOpen(false);
+                        }}
+                      >
+                        🏪 Salon Login
+                      </button>
+                      <button
+                        className={styles.mobileNavLink}
+                        onClick={() => {
+                          navigateToAuth("register", "salon");
+                          setIsMobileMenuOpen(false);
+                        }}
+                      >
+                        🏪 Register Salon
+                      </button>
+                    </>
+                  )}
+
+                  {/* Show Logout if logged in */}
+                  {UserDataManager.isLoggedIn() && (
+                    <button
+                      className={styles.mobileNavLink}
+                      onClick={() => {
+                        if (
+                          window.confirm("Are you sure you want to logout?")
+                        ) {
+                          localStorage.removeItem("userToken");
+                          localStorage.removeItem("authenticatedUserData");
+                          localStorage.removeItem("salonToken");
+                          localStorage.removeItem("salonSession");
+                          localStorage.removeItem("ownerToken");
+
+                          alert("Logged out successfully!");
+                          window.location.href = "/";
+                        }
+                      }}
+                    >
+                      Logout
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </header>
+      )}
+
+      <Component {...pageProps} />
+    </>
+  );
+}
+
+export default MyApp;
+</file>
+
+<file path="src/pages/feedback.js">
+// src/pages/feedback.js - Enhanced feedback with star ratings
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
+import styles from "../styles/Feedback.module.css";
+
+export default function FeedbackPage() {
+  const router = useRouter();
+  const { bookingId } = router.query;
+
+  const [bookings, setBooking] = useState(null);
+  const [ratings, setRatings] = useState({
+    serviceQuality: 0,
+    timing: 0,
+    barberPerformance: 0,
+    ambience: 0,
+    overall: 0,
+  });
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchBookingDetails = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log("API Response:", data); // ✅ Debug log
+
+        // Handle different API response formats
+        const bookingData = data.booking || data;
+        setBooking(bookingData);
+      } else {
+        console.error("Failed to fetch booking:", response.status);
+        alert("Failed to load booking details");
+      }
+    } catch (error) {
+      console.error("Error fetching booking:", error);
+      alert("Error loading booking: " + error.message);
+    }
+  }, [bookingId]);
+
+  useEffect(() => {
+    if (bookingId) {
+      fetchBookingDetails();
+    }
+  }, [bookingId, fetchBookingDetails]);
+
+  // StarRating component - fixed version
+  const StarRating = ({ value, onChange, label, required = true }) => {
+    return (
+      <div className={styles.ratingGroup}>
+        <label className={styles.ratingLabel}>
+          {label} {required && <span className={styles.required}>*</span>}
+        </label>
+        <div className={styles.starsContainer}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              onClick={() => onChange(star)}
+              className={`${styles.starButton} ${
+                star <= value ? styles.starFilled : styles.starEmpty
+              }`}
+            >
+              {star <= value ? "⭐" : "☆"}
+            </button>
+          ))}
+          <div className={styles.ratingInfo}>
+            {value === 0 ? (
+              <span className={styles.ratingPlaceholder}>Tap to rate</span>
+            ) : (
+              <span className={styles.ratingValue}>
+                {value}/5 {getRatingLabel(value)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Add rating labels
+  const getRatingLabel = (rating) => {
+    switch (rating) {
+      case 1:
+        return "Poor";
+      case 2:
+        return "Fair";
+      case 3:
+        return "Good";
+      case 4:
+        return "Very Good";
+      case 5:
+        return "Excellent";
+      default:
+        return "";
+    }
+  };
+
+  // Add validation before submission
+  const submitFeedback = async () => {
+    if (!bookingId) {
+      alert("Invalid booking ID");
+      return;
+    }
+
+    // Validate that all ratings are provided
+    const unratedFields = Object.entries(ratings)
+      .filter(([key, value]) => value === 0)
+      .map(([key]) => key.replace(/([A-Z])/g, " $1").toLowerCase());
+
+    if (unratedFields.length > 0) {
+      alert(`Please rate: ${unratedFields.join(", ")}`);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/bookings/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingId,
+          feedback: { ratings, comment },
+          submittedAt: new Date(),
+        }),
+      });
+
+      if (response.ok) {
+        alert("Thank you for your feedback!");
+
+        // Check if user is logged in
+        const userToken = localStorage.getItem("userToken");
+        const authenticatedUserData = localStorage.getItem(
+          "authenticatedUserData"
+        );
+
+        if (userToken && authenticatedUserData) {
+          // User is logged in - redirect to dashboard
+          router.push("/user/dashboard");
+        } else {
+          // User is not logged in - store prefill data and redirect to register
+          if (bookings) {
+            const prefillData = {
+              name: bookings.customerName,
+              phone: bookings.customerPhone,
+              gender: bookings.customerGender,
+              lastbookings: {
+                salonId: bookings.salonId,
+                service: bookings.service,
+                date: bookings.date,
+                time: bookings.time,
+              },
+              timestamp: new Date().getTime(),
+            };
+            console.log("Storing prefill data:", prefillData);
+            localStorage.setItem(
+              "userPrefillData",
+              JSON.stringify(prefillData)
+            );
+          }
+          router.push("/auth/user/register");
+        }
+      } else {
+        alert("Failed to submit feedback");
+      }
+    } catch (error) {
+      console.error("Feedback submission error:", error);
+      alert("Error submitting feedback");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!bookings) {
+    return (
+      <div className={styles.loadingContainer}>
+        <div className={styles.loadingContent}>
+          <div className={styles.spinner}></div>
+          <p className={styles.loadingText}>Loading booking details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.pageContainer}>
+      <div className={styles.content}>
+        <div className={styles.card}>
+          <div className={styles.header}>
+            <h1 className={styles.title}>Rate Your Experience</h1>
+            <p className={styles.subtitle}>
+              How was your visit to {bookings.salonName || "the salon"}?
+            </p>
+          </div>
+
+          {/* Booking Summary */}
+          <div className={styles.bookingSummary}>
+            <h3 className={styles.summaryTitle}>Booking Summary</h3>
+            <p className={styles.summaryInfo}>
+              <strong>Customer:</strong> {bookings.customerName}
+              {bookings.customerAge && ` (${bookings.customerAge} years)`}
+            </p>
+            <p className={styles.summaryInfo}>
+              <strong>Phone:</strong> {bookings.customerPhone}
+            </p>
+            <p className={styles.summaryInfo}>
+              <strong>Service:</strong> {bookings.service}
+            </p>
+            {bookings.barber && (
+              <p className={styles.summaryInfo}>
+                <strong>Barber:</strong> {bookings.barber}
+              </p>
+            )}
+            <p className={styles.summaryInfo}>
+              <strong>Date:</strong> {bookings.date} at {bookings.time}
+            </p>
+            <p className={styles.summaryInfo}>
+              <strong>Amount:</strong> ₹{bookings.price}
+            </p>
+          </div>
+
+          {/* Rating Form */}
+          <div className={styles.ratingsForm}>
+            <StarRating
+              label="Service Quality"
+              value={ratings.serviceQuality}
+              onChange={(value) =>
+                setRatings({ ...ratings, serviceQuality: value })
+              }
+            />
+
+            <StarRating
+              label="Timing/Punctuality"
+              value={ratings.timing}
+              onChange={(value) => setRatings({ ...ratings, timing: value })}
+            />
+
+            <StarRating
+              label="Barber Performance"
+              value={ratings.barberPerformance}
+              onChange={(value) =>
+                setRatings({ ...ratings, barberPerformance: value })
+              }
+            />
+
+            <StarRating
+              label="Salon Ambience / Cleanliness"
+              value={ratings.ambience}
+              onChange={(value) => setRatings({ ...ratings, ambience: value })}
+            />
+
+            <StarRating
+              label="Overall Experience"
+              value={ratings.overall}
+              onChange={(value) => setRatings({ ...ratings, overall: value })}
+            />
+
+            {/* Text Feedback */}
+            <div className={styles.commentSection}>
+              <label className={styles.commentLabel}>
+                Additional Comments (Optional)
+              </label>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Share your experience in detail..."
+                className={styles.textarea}
+                rows="4"
+              />
+            </div>
+
+            {/* Submit Button */}
+            <div className={styles.submitSection}>
+              <button
+                onClick={submitFeedback}
+                disabled={submitting}
+                className={styles.submitButton}
+              >
+                {submitting ? "Submitting..." : "✅ Submit Feedback"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/styles/Home.module.css">
 /* Container & Layout */
 .container {
@@ -28789,6 +29110,224 @@ export default async function handler(req, res) {
   font-size: 1.25rem;
   font-weight: 600;
   font-family: var(--font-display);
+}
+/* Booking Mode Toggle */
+.bookingModeToggle {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin: 32px 0;
+  flex-wrap: wrap;
+}
+
+.modeButton {
+  padding: 16px 32px;
+  background: transparent;
+  border: 2px solid var(--border-color);
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+}
+
+.modeButton:hover {
+  border-color: var(--gold-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.2);
+}
+
+.activeModeButton {
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-dark) 100%
+  );
+  border-color: var(--gold-primary);
+  color: var(--contrast-dark);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
+}
+
+.modeBadge {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.activeModeButton .modeBadge {
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--contrast-dark);
+}
+
+/* Walk-in Instruction */
+.walkInInstruction {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  padding: 20px 32px;
+  border-radius: 16px;
+  margin: 24px 0;
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.instructionIcon {
+  font-size: 24px;
+}
+
+.instructionText {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .modeButton {
+    padding: 12px 24px;
+    font-size: 14px;
+  }
+
+  .modeBadge {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  .walkInInstruction {
+    padding: 16px 20px;
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .instructionText {
+    font-size: 14px;
+  }
+}
+
+/* Fallback Banner */
+.fallbackBanner {
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary) 0%,
+    var(--gold-secondary) 100%
+  );
+  border-radius: 24px;
+  padding: 60px 40px;
+  text-align: center;
+  margin: 60px auto;
+  max-width: 700px;
+  box-shadow: 0 20px 60px rgba(212, 175, 55, 0.25);
+}
+
+.bannerContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.bannerIcon {
+  font-size: 64px;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.bannerTitle {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--contrast-dark);
+  margin: 0;
+}
+
+.bannerText {
+  font-size: 18px;
+  color: var(--contrast-dark);
+  opacity: 0.9;
+  margin: 0;
+  max-width: 500px;
+}
+
+.bannerActions {
+  display: flex;
+  gap: 20px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.bannerBtnPrimary,
+.bannerBtnSecondary {
+  padding: 16px 36px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+}
+
+.bannerBtnPrimary {
+  background: var(--contrast-dark);
+  color: var(--gold-primary);
+}
+
+.bannerBtnPrimary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.bannerBtnSecondary {
+  background: transparent;
+  color: var(--contrast-dark);
+  border: 3px solid var(--contrast-dark);
+}
+
+.bannerBtnSecondary:hover {
+  background: var(--contrast-dark);
+  color: var(--gold-primary);
+  transform: translateY(-3px);
+}
+
+@media (max-width: 768px) {
+  .fallbackBanner {
+    padding: 40px 20px;
+    margin: 40px 20px;
+  }
+
+  .bannerTitle {
+    font-size: 24px;
+  }
+
+  .bannerText {
+    font-size: 16px;
+  }
+
+  .bannerActions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .bannerBtnPrimary,
+  .bannerBtnSecondary {
+    width: 100%;
+  }
 }
 
 /* Enhanced Header */
@@ -30964,296 +31503,6 @@ export default async function handler(req, res) {
 }
 </file>
 
-<file path="src/pages/feedback.js">
-// src/pages/feedback.js - Enhanced feedback with star ratings
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/router";
-import styles from "../styles/Feedback.module.css";
-
-export default function FeedbackPage() {
-  const router = useRouter();
-  const { bookingId } = router.query;
-
-  const [bookings, setBooking] = useState(null);
-  const [ratings, setRatings] = useState({
-    serviceQuality: 0,
-    timing: 0,
-    barberPerformance: 0,
-    ambience: 0,
-    overall: 0,
-  });
-  const [comment, setComment] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const fetchBookingDetails = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/bookings/${bookingId}`);
-      if (response.ok) {
-        const data = await response.json();
-        console.log("API Response:", data); // ✅ Debug log
-
-        // Handle different API response formats
-        const bookingData = data.booking || data;
-        setBooking(bookingData);
-      } else {
-        console.error("Failed to fetch booking:", response.status);
-        alert("Failed to load booking details");
-      }
-    } catch (error) {
-      console.error("Error fetching booking:", error);
-      alert("Error loading booking: " + error.message);
-    }
-  }, [bookingId]);
-
-  useEffect(() => {
-    if (bookingId) {
-      fetchBookingDetails();
-    }
-  }, [bookingId, fetchBookingDetails]);
-
-  // StarRating component - fixed version
-  const StarRating = ({ value, onChange, label, required = true }) => {
-    return (
-      <div className={styles.ratingGroup}>
-        <label className={styles.ratingLabel}>
-          {label} {required && <span className={styles.required}>*</span>}
-        </label>
-        <div className={styles.starsContainer}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              type="button"
-              onClick={() => onChange(star)}
-              className={`${styles.starButton} ${
-                star <= value ? styles.starFilled : styles.starEmpty
-              }`}
-            >
-              {star <= value ? "⭐" : "☆"}
-            </button>
-          ))}
-          <div className={styles.ratingInfo}>
-            {value === 0 ? (
-              <span className={styles.ratingPlaceholder}>Tap to rate</span>
-            ) : (
-              <span className={styles.ratingValue}>
-                {value}/5 {getRatingLabel(value)}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Add rating labels
-  const getRatingLabel = (rating) => {
-    switch (rating) {
-      case 1:
-        return "Poor";
-      case 2:
-        return "Fair";
-      case 3:
-        return "Good";
-      case 4:
-        return "Very Good";
-      case 5:
-        return "Excellent";
-      default:
-        return "";
-    }
-  };
-
-  // Add validation before submission
-  const submitFeedback = async () => {
-    if (!bookingId) {
-      alert("Invalid booking ID");
-      return;
-    }
-
-    // Validate that all ratings are provided
-    const unratedFields = Object.entries(ratings)
-      .filter(([key, value]) => value === 0)
-      .map(([key]) => key.replace(/([A-Z])/g, " $1").toLowerCase());
-
-    if (unratedFields.length > 0) {
-      alert(`Please rate: ${unratedFields.join(", ")}`);
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const response = await fetch("/api/bookings/update", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingId,
-          feedback: { ratings, comment },
-          submittedAt: new Date(),
-        }),
-      });
-
-      if (response.ok) {
-        alert("Thank you for your feedback!");
-
-        // Check if user is logged in
-        const userToken = localStorage.getItem("userToken");
-        const authenticatedUserData = localStorage.getItem(
-          "authenticatedUserData"
-        );
-
-        if (userToken && authenticatedUserData) {
-          // User is logged in - redirect to dashboard
-          router.push("/user/dashboard");
-        } else {
-          // User is not logged in - store prefill data and redirect to register
-          if (bookings) {
-            const prefillData = {
-              name: bookings.customerName,
-              phone: bookings.customerPhone,
-              gender: bookings.customerGender,
-              lastbookings: {
-                salonId: bookings.salonId,
-                service: bookings.service,
-                date: bookings.date,
-                time: bookings.time,
-              },
-              timestamp: new Date().getTime(),
-            };
-            console.log("Storing prefill data:", prefillData);
-            localStorage.setItem(
-              "userPrefillData",
-              JSON.stringify(prefillData)
-            );
-          }
-          router.push("/auth/user/register");
-        }
-      } else {
-        alert("Failed to submit feedback");
-      }
-    } catch (error) {
-      console.error("Feedback submission error:", error);
-      alert("Error submitting feedback");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (!bookings) {
-    return (
-      <div className={styles.loadingContainer}>
-        <div className={styles.loadingContent}>
-          <div className={styles.spinner}></div>
-          <p className={styles.loadingText}>Loading booking details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.pageContainer}>
-      <div className={styles.content}>
-        <div className={styles.card}>
-          <div className={styles.header}>
-            <h1 className={styles.title}>Rate Your Experience</h1>
-            <p className={styles.subtitle}>
-              How was your visit to {bookings.salonName || "the salon"}?
-            </p>
-          </div>
-
-          {/* Booking Summary */}
-          <div className={styles.bookingSummary}>
-            <h3 className={styles.summaryTitle}>Booking Summary</h3>
-            <p className={styles.summaryInfo}>
-              <strong>Customer:</strong> {bookings.customerName}
-              {bookings.customerAge && ` (${bookings.customerAge} years)`}
-            </p>
-            <p className={styles.summaryInfo}>
-              <strong>Phone:</strong> {bookings.customerPhone}
-            </p>
-            <p className={styles.summaryInfo}>
-              <strong>Service:</strong> {bookings.service}
-            </p>
-            {bookings.barber && (
-              <p className={styles.summaryInfo}>
-                <strong>Barber:</strong> {bookings.barber}
-              </p>
-            )}
-            <p className={styles.summaryInfo}>
-              <strong>Date:</strong> {bookings.date} at {bookings.time}
-            </p>
-            <p className={styles.summaryInfo}>
-              <strong>Amount:</strong> ₹{bookings.price}
-            </p>
-          </div>
-
-          {/* Rating Form */}
-          <div className={styles.ratingsForm}>
-            <StarRating
-              label="Service Quality"
-              value={ratings.serviceQuality}
-              onChange={(value) =>
-                setRatings({ ...ratings, serviceQuality: value })
-              }
-            />
-
-            <StarRating
-              label="Timing/Punctuality"
-              value={ratings.timing}
-              onChange={(value) => setRatings({ ...ratings, timing: value })}
-            />
-
-            <StarRating
-              label="Barber Performance"
-              value={ratings.barberPerformance}
-              onChange={(value) =>
-                setRatings({ ...ratings, barberPerformance: value })
-              }
-            />
-
-            <StarRating
-              label="Salon Ambience / Cleanliness"
-              value={ratings.ambience}
-              onChange={(value) => setRatings({ ...ratings, ambience: value })}
-            />
-
-            <StarRating
-              label="Overall Experience"
-              value={ratings.overall}
-              onChange={(value) => setRatings({ ...ratings, overall: value })}
-            />
-
-            {/* Text Feedback */}
-            <div className={styles.commentSection}>
-              <label className={styles.commentLabel}>
-                Additional Comments (Optional)
-              </label>
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Share your experience in detail..."
-                className={styles.textarea}
-                rows="4"
-              />
-            </div>
-
-            {/* Submit Button */}
-            <div className={styles.submitSection}>
-              <button
-                onClick={submitFeedback}
-                disabled={submitting}
-                className={styles.submitButton}
-              >
-                {submitting ? "Submitting..." : "✅ Submit Feedback"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="src/pages/salons/dashboard.js">
 //pages/salons/dashboard.js
 import React, { useEffect, useState, useCallback } from "react";
@@ -31280,6 +31529,11 @@ export default function DashboardPage() {
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const loadBookings = useCallback(async (salonId, dateString) => {
     try {
       setLoading(true);
@@ -31291,10 +31545,8 @@ export default function DashboardPage() {
         dateParam = `&date=${dateString}`;
       }
 
-      // ✅ Add bookingType=all to include walk-ins
       const response = await fetch(
         `/api/salons/bookings?salonId=${salonId}${dateParam}&includeWalkins=true`,
-
         { cache: "no-store", headers: { "Content-Type": "application/json" } }
       );
 
@@ -31333,6 +31585,18 @@ export default function DashboardPage() {
     loadBookings(salonData._id, selectedDate);
     loadBarbers(salonData._id);
   }, [router, router.isReady, loadBookings, selectedDate]);
+
+  // ✅ Only this check can come after all hooks
+  if (!mounted) {
+    return (
+      <div className={styles.loadingContainer}>
+        <div className={styles.loadingContent}>
+          <div className={styles.spinner}></div>
+          <p className={styles.loadingText}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Handle date change
   const handleDateChange = (newDate) => {
@@ -31980,6 +32244,7 @@ export default function Home() {
   const [selectedService, setSelectedService] = useState("");
   const [filteredSalons, setFilteredSalons] = useState([]);
   const [isPrebook, setIsPrebook] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
 
   // Dynamic import for map component
   const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
@@ -31991,16 +32256,16 @@ export default function Home() {
     const initializeUser = async () => {
       if (typeof window === "undefined") return;
 
-      // Check if user has completed onboarding
-      if (!UserDataManager.hasOnboarded()) {
-        router.push("/onboarding");
-        return;
-      }
-
       const userToken = localStorage.getItem("userToken");
+      const authenticatedUserData = localStorage.getItem(
+        "authenticatedUserData"
+      );
+      const hasOnboarded = localStorage.getItem("hasOnboarded");
 
-      if (userToken) {
-        // User is logged in - get API data and use hardcoded location for now
+      // If user is logged in, proceed with dashboard
+      if (userToken || authenticatedUserData) {
+        // User is logged in - get API data
+
         try {
           const response = await fetch("/api/user/profile", {
             headers: { Authorization: `Bearer ${userToken}` },
@@ -32019,7 +32284,8 @@ export default function Home() {
                   "Shahad, Ambivali, Kalyan-Dombivli, Kalyan Taluka, Thane, Maharashtra, 410209, India",
               },
             };
-
+            setUserOnboarding(userData);
+            setUserLocation(userData.location);
             setUserOnboarding(userData);
 
             // Load salons with the location
@@ -32039,7 +32305,7 @@ export default function Home() {
           try {
             const userData = JSON.parse(onboardingData);
             setUserOnboarding(userData);
-
+            setUserLocation(userData.location);
             if (userData.location?.latitude && userData.location?.longitude) {
               loadNearbySalons(
                 userData.location.latitude,
@@ -32282,6 +32548,7 @@ export default function Home() {
                 </motion.div>
               </motion.div>
             </div>
+            {/* Login/Onboard Banner */}
 
             <div className={styles.heroRight}>
               <motion.div
@@ -32486,6 +32753,7 @@ export default function Home() {
       </motion.section>
       ; */}
         {/* Salons Section with Booking Type Tabs */}
+        {/* Salons Section with Booking Type Tabs */}
         <motion.section
           className={styles.salonsSection}
           initial={{ opacity: 0, y: 50 }}
@@ -32499,79 +32767,131 @@ export default function Home() {
                 Handpicked luxury experiences in your area
               </p>
             </div>
-
-            {/* NEW: Booking Type Tabs */}
-            <div className={styles.bookingTypeTabs}>
-              <button
-                className={`${styles.bookingTypeTab} ${
-                  !isPrebook ? styles.activeTab : ""
-                }`}
-                onClick={() => setIsPrebook(false)}
-              >
-                <span className={styles.tabIcon}>⚡</span>
-                <span className={styles.tabLabel}>Walk-in</span>
-                <span className={styles.tabBadge}>Instant</span>
-              </button>
-
-              <button
-                className={`${styles.bookingTypeTab} ${
-                  isPrebook ? styles.activeTab : ""
-                }`}
-                onClick={() => setIsPrebook(true)}
-              >
-                <span className={styles.tabIcon}>📅</span>
-                <span className={styles.tabLabel}>Pre-book</span>
-                <span className={styles.tabBadge}>Advance</span>
-              </button>
-            </div>
-
-            {/* View toggle (only show for pre-book) */}
-            {isPrebook && (
-              <div className={styles.viewOptions}>
-                <motion.button
-                  className={`${styles.viewToggle} ${
-                    !showMapView ? styles.active : ""
-                  }`}
-                  onClick={() => setShowMapView(false)}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <span className={styles.viewIcon}>⊞</span>
-                  Grid View
-                </motion.button>
-
-                <motion.button
-                  className={`${styles.viewToggle} ${
-                    showMapView ? styles.active : ""
-                  }`}
-                  onClick={() => setShowMapView(true)}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <span className={styles.viewIcon}>🗺</span>
-                  Map View
-                </motion.button>
-              </div>
-            )}
           </div>
 
-          {/* Conditional Rendering based on Tab */}
-          {!isPrebook ? (
-            // WALK-IN MODE
-            <div className={styles.walkInContainer}>
-              <div className={styles.walkInInfo}>
-                <span className={styles.walkInIcon}>⚡</span>
-                <p>
-                  Select a salon below to see real-time chair availability and
-                  queue status
+          {/* ✅ BANNER ABOVE TABS - Show when NO location */}
+          {!userLocation && (
+            <div className={styles.fallbackBanner}>
+              <div className={styles.bannerContent}>
+                <div className={styles.bannerIcon}>📍</div>
+                <h3 className={styles.bannerTitle}>
+                  Want to see nearby salons?
+                </h3>
+                <p className={styles.bannerText}>
+                  Please login or complete onboarding to view salons near you
                 </p>
+                <div className={styles.bannerActions}>
+                  <button
+                    onClick={() => router.push("/auth/user/login")}
+                    className={styles.bannerBtnPrimary}
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => router.push("/onboarding")}
+                    className={styles.bannerBtnSecondary}
+                  >
+                    Complete Onboarding
+                  </button>
+                </div>
               </div>
+            </div>
+          )}
 
-              <div className={styles.salonsGrid}>
-                {(filteredSalons.length > 0
-                  ? filteredSalons
-                  : nearbySalons
-                ).map((salon, index) => (
+          {/* Booking Mode Tabs */}
+          <div className={styles.bookingModeToggle}>
+            <button
+              className={`${styles.modeButton} ${
+                !isPrebook ? styles.activeModeButton : ""
+              }`}
+              onClick={() => setIsPrebook(false)}
+            >
+              ⚡ Walk-in <span className={styles.modeBadge}>INSTANT</span>
+            </button>
+            <button
+              className={`${styles.modeButton} ${
+                isPrebook ? styles.activeModeButton : ""
+              }`}
+              onClick={() => setIsPrebook(true)}
+            >
+              📅 Pre-book <span className={styles.modeBadge}>ADVANCE</span>
+            </button>
+          </div>
+
+          {/* Walk-in Instruction - ONLY show on Walk-in tab
+          {!isPrebook && (
+            <div className={styles.walkInInstruction}>
+              <span className={styles.instructionIcon}>⚡</span>
+              <p className={styles.instructionText}>
+                Select a salon below to see real-time chair availability and
+                queue status
+              </p>
+            </div>
+          )} */}
+
+          {/* View toggle (only show for pre-book with location) */}
+          {nearbySalons.length > 0 && (
+            <div className={styles.viewOptions}>
+              <motion.button
+                className={`${styles.viewToggle} ${
+                  !showMapView ? styles.active : ""
+                }`}
+                onClick={() => setShowMapView(false)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <span className={styles.viewIcon}>⊞</span>
+                Grid View
+              </motion.button>
+
+              <motion.button
+                className={`${styles.viewToggle} ${
+                  showMapView ? styles.active : ""
+                }`}
+                onClick={() => setShowMapView(true)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <span className={styles.viewIcon}>🗺</span>
+                Map View
+              </motion.button>
+            </div>
+          )}
+
+          {/* Salons Display */}
+          {isLoadingSalons ? (
+            <div className={styles.loadingSalons}>
+              <div className={styles.luxurySpinner}>
+                <div className={styles.spinnerRing}></div>
+                <div className={styles.spinnerCore}></div>
+              </div>
+              <p>Discovering premium salons near you...</p>
+            </div>
+          ) : nearbySalons.length === 0 ? (
+            <div className={styles.noSalons}>
+              <p>
+                Select a salon below to see real-time chair availability and
+                queue status
+              </p>{" "}
+            </div>
+          ) : showMapView ? (
+            <div className={styles.mapContainer}>
+              <SalonMap
+                salons={nearbySalons}
+                userLocation={{
+                  lat: userOnboarding?.location?.latitude,
+                  lng: userOnboarding?.location?.longitude,
+                }}
+                selectedSalon={selectedSalon}
+                onSalonSelect={setSelectedSalon}
+                onBookNow={handleSalonCardClick}
+                userGender={userOnboarding?.gender}
+              />
+            </div>
+          ) : (
+            <div className={styles.salonsGrid}>
+              {(filteredSalons.length > 0 ? filteredSalons : nearbySalons).map(
+                (salon, index) => (
                   <motion.div
                     key={salon._id?.oid || salon._id?.toString() || index}
                     className={styles.salonCard}
@@ -32581,13 +32901,11 @@ export default function Home() {
                     whileHover={{ y: -12, scale: 1.02 }}
                     onClick={() => {
                       const salonId = salon._id?.oid || salon._id;
-                      if (isPrebook) {
-                        // Pre-book mode
-                        router.push(`/salons/${salonId}?mode=prebook`);
-                      } else {
-                        // Walk-in mode - SAME PAGE, just different mode
-                        router.push(`/salons/${salonId}?mode=walkin`);
-                      }
+                      router.push(
+                        `/salons/${salonId}?mode=${
+                          isPrebook ? "prebook" : "walkin"
+                        }`
+                      );
                     }}
                   >
                     {/* Salon Image */}
@@ -32604,13 +32922,32 @@ export default function Home() {
                       />
                       <div className={styles.salonImageOverlay}></div>
 
-                      {/* Walk-in Badge */}
+                      {/* Badges */}
                       <div className={styles.salonBadges}>
-                        <span
-                          className={`${styles.salonBadge} ${styles.walkInBadge}`}
-                        >
-                          ⚡ Walk-in Ready
-                        </span>
+                        {!isPrebook ? (
+                          <span
+                            className={`${styles.salonBadge} ${styles.walkInBadge}`}
+                          >
+                            ⚡ Walk-in Ready
+                          </span>
+                        ) : (
+                          <>
+                            <span
+                              className={`${styles.salonBadge} ${styles.primaryBadge}`}
+                            >
+                              {salon.distance < 2
+                                ? "Very Close"
+                                : salon.isVerified
+                                ? "Verified"
+                                : "Popular"}
+                            </span>
+                            <span
+                              className={`${styles.salonBadge} ${styles.distanceBadge}`}
+                            >
+                              {salon.distance}km away
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -32634,7 +32971,9 @@ export default function Home() {
                         <div className={styles.metric}>
                           <span className={styles.metricIcon}>📍</span>
                           <span className={styles.metricValue}>
-                            {salon.distance} km away
+                            {!isPrebook
+                              ? `${salon.distance || 0} km away`
+                              : `${salon.stats?.totalBookings || 0} bookings`}
                           </span>
                         </div>
                         <div className={styles.metric}>
@@ -32643,134 +32982,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Walk-in CTA */}
-                      <motion.button
-                        className={styles.walkInButton}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        View Live Availability
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            // PRE-BOOK MODE (EXISTING INTERFACE)
-            <>
-              {isLoadingSalons ? (
-                <div className={styles.loadingSalons}>
-                  <div className={styles.luxurySpinner}>
-                    <div className={styles.spinnerRing}></div>
-                    <div className={styles.spinnerCore}></div>
-                  </div>
-                  <p>Discovering premium salons near you...</p>
-                </div>
-              ) : nearbySalons.length === 0 ? (
-                <div className={styles.noSalons}>
-                  <p>No salons found in your area</p>
-                </div>
-              ) : showMapView ? (
-                <div className={styles.mapContainer}>
-                  <SalonMap
-                    salons={nearbySalons}
-                    userLocation={{
-                      lat: userOnboarding?.location?.latitude,
-                      lng: userOnboarding?.location?.longitude,
-                    }}
-                    selectedSalon={selectedSalon}
-                    onSalonSelect={setSelectedSalon}
-                    onBookNow={handleSalonCardClick}
-                    userGender={userOnboarding?.gender}
-                  />
-                </div>
-              ) : (
-                <div className={styles.salonsGrid}>
-                  {(filteredSalons.length > 0
-                    ? filteredSalons
-                    : nearbySalons
-                  ).map((salon, index) => (
-                    <motion.div
-                      key={salon._id?.oid || salon._id?.toString() || index}
-                      className={styles.salonCard}
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: 0.1 * index }}
-                      whileHover={{ y: -12, scale: 1.02 }}
-                      onClick={() => {
-                        const salonId = salon._id?.oid || salon._id;
-                        if (isPrebook) {
-                          // Pre-book mode: use existing flow
-                          handleSalonCardClick(salonId);
-                        } else {
-                          // Walk-in mode: add mode parameter
-                          router.push(`/salons/${salonId}?mode=walkin`);
-                        }
-                      }}
-                    >
-                      {/* EXISTING PREBOOK SALON CARD CODE - KEEP AS IS */}
-                      <div className={styles.salonImageContainer}>
-                        <img
-                          src={
-                            typeof salon.salonImages?.[0] === "string"
-                              ? salon.salonImages[0]
-                              : salon.salonImages?.[0]?.url ||
-                                "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&h=200&fit=crop"
-                          }
-                          alt={`${salon.salonName} Salon`}
-                          className={styles.salonImage}
-                        />
-                        <div className={styles.salonImageOverlay}></div>
-
-                        <div className={styles.salonBadges}>
-                          <span
-                            className={`${styles.salonBadge} ${styles.primaryBadge}`}
-                          >
-                            {salon.distance < 2
-                              ? "Very Close"
-                              : salon.isVerified
-                              ? "Verified"
-                              : "Popular"}
-                          </span>
-                          <span
-                            className={`${styles.salonBadge} ${styles.distanceBadge}`}
-                          >
-                            {salon.distance}km away
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className={styles.salonInfo}>
-                        <div className={styles.salonHeader}>
-                          <h4 className={styles.salonName}>
-                            {salon.salonName}
-                          </h4>
-                          <div className={styles.salonRating}>
-                            <span className={styles.ratingStars}>⭐</span>
-                            <span className={styles.ratingNumber}>
-                              {salon.ratings?.overall ?? salon.rating ?? 4.5}
-                            </span>
-                          </div>
-                        </div>
-
-                        <p className={styles.salonLocation}>
-                          {salon.location?.address}
-                        </p>
-
-                        <div className={styles.salonMetrics}>
-                          <div className={styles.metric}>
-                            <span className={styles.metricIcon}>📍</span>
-                            <span className={styles.metricValue}>
-                              {salon.stats?.totalBookings || 0} bookings
-                            </span>
-                          </div>
-                          <div className={styles.metric}>
-                            <span className={styles.metricIcon}>🕐</span>
-                            <span className={styles.metricValue}>Open Now</span>
-                          </div>
-                        </div>
-
+                      {isPrebook && (
                         <div className={styles.salonServices}>
                           {salon.topServices
                             ?.slice(0, 3)
@@ -32780,23 +32992,26 @@ export default function Home() {
                               </span>
                             ))}
                         </div>
+                      )}
 
-                        <motion.button
-                          className={styles.bookButton}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          Book Now
-                        </motion.button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
+                      <motion.button
+                        className={
+                          !isPrebook ? styles.walkInButton : styles.bookButton
+                        }
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {!isPrebook ? "View Live Availability" : "Book Now"}
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                )
               )}
-            </>
+            </div>
           )}
         </motion.section>
-        ;{/* Testimonials Section */}
+
+        {/* Testimonials Section */}
         <motion.section
           className={styles.testimonialsSection}
           initial={{ opacity: 0, y: 50 }}

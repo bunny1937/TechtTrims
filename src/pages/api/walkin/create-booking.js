@@ -11,8 +11,11 @@ export default async function handler(req, res) {
       salonId,
       barberId,
       service,
+      price,
       customerName,
       customerPhone,
+      customerEmail,
+      userId,
       estimatedDuration,
     } = req.body;
 
@@ -76,11 +79,14 @@ export default async function handler(req, res) {
       barberId: new ObjectId(barberId),
       customerName,
       customerPhone: customerPhone || "",
+      customerEmail: customerEmail || "",
+      userId: userId || null,
       service,
+      price: Number(price),
       bookingCode,
       queueStatus: "RED",
-      status: "confirmed", // ✅ ADD THIS
-      estimatedDuration: estimatedDuration || 5,
+      status: "confirmed",
+      estimatedDuration: estimatedDuration || 30,
       expiresAt,
       isExpired: false,
       bookingType: "WALKIN",

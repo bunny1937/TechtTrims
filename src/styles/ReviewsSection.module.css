@@ -364,18 +364,14 @@
 }
 
 @media (max-width: 968px) {
-  .statsHeader {
-    flex-direction: column;
-  }
-
   .breakdownRow {
     grid-template-columns: 90px 1fr 45px 55px;
   }
 }
 
 @media (max-width: 640px) {
-  .reviewsGrid {
-    grid-template-columns: 1fr;
+  .reviewsContainer {
+    flex-direction: column;
   }
 
   .breakdownRow {

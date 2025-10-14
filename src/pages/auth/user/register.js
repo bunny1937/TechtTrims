@@ -28,23 +28,31 @@ export default function UserRegisterPage() {
     if (savedPrefillData) {
       try {
         const data = JSON.parse(savedPrefillData);
+        console.log("Parsed prefill data:", data); // Debug log
+
         prefillInfo = {
-          name: data.name || "",
-          phone: data.phone || "",
-          phoneNumber: data.phoneNumber || data.phone || "",
-          gender: data.gender || "",
-          age: data.age || null,
-          lastBooking: data.lastBookings || {},
+          name: data.name || data.customerName,
+          phone: data.phone || data.phoneNumber || data.customerPhone,
+          phoneNumber: data.phoneNumber || data.phone || data.customerPhone,
+          gender: data.gender || data.customerGender,
+          age: data.age || data.customerAge || null,
+          lastBooking: data.lastBookings,
           source: "feedback",
         };
         setPrefillData(prefillInfo);
         setFormData((prev) => ({
           ...prev,
-          name: data.name || prev.name,
-          phone: data.phoneNumber || data.phone || prev.phone,
-          age: data.age || prev.age,
-          gender: data.gender || prev.gender,
+          name: prefillInfo.name || prev.name,
+          phone: prefillInfo.phoneNumber || prev.phone,
+          age: prefillInfo.age || prev.age,
+          gender: prefillInfo.gender || prev.gender,
         }));
+
+        console.log("Form data after prefill:", {
+          name: prefillInfo.name,
+          phone: prefillInfo.phoneNumber,
+          gender: prefillInfo.gender,
+        });
       } catch (error) {
         console.error("Error parsing prefill data:", error);
       }

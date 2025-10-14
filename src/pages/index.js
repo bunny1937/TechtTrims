@@ -22,6 +22,7 @@ export default function Home() {
   const [filteredSalons, setFilteredSalons] = useState([]);
   const [isPrebook, setIsPrebook] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // Dynamic import for map component
   const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
@@ -180,12 +181,91 @@ export default function Home() {
   //   }
   // };
 
-  const navigateToAuth = (type, role) => {
-    router.push(`/auth/${role}/${type}`);
+  // Function to get salon status based on opening hours and current time
+  const getSalonStatus = (salon) => {
+    if (!salon.operatingHours && !salon.openingHours) return "Open Now";
+
+    const now = new Date();
+    const currentDay = now
+      .toLocaleDateString("en-US", { weekday: "long" })
+      .toLowerCase();
+
+    const currentTime = now.getHours() * 100 + now.getMinutes(); // e.g., 1430 for 14:30
+
+    const hours = salon.operatingHours?.[currentDay] || salon.openingHours;
+
+    if (!hours || hours.closed) {
+      // Find next opening day
+      const daysOrder = [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ];
+      const currentDayIndex = daysOrder.indexOf(currentDay);
+
+      for (let i = 1; i <= 7; i++) {
+        const nextDay = daysOrder[(currentDayIndex + i) % 7];
+        const nextDayHours =
+          salon.operatingHours?.[nextDay] || salon.openingHours;
+        if (nextDayHours && !nextDayHours.closed) {
+          return i === 1
+            ? `Opens Tomorrow at ${formatTime(nextDayHours.open)}`
+            : `Closed`;
+        }
+      }
+      return "Closed";
+    }
+
+    const openTime = parseInt(hours.open?.replace(":", "") || "0900");
+    const closeTime = parseInt(hours.close?.replace(":", "") || "2100");
+
+    if (currentTime < openTime) {
+      const hoursUntil = Math.floor((openTime - currentTime) / 100);
+      const minsUntil = (openTime - currentTime) % 100;
+      if (hoursUntil < 1) {
+        return `Opens in ${minsUntil}mins`;
+      }
+      return `Opens at ${formatTime(hours.open)}`;
+    }
+
+    if (currentTime >= closeTime) {
+      return "Closed";
+    }
+
+    // Calculate time until closing
+    const timeUntilClose = closeTime - currentTime;
+    const hoursLeft = Math.floor(timeUntilClose / 100);
+    const minsLeft = timeUntilClose % 100;
+
+    if (hoursLeft < 2) {
+      if (hoursLeft === 0 && minsLeft <= 20) {
+        return `Closes in ${minsLeft}mins`;
+      }
+      if (hoursLeft === 1) {
+        return `Closes in 1hr ${minsLeft}mins`;
+      }
+      return `Closes in ${hoursLeft}hrs`;
+    }
+
+    return "Open Now";
   };
 
-  const handleSalonCardClick = (salonId) => {
-    router.push({ pathname: "/salons/[id]", query: { id: salonId } });
+  const formatTime = (time) => {
+    if (!time) return "";
+    const hours = parseInt(time.substring(0, 2));
+    const mins = time.substring(2, 4) || time.substring(3, 5);
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+    return `${displayHours}:${mins} ${ampm}`;
+  };
+
+  const handleSalonCardClick = (salonId, mode) => {
+    setIsNavigating(true);
+    router.push(`/salons/${salonId}?mode=${mode}`);
   };
 
   if (isLoading) {
@@ -202,6 +282,25 @@ export default function Home() {
           className={styles.loadingText}
         >
           Crafting your luxury experience...
+        </motion.p>
+      </div>
+    );
+  }
+
+  if (isNavigating) {
+    return (
+      <div className={styles.loadingContainer}>
+        <div className={styles.luxurySpinner}>
+          <div className={styles.spinnerRing}></div>
+          <div className={styles.spinnerCore}></div>
+        </div>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className={styles.loadingText}
+        >
+          Loading salon details...
         </motion.p>
       </div>
     );
@@ -272,17 +371,19 @@ export default function Home() {
                   transition={{ duration: 1, delay: 0.6 }}
                 >
                   <div className={styles.heroStat}>
-                    <div className={styles.statIcon}>🏪</div>
-                    <div className={styles.statContent}>
+                    <div className={styles.statIcon}>
+                      🏪{" "}
                       <span className={styles.statNumber}>
                         {nearbySalons.length}
                       </span>
+                    </div>
+                    <div className={styles.statContent}>
                       <span className={styles.statLabel}>Premium Salons</span>
                     </div>
                   </div>
                   <div className={styles.heroStat}>
-                    <div className={styles.statIcon}>💆</div>
-                    <div className={styles.statContent}>
+                    <div className={styles.statIcon}>
+                      💆{" "}
                       <span className={styles.statNumber}>
                         {nearbySalons.reduce(
                           (total, salon) =>
@@ -290,12 +391,14 @@ export default function Home() {
                           0
                         )}
                       </span>
+                    </div>
+                    <div className={styles.statContent}>
                       <span className={styles.statLabel}>Expert Services</span>
                     </div>
                   </div>
                   <div className={styles.heroStat}>
-                    <div className={styles.statIcon}>⭐</div>
-                    <div className={styles.statContent}>
+                    <div className={styles.statIcon}>
+                      ⭐
                       <span className={styles.statNumber}>
                         {nearbySalons.reduce(
                           (total, salon) =>
@@ -303,12 +406,14 @@ export default function Home() {
                           0
                         )}
                       </span>
+                    </div>
+                    <div className={styles.statContent}>
                       <span className={styles.statLabel}>Happy Clients</span>
                     </div>
                   </div>
                 </motion.div>
 
-                <motion.div
+                {/* <motion.div
                   className={styles.heroActions}
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -322,7 +427,7 @@ export default function Home() {
                     <span className={styles.ctaIcon}>📅</span>
                     Book Appointment
                   </button>
-                </motion.div>
+                </motion.div> */}
               </motion.div>
             </div>
             {/* Login/Onboard Banner */}
@@ -409,7 +514,6 @@ export default function Home() {
               transition={{ type: "spring", stiffness: 300 }}
             >
               <div className={styles.searchInputWrapper}>
-                <span className={styles.searchIcon}>🔍</span>
                 <input
                   type="text"
                   placeholder="Search for services, salons, or treatments..."
@@ -417,13 +521,14 @@ export default function Home() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <motion.button
+                <span className={styles.searchIcon}>🔍</span>
+                {/* <motion.button
                   className={styles.searchButton}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
                 >
                   Search
-                </motion.button>
+                </motion.button> */}
               </div>
             </motion.div>
 
@@ -678,10 +783,9 @@ export default function Home() {
                     whileHover={{ y: -12, scale: 1.02 }}
                     onClick={() => {
                       const salonId = salon._id?.oid || salon._id;
-                      router.push(
-                        `/salons/${salonId}?mode=${
-                          isPrebook ? "prebook" : "walkin"
-                        }`
+                      handleSalonCardClick(
+                        salonId,
+                        isPrebook ? "prebook" : "walkin"
                       );
                     }}
                   >
@@ -748,15 +852,29 @@ export default function Home() {
                         <div className={styles.metric}>
                           <span className={styles.metricIcon}>📍</span>
                           <span className={styles.metricValue}>
-                            {!isPrebook
-                              ? `${salon.distance || 0} km away`
-                              : `${salon.stats?.totalBookings || 0} bookings`}
+                            {salon.distance || 0} km away
                           </span>
                         </div>
                         <div className={styles.metric}>
                           <span className={styles.metricIcon}>🕐</span>
-                          <span className={styles.metricValue}>Open Now</span>
+                          <span className={styles.metricValue}>
+                            {getSalonStatus(salon)}
+                          </span>
                         </div>
+                        <div className={styles.metric}>
+                          <span className={styles.metricIcon}>⭐</span>
+                          <span className={styles.metricValue}>
+                            {salon.ratings?.totalReviews || 0} reviews
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className={styles.salonServices}>
+                        {salon.topServices?.slice(0, 3).map((service, idx) => (
+                          <span key={idx} className={styles.serviceTag}>
+                            {service.name}
+                          </span>
+                        ))}
                       </div>
 
                       {isPrebook && (

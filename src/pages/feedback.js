@@ -17,6 +17,21 @@ export default function FeedbackPage() {
   });
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [userOnboardingData, setUserOnboardingData] = useState(null);
+
+  useEffect(() => {
+    // Get user onboarding data from localStorage
+    if (typeof window !== "undefined") {
+      const onboardingData = localStorage.getItem("userOnboardingData");
+      if (onboardingData) {
+        try {
+          setUserOnboardingData(JSON.parse(onboardingData));
+        } catch (e) {
+          console.error("Error parsing onboarding data:", e);
+        }
+      }
+    }
+  }, []);
 
   const fetchBookingDetails = useCallback(async () => {
     try {
@@ -120,8 +135,20 @@ export default function FeedbackPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookingId,
-          feedback: { ratings, comment },
-          submittedAt: new Date(),
+          feedback: {
+            ratings,
+            comment,
+            submittedAt: new Date(),
+            serviceDate:
+              bookings.serviceStartedAt ||
+              bookings.completedAt ||
+              bookings.createdAt ||
+              new Date(),
+            customerPhone:
+              bookings.customerPhone || userOnboardingData?.phoneNumber,
+            price: bookings.price, // ✅ Store price in feedback
+            barberName: bookings.barberName,
+          },
         }),
       });
 
@@ -142,8 +169,17 @@ export default function FeedbackPage() {
           if (bookings) {
             const prefillData = {
               name: bookings.customerName,
-              phone: bookings.customerPhone,
-              gender: bookings.customerGender,
+              customerName: bookings.customerName, // Add both formats
+              phone: bookings.customerPhone || userOnboardingData?.phoneNumber,
+              phoneNumber:
+                bookings.customerPhone || userOnboardingData?.phoneNumber, // Add both formats
+              customerPhone:
+                bookings.customerPhone || userOnboardingData?.phoneNumber,
+              gender: bookings.customerGender || userOnboardingData?.gender,
+              customerGender:
+                bookings.customerGender || userOnboardingData?.gender, // Add both formats
+              age: bookings.customerAge || userOnboardingData?.age,
+              customerAge: bookings.customerAge || userOnboardingData?.age,
               lastbookings: {
                 salonId: bookings.salonId,
                 service: bookings.service,
@@ -152,6 +188,8 @@ export default function FeedbackPage() {
               },
               timestamp: new Date().getTime(),
             };
+            console.log("Storing complete prefill data:", prefillData); // Debug log
+
             console.log("Storing prefill data:", prefillData);
             localStorage.setItem(
               "userPrefillData",
@@ -195,28 +233,62 @@ export default function FeedbackPage() {
 
           {/* Booking Summary */}
           <div className={styles.bookingSummary}>
-            <h3 className={styles.summaryTitle}>Booking Summary</h3>
+            <h3 className={styles.summaryTitle}>📋 Booking Summary</h3>
             <p className={styles.summaryInfo}>
               <strong>Customer:</strong> {bookings.customerName}
               {bookings.customerAge && ` (${bookings.customerAge} years)`}
             </p>
             <p className={styles.summaryInfo}>
-              <strong>Phone:</strong> {bookings.customerPhone}
+              <strong>Phone:</strong>{" "}
+              {bookings.customerPhone ||
+                userOnboardingData?.phoneNumber ||
+                "Not provided"}
             </p>
             <p className={styles.summaryInfo}>
               <strong>Service:</strong> {bookings.service}
             </p>
-            {bookings.barber && (
+            {bookings.barberName && (
               <p className={styles.summaryInfo}>
-                <strong>Barber:</strong> {bookings.barber}
+                <strong>Barber:</strong> {bookings.barberName}
               </p>
             )}
             <p className={styles.summaryInfo}>
-              <strong>Date:</strong> {bookings.date} at {bookings.time}
+              <strong>Date:</strong>{" "}
+              {bookings.serviceStartedAt
+                ? new Date(bookings.serviceStartedAt).toLocaleDateString(
+                    "en-IN",
+                    {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    }
+                  ) +
+                  " at " +
+                  new Date(bookings.serviceStartedAt).toLocaleTimeString(
+                    "en-IN",
+                    {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }
+                  )
+                : bookings.completedAt
+                ? new Date(bookings.completedAt).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : bookings.date && bookings.time
+                ? `${bookings.date} at ${bookings.time}`
+                : "Today"}
             </p>
             <p className={styles.summaryInfo}>
-              <strong>Amount:</strong> ₹{bookings.price}
+              <strong>Amount:</strong> ₹{bookings.price || "Paid at salon"}
             </p>
+            {bookings.estimatedDuration && (
+              <p className={styles.summaryInfo}>
+                <strong>Duration:</strong> {bookings.estimatedDuration} mins
+              </p>
+            )}
           </div>
 
           {/* Rating Form */}
