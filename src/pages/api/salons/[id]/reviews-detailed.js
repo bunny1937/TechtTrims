@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
     // Format reviews
     const formattedReviews = reviews.map((booking) => ({
-      _id: booking._id,
+      id: booking._id,
       customerName: booking.customerName,
       rating: booking.feedback.ratings.overall,
       ratings: {
@@ -51,7 +51,12 @@ export default async function handler(req, res) {
       },
       comment: booking.feedback.comment || "",
       service: booking.service,
-      serviceDate: booking.date,
+      serviceDate:
+        booking.feedback.serviceDate ||
+        booking.serviceStartedAt ||
+        booking.completedAt ||
+        booking.date ||
+        booking.createdAt, // ✅ FIX THIS
       submittedAt: booking.feedback.submittedAt,
     }));
 

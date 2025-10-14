@@ -7,8 +7,8 @@ export default function ReviewsSection({ salonId }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState("relevant"); // 'relevant' or 'recent'
-  const [displayCount, setDisplayCount] = useState(9); // Show 6 reviews initially
-  const REVIEWS_PER_PAGE = 9;
+  const [displayCount, setDisplayCount] = useState(4); // Show 6 reviews initially
+  const REVIEWS_PER_PAGE = 4;
 
   useEffect(() => {
     const fetchReviews = async () => {

@@ -3,36 +3,40 @@ import { ObjectId } from "mongodb";
 export async function calculateWaitTime(db, barberId) {
   try {
     // Get barber's current service time left
-    const barber = await db.collection("barbers").findOne({
-      _id: new ObjectId(barberId),
-    });
-
+    const barber = await db
+      .collection("barbers")
+      .findOne({ _id: new ObjectId(barberId) });
     if (!barber) return 0;
 
     let timeLeft = 0;
 
-    // If barber is currently serving someone
-    if (
-      barber.currentBookingId &&
-      barber.currentServiceStartTime &&
-      barber.currentServiceEndTime
-    ) {
+    // If barber is currently serving someone (GREEN status)
+    if (barber.currentServiceEndTime) {
       const now = new Date();
       const endTime = new Date(barber.currentServiceEndTime);
       timeLeft = Math.max(0, Math.ceil((endTime - now) / 1000 / 60)); // minutes
     }
 
-    // Get queue count
-    const queueCount = await db.collection("walkinbookings").countDocuments({
-      barberId: new ObjectId(barberId),
-      queueStatus: "ORANGE",
-      isExpired: false,
-    });
+    // Get all ORANGE (waiting) bookings with their estimated durations
+    const waitingBookings = await db
+      .collection("bookings")
+      .find({
+        barberId: new ObjectId(barberId),
+        queueStatus: "ORANGE",
+        isExpired: false,
+      })
+      .toArray();
 
-    // Estimated wait = time left + (queue * 45 mins average)
-    const estimatedWait = timeLeft + queueCount * 45;
+    // Calculate total wait time from ORANGE bookings
+    const orangeWaitTime = waitingBookings.reduce((total, booking) => {
+      return total + (booking.estimatedDuration || 30);
+    }, 0);
 
-    return estimatedWait;
+    // Total wait time = current service time left + all waiting bookings time
+    const totalWait = timeLeft + orangeWaitTime;
+
+    // CRITICAL FIX: Return timeLeft if no orange bookings, otherwise return total
+    return totalWait > 0 ? totalWait : 0;
   } catch (error) {
     console.error("Calculate wait time error:", error);
     return 0;
@@ -55,7 +59,7 @@ export async function updateBarberStatus(db, barberId) {
       if (now >= endTime) {
         // Service should be done, auto-complete it
         if (barber.currentBookingId) {
-          await db.collection("walkinbookings").updateOne(
+          await db.collection("bookings").updateOne(
             { _id: barber.currentBookingId },
             {
               $set: {

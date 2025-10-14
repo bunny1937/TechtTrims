@@ -6,7 +6,686 @@
   color: var(--text-primary);
   padding-bottom: var(--space-24);
 }
+.barberSkeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 16px;
+  height: 280px;
+}
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
 
+/* Booking Progress Bar */
+.bookingProgressBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 48px auto 32px;
+  max-width: 600px;
+  padding: 0 20px;
+}
+.bookingCardWrapper {
+  perspective: 3000px;
+  perspective-origin: 50% 50%;
+  position: relative;
+  overflow: visible !important;
+}
+
+.progressStep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.stepNumber {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  transition: all 0.4s ease;
+  border: 3px solid transparent;
+}
+
+.progressStep.active .stepNumber {
+  background: linear-gradient(135deg, #d4af37, #b8941e);
+  color: white;
+  border-color: white;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  transform: scale(1.1);
+}
+
+.stepLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: #999;
+  transition: all 0.3s ease;
+}
+
+.progressStep.active .stepLabel {
+  color: #667eea;
+}
+
+.progressLine {
+  flex: 1;
+  height: 3px;
+  background: #e0e0e0;
+  margin: 0 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.progressLine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(135deg, #d4af37, #b8941e);
+  animation: fillLine 0.6s ease forwards;
+}
+
+@keyframes fillLine {
+  to {
+    width: 100%;
+  }
+}
+
+/* Booking Stepper */
+.bookingStepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 40px;
+  padding: 0 20px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.5;
+  transition: all 0.3s ease;
+}
+
+.step.active {
+  opacity: 1;
+}
+
+.step.completed .stepNumber {
+  background: #d4af37;
+  color: #000;
+}
+
+.stepNumber {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  transition: all 0.3s ease;
+}
+
+.step.active .stepNumber {
+  background: #d4af37;
+  color: #000;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+}
+
+.stepLine {
+  width: 80px;
+  height: 2px;
+  background: #e0e0e0;
+  margin: 0 10px;
+}
+
+.bookingCard {
+  perspective: 2500px;
+  perspective-origin: 50% 50%;
+  min-height: 600px;
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  position: relative;
+  overflow: visible !important;
+}
+
+.stepContent {
+  background: #f9f9f9;
+  border-radius: 20px;
+  padding: 40px;
+  transform-style: preserve-3d;
+}
+
+.navigationButtons {
+  display: flex;
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.prevButton,
+.nextButton {
+  flex: 1;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.prevButton {
+  background: transparent;
+  border: 2px solid #ccc;
+  color: #333;
+}
+
+.nextButton {
+  background: linear-gradient(135deg, #d4af37, #b8941e);
+  border: none;
+  color: #000;
+}
+
+.nextButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.barberStats {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+}
+
+.stat {
+  font-weight: 600;
+}
+
+/* Stepped Booking Card */
+.bookingCard {
+  background: white;
+  border-radius: 24px;
+  padding: 40px;
+  margin: 32px auto;
+  max-width: 1200px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+  min-height: 500px;
+  position: relative;
+  overflow: hidden;
+}
+
+.bookingCard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(135deg, #d4af37, #b8941e);
+}
+
+.cardContent {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  position: relative;
+  width: 100%;
+  transform-origin: left center; /* pivot from left edge like a book spine */
+  /* Removed slideIn animation to avoid conflict */
+}
+
+.cardTitle {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 32px;
+  text-align: center;
+  background: linear-gradient(135deg, #d4af37, #b8941e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card Actions */
+.cardActions {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding-top: 32px;
+  border-top: 2px solid #f0f0f0;
+}
+
+.prevButton,
+.nextButton {
+  flex: 1;
+  padding: 16px 32px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.prevButton {
+  background: #f7fafc;
+  color: #4a5568;
+  border: 2px solid #e2e8f0;
+}
+
+.prevButton:hover {
+  background: #edf2f7;
+  transform: translateX(-4px);
+}
+
+.nextButton {
+  background: linear-gradient(135deg, #d4af37, #b8941e);
+  color: white;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.nextButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(102, 126, 234, 0.4);
+}
+
+.nextButton:disabled,
+.prevButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Real-time Status Compact (Inside Card) */
+.realTimeStatusCompact {
+  background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
+  border-radius: 16px;
+  padding: 24px;
+  margin-top: 32px;
+}
+
+.realTimeStatusCompact .statusTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.realTimeStatusCompact .statusGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.realTimeStatusCompact .statusCard {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.realTimeStatusCompact .statusValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #d4af37;
+  margin-bottom: 4px;
+}
+
+.realTimeStatusCompact .statusLabel {
+  font-size: 12px;
+  color: #718096;
+  font-weight: 600;
+}
+
+/* Services Grid in Card */
+.cardContent .servicesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.cardContent .serviceCard {
+  background: linear-gradient(135deg, #f6f8fb 0%, #ffffff 100%);
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.cardContent .serviceCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(102, 126, 234, 0.15);
+  border-color: #b8941e;
+}
+
+.cardContent .serviceCard.selected {
+  background: linear-gradient(135deg, #d4af37, #b8941e);
+  border-color: #b8941e;
+  color: white;
+  box-shadow: 0 12px 28px rgba(102, 126, 234, 0.4);
+}
+
+.cardContent .serviceCard.selected .serviceName,
+.cardContent .serviceCard.selected .servicePrice,
+.cardContent .serviceCard.selected .serviceDuration {
+  color: white;
+}
+
+.serviceName {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 8px;
+}
+
+.servicePrice {
+  font-size: 24px;
+  font-weight: 800;
+  color: #b8941e;
+  margin-bottom: 4px;
+}
+
+.serviceDuration {
+  font-size: 14px;
+  color: #718096;
+  font-weight: 500;
+}
+
+/* Barbers Grid in Card */
+.cardContent .barbersGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.cardContent .barberCard {
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.cardContent .barberCard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(135deg, #d4af37, #b8941e);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.cardContent .barberCard:hover::before,
+.cardContent .barberCard.selected::before {
+  transform: scaleX(1);
+}
+
+.cardContent .barberCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(102, 126, 234, 0.15);
+  border-color: #b8941e;
+}
+
+.cardContent .barberCard.selected {
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.1) 0%,
+    rgba(118, 75, 162, 0.1) 100%
+  );
+  border-color: #d4af37;
+  box-shadow: 0 12px 28px rgba(102, 126, 234, 0.2);
+}
+
+.barberPhoto {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.cardContent .barberCard.selected .barberPhoto {
+  border-color: #d4af37;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.barberImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.barberName {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 4px;
+}
+
+.barberExperience {
+  font-size: 14px;
+  color: #718096;
+  margin-bottom: 8px;
+}
+
+.barberRating {
+  font-size: 14px;
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+/* Walk-in Status Badge on Barber Card */
+.walkInStatusBadge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.availableNow {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.occupiedNow {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.queueBadge {
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+/* Date Time Picker in Card */
+.cardContent .dateTimePicker {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.dateInput {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 24px;
+  transition: all 0.3s ease;
+}
+
+.dateInput:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.timeSlotsWrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.timeSlot {
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  background: white;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.timeSlot:hover:not(.disabled) {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.05);
+  transform: translateY(-2px);
+}
+
+.timeSlot.selected {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.timeSlot.disabled {
+  background: #f9fafb;
+  color: #cbd5e0;
+  border-color: #f3f4f6;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .bookingProgressBar {
+    padding: 0 10px;
+  }
+
+  .stepNumber {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .stepLabel {
+    font-size: 12px;
+  }
+
+  .progressLine {
+    margin: 0 8px;
+  }
+
+  .bookingCard {
+    padding: 24px 16px;
+    margin: 16px;
+  }
+
+  .cardTitle {
+    font-size: 22px;
+    margin-bottom: 24px;
+  }
+
+  .prevButton,
+  .nextButton {
+    width: 100%;
+  }
+
+  .cardContent .servicesGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cardContent .barbersGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .realTimeStatusCompact .statusGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .timeSlotsWrapper {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .stepLabel {
+    display: none;
+  }
+
+  .progressLine {
+    margin: 0 4px;
+  }
+
+  .timeSlotsWrapper {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 /* Header Section */
 .header {
   display: flex;
@@ -201,17 +880,6 @@
 
 .waitTime {
   color: #ff9800;
-}
-
-/* Mobile Responsive */
-@media (max-width: 768px) {
-  .modeToggle {
-    flex-direction: column;
-  }
-
-  .modeButton {
-    width: 100%;
-  }
 }
 
 .headerActions {
@@ -428,6 +1096,72 @@
   border-color: #ff9800;
 }
 
+.chairPaused {
+  text-align: center;
+  padding: 12px;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: 8px;
+}
+
+.chairBadgePaused {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #f59e0b;
+  color: white;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.pausedBadge {
+  display: inline-block;
+  padding: 6px 12px;
+  background: #f59e0b;
+  color: white;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 4px;
+}
+
+.pausedWait {
+  color: #92400e;
+  font-weight: 600;
+  font-size: 14px;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 8px 12px;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.pausedMessage {
+  font-size: 13px;
+  color: #92400e;
+  margin: 8px 0 0 0;
+}
+
+.pausedLabel {
+  color: #f59e0b;
+  font-weight: 700;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 4px 12px;
+  border-radius: 6px;
+  display: inline-block;
+}
+.paused {
+  color: #f59e0b !important;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.pausedBtn {
+  background: #f59e0b !important;
+}
+
+.pausedBtn:hover {
+  background: #d97706 !important;
+}
+
 /* Mini Info in Status Cards */
 .miniInfo {
   font-size: 11px;
@@ -438,7 +1172,7 @@
 /* Real-Time Status Dashboard */
 .realTimeStatus {
   background: var(--background-primary);
-  padding: 30px;
+  padding: 30px 10px 0 10px;
   border-radius: 16px;
   max-width: 1400px;
   margin: 0 auto;
@@ -454,8 +1188,7 @@
 
 .statusGrid {
   color: #000;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: flex;
   gap: 20px;
   margin-bottom: 30px;
 }
@@ -463,25 +1196,25 @@
 .statusCard {
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);
-  padding: 20px;
+  padding: 10px;
   border-radius: 12px;
   text-align: center;
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .statusIcon {
-  font-size: 32px;
+  font-size: 24px;
   margin-bottom: 10px;
 }
 
 .statusValue {
-  font-size: 32px;
+  font-size: 20px;
   font-weight: 700;
   margin: 10px 0;
 }
 
 .statusLabel {
-  font-size: 14px;
+  font-size: 10px;
   opacity: 0.9;
 }
 
@@ -975,7 +1708,7 @@
 }
 
 /* Book Button Container */
-.bookButtonContainer {
+/* .bookButtonContainer {
   position: fixed;
   bottom: 0;
   left: 0;
@@ -986,7 +1719,7 @@
   box-shadow: var(--shadow-xl);
   z-index: 90;
   backdrop-filter: blur(10px);
-}
+} */
 
 .bookButton {
   width: 100%;
@@ -1316,10 +2049,6 @@
     font-size: 0.875rem;
   }
 
-  .bookButtonContainer {
-    padding: var(--space-4);
-  }
-
   .bookButton {
     padding: var(--space-4) var(--space-6);
     font-size: 1rem;
@@ -1336,6 +2065,13 @@
   .modalActions {
     flex-direction: column;
   }
+}
+
+@media (max-width: 480px) {
+  /* .stat {
+    justify-content: space-between;
+    flex-direction: row;
+  } */
 }
 
 /* Small Mobile */

@@ -1546,7 +1546,6 @@
 .salonCard {
   background: var(--background-primary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-3xl);
   overflow: hidden;
   transition: all var(--transition-luxury);
   cursor: pointer;
@@ -2159,11 +2158,6 @@
     height: 500px;
   }
 
-  .heroStats {
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-
   .footerMain {
     grid-template-columns: 1fr;
     gap: var(--space-12);
@@ -2190,19 +2184,15 @@
   }
 
   .heroTitle {
-    font-size: 2.5rem;
+    font-size: 3rem;
   }
 
   .heroSubtitle {
     font-size: 1.125rem;
   }
 
-  .heroActions {
-    flex-direction: column;
-    width: 100%;
-  }
-
   .heroCta {
+    border-radius: var(--radius-xl);
     width: 100%;
     justify-content: center;
   }
@@ -2217,10 +2207,27 @@
   }
 
   .salonsGrid {
-    grid-template-columns: 1fr;
-    gap: var(--space-6);
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
   }
-
+  .salonCard {
+    padding: 10px;
+  }
+  .salonInfo {
+    padding: var(--space-3) 0;
+  }
+  .salonName {
+    font-size: 1.25rem;
+  }
+  .salonImageContainer {
+    height: 200px;
+  }
+  .salonRating {
+    display: block;
+  }
+  .salonMetrics {
+    display: block;
+  }
   .testimonialsGrid {
     grid-template-columns: 1fr;
     gap: var(--space-6);
@@ -2275,17 +2282,15 @@
 }
 
 @media (max-width: 640px) {
-  .heroStats {
+  .heroStat {
     flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    padding: var(--space-2);
+  }
+  .heroStats {
     gap: var(--space-4);
   }
-
-  .heroStat {
-    flex-direction: row;
-    justify-content: center;
-    padding: var(--space-3) var(--space-4);
-  }
-
   .servicesGrid {
     grid-template-columns: 1fr;
   }
@@ -2303,7 +2308,7 @@
   }
 
   .searchInput {
-    padding: var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4);
     font-size: 16px; /* Prevents zoom on iOS */
   }
 
@@ -2326,49 +2331,170 @@
   }
 }
 
-@media (max-width: 420px) {
-  .logo {
-    font-size: 1.5rem;
+@media (max-width: 480px) {
+  .desktopNav {
+    display: none;
+  }
+  .bookingModeToggle {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+  .modeButton {
+    display: block;
+  }
+  .mobileMenuButton {
+    display: flex;
+  }
+
+  .headerContent {
+    height: 70px;
+    padding: 0 var(--space-4);
+  }
+
+  .heroSection {
+    padding: var(--space-12) 0;
   }
 
   .heroTitle {
-    font-size: 2rem;
+    font-size: 3rem;
   }
 
   .heroSubtitle {
+    font-size: 1.125rem;
+  }
+
+  .heroCta {
+    border-radius: var(--radius-xl);
+    width: 100%;
+    justify-content: center;
+  }
+
+  .heroRight {
+    height: 400px;
+  }
+
+  .servicesGrid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-6);
+  }
+
+  .salonsGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .salonCard {
+    padding: 10px;
+  }
+  .salonBadge {
+    font-size: 0.65rem;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-3xl);
+  }
+  .salonBadges {
+    top: var(--space-2);
+    left: var(--space-2);
+    right: var(--space-2);
+  }
+  .salonInfo {
+    padding: var(--space-3) 0;
+  }
+  .salonName {
     font-size: 1rem;
   }
-
-  .sectionTitle {
-    font-size: 1.75rem;
+  .salonLocation {
+    font-size: 0.75rem;
+    margin-bottom: var(--space-3);
+  }
+  .salonImageContainer {
+    height: 200px;
+  }
+  .salonRating {
+    display: block;
+  }
+  .salonMetrics {
+    display: block;
+    margin-bottom: var(--space-3);
+  }
+  .metricValue {
+    font-size: 0.75rem;
+  }
+  .salonServices {
+    margin-bottom: var(--space-3);
+  }
+  .serviceTag {
+    font-size: 0.6rem;
+    padding: var(--space-1) var(--space-2);
+  }
+  .walkInButton {
+    font-size: 0.7rem;
+  }
+  .testimonialsGrid {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
   }
 
-  .serviceCard {
-    padding: var(--space-6);
+  .searchSection {
+    padding: var(--space-1) var(--space-4);
   }
 
-  .serviceName {
-    font-size: 1.25rem;
+  .servicesSection {
+    padding: var(--space-16) var(--space-4);
   }
 
-  .servicePrice {
-    font-size: 1.5rem;
+  .salonsSection {
+    padding: var(--space-16) var(--space-4);
   }
 
-  .salonInfo {
-    padding: var(--space-6);
+  .testimonialsSection {
+    padding: var(--space-16) var(--space-4);
   }
 
-  .salonName {
-    font-size: 1.25rem;
+  .sectionHeader {
+    flex-direction: column;
+    gap: var(--space-4);
+    text-align: center;
   }
 
-  .mapContainer {
-    height: 400px;
+  .quickFilters {
+    justify-content: center;
+  }
+
+  .filtersLabel {
+    width: 100%;
+    text-align: center;
+    margin-bottom: var(--space-2);
+  }
+
+  .footerContent {
+    padding: var(--space-12) var(--space-4) 0;
+  }
+
+  .footerLinks {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-8);
+    text-align: center;
+  }
+
+  .footerBottomContent {
+    flex-direction: column;
+    text-align: center;
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 430px) {
+  .statLabel {
+    font-size: 0.75rem;
+  }
+}
+@media (max-width: 400px) {
+  .heroCta {
+    gap: var(--space-2);
+    padding: var(--space-2);
+    font-weight: 700;
+    font-size: 0.8rem;
+  }
+}
+@media (max-width: 321px) {
   .headerContent {
     padding: 0 var(--space-3);
   }
@@ -2387,6 +2513,10 @@
 
   .servicesSection {
     padding: var(--space-12) var(--space-3);
+  }
+
+  .statLabel {
+    font-size: 0.7rem;
   }
 
   .salonsSection {

@@ -73,6 +73,7 @@ export default async function handler(req, res) {
           timeLeft,
           queueCount,
           currentCustomer,
+          isPaused: barber.isPaused || false, // ✅ ADD THIS
         };
       })
     );
@@ -126,9 +127,12 @@ export default async function handler(req, res) {
       }
     });
 
+    // ✅ CORRECT: Total wait = GREEN time left + ORANGE durations (NO DIVISION)
     const avgWaitTime =
-      orangeCount > 0
-        ? Math.round((totalTimeLeft + orangeCount * 30) / orangeCount)
+      greenCount > 0 && orangeCount === 0
+        ? Math.round(totalTimeLeft / greenCount) // Only GREEN → avg time left per barber
+        : orangeCount > 0
+        ? totalTimeLeft + orangeCount * 30 // GREEN time left + ORANGE waiting time
         : 0;
 
     res.status(200).json({
