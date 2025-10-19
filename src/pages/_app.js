@@ -8,13 +8,13 @@ import styles from "../styles/Home.module.css";
 import { UserDataManager } from "../lib/userData";
 import NetworkStatus from "../components/NetworkStatus";
 import OnboardingLogoutButton from "../components/OnBoardingLogout";
-import GradientBackground from "@/components/Background";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const [showLoginMenu, setShowLoginMenu] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   // Don't show header on onboarding AND auth pages
   const hideHeader =
@@ -22,7 +22,7 @@ function MyApp({ Component, pageProps }) {
     router.pathname.startsWith("/auth/");
 
   useEffect(() => {
-    // Check theme preference
+    setMounted(true);
     const darkMode = localStorage.getItem("darkMode") === "true";
     setIsDarkMode(darkMode);
     if (darkMode) {
@@ -49,7 +49,7 @@ function MyApp({ Component, pageProps }) {
   return (
     <>
       <NetworkStatus />
-      {!hideHeader && (
+      {mounted && !hideHeader && (
         <header className={styles.header}>
           <div className={styles.headerContent}>
             <motion.div

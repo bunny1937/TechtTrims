@@ -20,15 +20,8 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // Get queue position if ORANGE
-    let queuePosition = null;
-    if (booking.queueStatus === "ORANGE") {
-      queuePosition = await db.collection("bookings").countDocuments({
-        salonId: booking.salonId,
-        queueStatus: "ORANGE",
-        arrivedAt: { $lte: booking.arrivedAt },
-      });
-    }
+    // ✅ USE STORED POSITION ONLY
+    const queuePosition = booking.queuePosition || "Pending";
 
     res.status(200).json({
       status: booking.status,

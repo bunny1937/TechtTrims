@@ -16,7 +16,6 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db("techtrims");
 
-    // Find booking
     const booking = await db.collection("bookings").findOne({
       _id: new ObjectId(id),
     });
@@ -25,14 +24,54 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // Get barber details
-    const barber = await db.collection("barbers").findOne({
-      _id: booking.barberId,
-    });
+    let barber = null;
+    if (booking.barberId) {
+      barber = await db.collection("barbers").findOne({
+        _id: booking.barberId,
+      });
+    }
 
-    // Get salon details
     const salon = await db.collection("salons").findOne({
       _id: booking.salonId,
+    });
+
+    // ✅ CRITICAL FIX: Use STORED position only
+    let queuePosition = booking.queuePosition || null;
+
+    // Only calculate if missing
+    if (!queuePosition && booking.barberId) {
+      console.warn("⚠️ Position missing:", booking.bookingCode);
+
+      const allBookings = await db
+        .collection("bookings")
+        .find({
+          barberId: booking.barberId,
+          salonId: booking.salonId,
+          queueStatus: { $in: ["RED", "ORANGE"] },
+          isExpired: { $ne: true },
+        })
+        .sort({ createdAt: 1 })
+        .toArray();
+
+      const index = allBookings.findIndex(
+        (b) => b._id.toString() === booking._id.toString()
+      );
+      queuePosition = index >= 0 ? index + 1 : null;
+
+      if (queuePosition) {
+        await db
+          .collection("bookings")
+          .updateOne({ _id: booking._id }, { $set: { queuePosition } });
+      }
+    } else if (!queuePosition) {
+      queuePosition = "Pending Assignment";
+    }
+
+    console.log("📊 Queue:", {
+      code: booking.bookingCode,
+      barber: barber?.name,
+      position: queuePosition,
+      status: booking.queueStatus,
     });
 
     res.status(200).json({
@@ -40,18 +79,20 @@ export default async function handler(req, res) {
         ...booking,
         _id: booking._id.toString(),
         salonId: booking.salonId.toString(),
-        barberId: booking.barberId.toString(),
-        barberName: barber?.name || "Unknown",
+        barberId: booking.barberId ? booking.barberId.toString() : null,
+        barberName: barber?.name || booking.barber || "Unassigned",
         chairNumber: barber?.chairNumber || 1,
         salonName: salon?.salonName || "Unknown Salon",
-        salonLocation: salon?.location?.address || "",
+        salonLocation: salon?.location?.address || null,
         salonCoordinates: salon?.location?.coordinates || null,
+        queuePosition,
       },
     });
   } catch (error) {
     console.error("Get booking error:", error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 }
