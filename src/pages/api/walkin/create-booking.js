@@ -33,32 +33,24 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db("techtrims");
 
-    // Generate unique booking code
-    // Get salon details for initials
+    // Get salon details
     const salon = await db.collection("salons").findOne({
       _id: new ObjectId(salonId),
     });
 
-    // Generate short booking code based on salon name
+    // Generate booking code
     const generateShortBookingCode = (salonName) => {
-      // Get initials from salon name (e.g., "Singhania Trims" -> "ST")
       const words = salonName.trim().split(" ");
       let initials = "";
 
       if (words.length >= 2) {
-        // Take first letter of first two words
         initials = words[0][0] + words[1][0];
       } else if (words.length === 1) {
-        // Take first two letters if single word
         initials = words[0].substring(0, 2);
       }
 
       initials = initials.toUpperCase();
-
-      // Generate 4-digit random number
       const randomNumber = Math.floor(1000 + Math.random() * 9000);
-
-      // Generate random letter (A-Z)
       const randomLetter = String.fromCharCode(
         65 + Math.floor(Math.random() * 26)
       );
@@ -70,13 +62,54 @@ export default async function handler(req, res) {
       salon?.salonName || "TechTrims"
     );
 
-    // Create booking with 45-minute expiry
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 45 * 60 * 1000);
 
+    // Handle barber assignment
+    let barberObjectId = null;
+    let barberName = "Unassigned";
+    let assignmentStatus = "pending";
+
+    if (barberId && barberId !== "ANY") {
+      barberObjectId = new ObjectId(barberId);
+      assignmentStatus = "assigned";
+
+      const barberDoc = await db
+        .collection("barbers")
+        .findOne({ _id: barberObjectId });
+      barberName = barberDoc?.name || "Unknown";
+    }
+
+    // ✅ CHANGED: Calculate queue position BEFORE inserting
+    let queuePosition = null;
+    if (barberObjectId) {
+      // Count existing bookings (NOT including current)
+      const existingCount = await db.collection("bookings").countDocuments({
+        barberId: barberObjectId,
+        salonId: new ObjectId(salonId),
+        queueStatus: { $in: ["RED", "ORANGE"] },
+        isExpired: { $ne: true },
+      });
+      queuePosition = existingCount + 1; // This booking's position
+    } else {
+      queuePosition = "Pending Assignment";
+    }
+
+    console.log("📊 Queue position calculated:", {
+      barber: barberName,
+      existingInQueue:
+        queuePosition === "Pending Assignment" ? 0 : queuePosition - 1,
+      newPosition: queuePosition,
+      bookingCode,
+    });
+
+    // ✅ CHANGED: Add queuePosition to document
     const bookingDoc = {
       salonId: new ObjectId(salonId),
-      barberId: new ObjectId(barberId),
+      barberId: barberObjectId,
+      barber: barberName,
+      assignmentStatus: assignmentStatus,
+      queuePosition: queuePosition, // ✅ Store in DB
       customerName,
       customerPhone: customerPhone || "",
       customerEmail: customerEmail || "",
@@ -97,9 +130,14 @@ export default async function handler(req, res) {
     const result = await db.collection("bookings").insertOne(bookingDoc);
 
     // Update barber queue count
-    await db
-      .collection("barbers")
-      .updateOne({ _id: new ObjectId(barberId) }, { $inc: { queueLength: 1 } });
+    if (barberId && barberId !== "ANY") {
+      await db
+        .collection("barbers")
+        .updateOne(
+          { _id: new ObjectId(barberId) },
+          { $inc: { queueLength: 1 } }
+        );
+    }
 
     res.status(201).json({
       success: true,
@@ -107,6 +145,8 @@ export default async function handler(req, res) {
         bookingId: result.insertedId.toString(),
         bookingCode,
         expiresAt: expiresAt.toISOString(),
+        queuePosition,
+        barber: barberName,
       },
     });
   } catch (error) {

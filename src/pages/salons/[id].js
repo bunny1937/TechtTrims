@@ -52,6 +52,11 @@ export default function SalonDetail({ initialSalon }) {
   const [regEmail, setRegEmail] = useState("");
   const [bookingError, setBookingError] = useState(null);
   const [currentStep, setCurrentStep] = useState(1); // 1: Services, 2: Barbers, 3: Date/Time (prebook only)
+  const [salonStatus, setSalonStatus] = useState("open"); // open, paused, closing
+  const [pauseInfo, setPauseInfo] = useState(null);
+  const [closingCountdown, setClosingCountdown] = useState(null); // seconds remaining
+  const [showClosingTimer, setShowClosingTimer] = useState(false);
+  const [salonClosed, setSalonClosed] = useState(false);
 
   useEffect(() => {
     // Only run once when component mounts
@@ -69,6 +74,21 @@ export default function SalonDetail({ initialSalon }) {
     }
   }, []);
   // ✅ NEW: Fetch real-time barber states for walk-in mode
+
+  // Poll salon status
+  const checkSalonStatus = useCallback(async () => {
+    if (!salon?._id) return;
+
+    try {
+      const res = await fetch(`/api/salons/status?salonId=${salon._id}`);
+      const data = await res.json();
+      setSalonStatus(data.status);
+      setPauseInfo(data);
+    } catch (error) {
+      console.error("Status check error:", error);
+    }
+  }, [salon?._id]); // Only recreate if salon ID changes
+
   useEffect(() => {
     if (bookingMode !== "walkin" || !id) return;
 
@@ -89,6 +109,68 @@ export default function SalonDetail({ initialSalon }) {
 
     return () => clearInterval(interval);
   }, [bookingMode, id]);
+
+  // Poll salon status every 5 seconds
+  useEffect(() => {
+    if (!salon?._id) return;
+
+    // Initial check
+    checkSalonStatus();
+
+    // Visibility-aware polling
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkSalonStatus(); // Check immediately when user returns
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 10-second polling when active, pause when inactive
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        checkSalonStatus();
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [salon, checkSalonStatus]);
+
+  // Real-time closing countdown
+  useEffect(() => {
+    if (!pauseInfo?.closingTime) return;
+
+    const checkClosingTime = () => {
+      const now = new Date();
+      const [hours, minutes] = pauseInfo.closingTime.split(":");
+      const closingTime = new Date();
+      closingTime.setHours(parseInt(hours), parseInt(minutes), 20, 0); // +20s buffer
+
+      const secondsRemaining = Math.floor((closingTime - now) / 1000);
+
+      if (secondsRemaining <= 60 && secondsRemaining > 0) {
+        // Show countdown when less than 60 seconds
+        setShowClosingTimer(true);
+        setClosingCountdown(secondsRemaining);
+      } else if (secondsRemaining <= 0) {
+        // Salon is closed!
+        setSalonClosed(true);
+        setShowClosingTimer(false);
+        checkSalonStatus(); // Force refresh status
+      } else {
+        setShowClosingTimer(false);
+      }
+    };
+
+    // Check every second
+    checkClosingTime();
+    const interval = setInterval(checkClosingTime, 1000);
+
+    return () => clearInterval(interval);
+  }, [pauseInfo?.closingTime, checkSalonStatus]);
 
   useEffect(() => {
     if (bookingMode !== "walkin" || !id) return;
@@ -114,7 +196,7 @@ export default function SalonDetail({ initialSalon }) {
     };
 
     fetchSalonStats();
-    const interval = setInterval(fetchSalonStats, 10000); // Update every 10 seconds
+    const interval = setInterval(fetchSalonStats, 15000); // Update every 10 seconds
     return () => clearInterval(interval);
   }, [bookingMode, id]);
 
@@ -363,123 +445,6 @@ export default function SalonDetail({ initialSalon }) {
     }
   };
 
-  //   if (selectedServices.length === 0) {
-  //     alert("Please select at least one service");
-  //     return;
-  //   }
-
-  //   if (!selectedDate) {
-  //     alert("Please select a date");
-  //     return;
-  //   }
-
-  //   if (!selectedSlot) {
-  //     alert("Please select a time slot");
-  //     return;
-  //   }
-
-  //   try {
-  //     console.log(
-  //       "Booking with:",
-  //       selectedServices,
-  //       selectedSlot,
-  //       selectedBarber,
-  //       userInfo
-  //     );
-
-  //     // Find selected barber details if one is selected
-  //     const selectedBarberDetails = selectedBarber
-  //       ? availableBarbers.find((b) => b._id === selectedBarber)
-  //       : null;
-
-  //     // Prepare booking data
-  //     const allServices = selectedServices
-  //       .map((service) => service.name)
-  //       .join(", ");
-  //     const totalPrice = selectedServices.reduce(
-  //       (sum, service) => sum + service.price,
-  //       0
-  //     );
-  //     const currentUserInfo = UserDataManager.getStoredUserData();
-  //     const userToken = localStorage.getItem("userToken");
-
-  //     const payload = {
-  //       salonId: salon._id,
-  //       service: allServices,
-  //       barber: selectedBarberDetails?.name || "Any Available",
-  //       barberId: selectedBarber || null,
-  //       date: selectedDate,
-  //       time: selectedSlot,
-  //       price: totalPrice,
-  //       customerName: currentUserInfo?.name || "Anonymous",
-  //       customerPhone: currentUserInfo?.phone || "",
-  //       user: currentUserInfo,
-  //       userId: currentUserInfo?._id || currentUserInfo?.id || null,
-  //     };
-
-  //     console.log("Booking payload:", payload);
-
-  //     // Define makeBookingRequest function
-  //     const makeBookingRequest = async () => {
-  //       try {
-  //         setBookingError(null);
-  //         const response = await fetch("/api/bookings/create", {
-  //           method: "POST",
-  //           headers: {
-  //             "Content-Type": "application/json",
-  //             ...(userToken && { Authorization: `Bearer ${userToken}` }),
-  //           },
-  //           body: JSON.stringify(payload),
-  //         });
-
-  //         // Handle 409 conflict
-  //         if (response.status === 409) {
-  //           const errorData = await response.json();
-  //           alert(
-  //             "Sorry! This time slot was just booked by another customer. Please select a different time."
-  //           );
-  //           window.location.reload();
-  //           throw new Error("Slot already booked");
-  //         }
-
-  //         if (!response.ok) {
-  //           const errorData = await response.json();
-  //           throw new Error(errorData.error || "Booking failed");
-  //         }
-
-  //         const bookingResult = await response.json();
-  //         return bookingResult;
-  //       } catch (error) {
-  //         setBookingError(error.message);
-  //         throw error;
-  //       }
-  //     };
-
-  //     // Make the booking request
-  //     const bookingResult = await makeBookingRequest();
-
-  //     // ✅ REMOVED: All the duplicate response checking code that was causing the error
-
-  //     console.log("✅ Booking confirmed", bookingResult);
-
-  //     // Extract the booking ID correctly
-  //     const bookingId =
-  //       bookingResult.bookingId || bookingResult.id || bookingResult._id;
-
-  //     // Reset form
-  //     setSelectedServices([]);
-  //     setSelectedBarber(null);
-  //     setSelectedDate("");
-  //     setSelectedSlot("");
-
-  //     // Redirect to booking confirmation page
-  //     router.push(`/booking/confirmed?id=${bookingId}`);
-  //   } catch (error) {
-  //     console.error("❌ Booking error:", error);
-  //     alert("Booking failed: " + error.message);
-  //   }
-  // };
-
   const handleBooking = async () => {
     // ✅ Basic service validation (required for both modes)
     if (selectedServices.length === 0) {
@@ -573,8 +538,12 @@ export default function SalonDetail({ initialSalon }) {
         const prebookPayload = {
           salonId: salon?._id || id,
           service: allServices,
-          barber: selectedBarberDetails?.name || "Any Available",
-          barberId: selectedBarber || null,
+          barber:
+            selectedBarber === "ANY"
+              ? "Unassigned"
+              : selectedBarberDetails?.name || "Any Available",
+          barberId: selectedBarber === "ANY" ? null : selectedBarber || null,
+          assignmentStatus: selectedBarber === "ANY" ? "pending" : "assigned",
           date: selectedDate,
           time: selectedSlot,
           price: totalPrice,
@@ -679,6 +648,112 @@ export default function SalonDetail({ initialSalon }) {
 
   return (
     <div className={styles.container}>
+      {/* Floating Closing Countdown */}
+      {showClosingTimer && closingCountdown > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            top: "20px",
+            right: "20px",
+            background:
+              closingCountdown <= 20
+                ? "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
+                : "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+            color: "white",
+            padding: "20px 30px",
+            borderRadius: "16px",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "10px",
+            animation:
+              closingCountdown <= 20 ? "pulse 0.5s infinite" : "slideDown 0.3s",
+            minWidth: "200px",
+          }}
+        >
+          <div style={{ fontSize: "48px", fontWeight: "700", lineHeight: 1 }}>
+            {closingCountdown}
+          </div>
+          <div
+            style={{ fontSize: "16px", fontWeight: 600, textAlign: "center" }}
+          >
+            {closingCountdown <= 20
+              ? "🚨 Salon closing NOW!"
+              : "⏰ Salon closing soon"}
+          </div>
+          <div style={{ fontSize: "13px", opacity: 0.9 }}>
+            Bookings will be blocked
+          </div>
+        </div>
+      )}
+
+      {/* Salon Closed Overlay */}
+      {salonClosed && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.85)",
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: "40px",
+              borderRadius: "24px",
+              textAlign: "center",
+              maxWidth: "400px",
+            }}
+          >
+            <div style={{ fontSize: "64px", marginBottom: "20px" }}>🔒</div>
+            <h2
+              style={{
+                fontSize: "28px",
+                fontWeight: "700",
+                marginBottom: "12px",
+                color: "#1f2937",
+              }}
+            >
+              Salon Closed
+            </h2>
+            <p
+              style={{
+                fontSize: "16px",
+                color: "#6b7280",
+                marginBottom: "24px",
+              }}
+            >
+              This salon is now closed. Please come back during operating hours.
+            </p>
+            <button
+              onClick={() => (window.location.href = "/")}
+              style={{
+                padding: "12px 32px",
+                background: "#3b82f6",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "16px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Go Home
+            </button>
+          </div>
+        </div>
+      )}
+
       {bookingError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
           <p className="text-red-700 text-sm mb-2">❌ {bookingError}</p>
@@ -691,11 +766,45 @@ export default function SalonDetail({ initialSalon }) {
           ← Back
         </button>
         <h1 className={styles.salonName}>{salon.salonName}</h1>
+
         <div className={styles.headerActions}>
           <button className={styles.shareButton}>📤</button>
           <button className={styles.favoriteButton}>❤️</button>
         </div>
       </header>
+      {/* Real-time Salon Status with Time */}
+      {salonStatus === "paused" && pauseInfo && (
+        <div className={styles.pausedBanner}>
+          <span>⏸️ {pauseInfo.pauseReason || "Salon temporarily paused"}</span>
+          <span className={styles.resumeTime}>
+            {(() => {
+              if (!pauseInfo?.pauseUntil) return "soon";
+
+              try {
+                const resumeTime = new Date(pauseInfo.pauseUntil);
+                if (isNaN(resumeTime.getTime())) return "soon";
+
+                return resumeTime.toLocaleTimeString("en-IN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                });
+              } catch (error) {
+                return "soon";
+              }
+            })()}
+          </span>
+        </div>
+      )}
+
+      {salonStatus === "closing" && pauseInfo && (
+        <div className={styles.closingBanner}>
+          <span>⚠️ Salon closing soon</span>
+          <span className={styles.resumeTime}>
+            Closes at {pauseInfo.closingTime}
+          </span>
+        </div>
+      )}
 
       {/* ✅ NEW: Mode Toggle */}
       <div className={styles.modeToggle}>
@@ -879,6 +988,22 @@ export default function SalonDetail({ initialSalon }) {
               <h3 className={styles.cardTitle}>Choose Your Barber</h3>
               {availableBarbers.length > 0 ? (
                 <div className={styles.barbersGrid}>
+                  <motion.div
+                    key="any-barber"
+                    className={`${styles.barberCard} ${styles.anyBarberCard} ${
+                      selectedBarber === "ANY" ? styles.selected : ""
+                    }`}
+                    onClick={() => handleBarberClick("ANY")}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <div className={styles.anyBarberIcon}>👥</div>
+                    <h3>Any Available Barber</h3>
+                    <p className={styles.flexibleText}>
+                      Book now - A barber will be assigned at the salon
+                    </p>
+                    <span className={styles.flexibleBadge}>Flexible</span>
+                  </motion.div>
                   {availableBarbers.map((barber) => {
                     const barberState =
                       bookingMode === "walkin"
@@ -1051,59 +1176,58 @@ export default function SalonDetail({ initialSalon }) {
                 </div>
               </div>
               {/* Walk-in: Show real-time status below barbers */}
-              {bookingMode === "walkin" && (
-                <motion.section
-                  className={styles.realTimeStatus}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  <h3 className={styles.statusTitle}>📊 Live Salon Status</h3>
+              <motion.section
+                className={styles.realTimeStatus}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <h3 className={styles.statusTitle}>📊 Live Salon Status</h3>
 
-                  <div className={styles.statusGrid}>
-                    <div className={styles.statusCard}>
-                      <div className={styles.statusIcon}>🟢</div>
-                      <div className={styles.statusValue}>
-                        {salonStats.totalServing}
-                      </div>
-                      <div className={styles.statusLabel}>Serving Now</div>
-                      {barberStates
-                        .filter((b) => b.status === "OCCUPIED")
-                        .map((b) => (
-                          <div key={b.barberId} className={styles.miniInfo}>
-                            {b.name}: {b.timeLeft}m
-                          </div>
-                        ))}
+                <div className={styles.statusGrid}>
+                  <div className={styles.statusCard}>
+                    <div className={styles.statusIcon}>🟢</div>
+                    <div className={styles.statusValue}>
+                      {salonStats.totalServing}
                     </div>
+                    <div className={styles.statusLabel}>Serving Now</div>
+                    {barberStates
+                      .filter((b) => b.status === "OCCUPIED")
+                      .map((b) => (
+                        <div key={b.barberId} className={styles.miniInfo}>
+                          {b.name}: {b.timeLeft}m
+                        </div>
+                      ))}
+                  </div>
 
-                    <div className={styles.statusCard}>
-                      <div className={styles.statusIcon}>🟠</div>
-                      <div className={styles.statusValue}>
-                        {salonStats.totalWaiting}
-                      </div>
-                      <div className={styles.statusLabel}>In Queue</div>
+                  <div className={styles.statusCard}>
+                    <div className={styles.statusIcon}>🟠</div>
+                    <div className={styles.statusValue}>
+                      {salonStats.totalWaiting}
                     </div>
+                    <div className={styles.statusLabel}>In Queue</div>
+                  </div>
 
-                    <div className={styles.statusCard}>
-                      <div className={styles.statusIcon}>🔴</div>
-                      <div className={styles.statusValue}>
-                        {salonStats.totalBooked}
-                      </div>
-                      <div className={styles.statusLabel}>
-                        Booked (Not Arrived)
-                      </div>
+                  <div className={styles.statusCard}>
+                    <div className={styles.statusIcon}>🔴</div>
+                    <div className={styles.statusValue}>
+                      {salonStats.totalBooked}
                     </div>
-
-                    <div className={styles.statusCard}>
-                      <div className={styles.statusIcon}>⏱️</div>
-                      <div className={styles.statusValue}>
-                        ~{salonStats.avgWaitTime} min
-                      </div>
-                      <div className={styles.statusLabel}>Avg Wait</div>
+                    <div className={styles.statusLabel}>
+                      Booked (Not Arrived)
                     </div>
                   </div>
 
-                  {/* Legend */}
-                  {/* <div className={styles.statusLegend}>
+                  <div className={styles.statusCard}>
+                    <div className={styles.statusIcon}>⏱️</div>
+                    <div className={styles.statusValue}>
+                      ~{salonStats.avgWaitTime} min
+                    </div>
+                    <div className={styles.statusLabel}>Avg Wait</div>
+                  </div>
+                </div>
+
+                {/* Legend */}
+                {/* <div className={styles.statusLegend}>
                     <div className={styles.legendItem}>
                       <span className={`${styles.legendDot} ${styles.green}`}>
                         ●
@@ -1123,8 +1247,7 @@ export default function SalonDetail({ initialSalon }) {
                       <span>Booked</span>
                     </div>
                   </div> */}
-                </motion.section>
-              )}
+              </motion.section>
               <div className={styles.cardActions}>
                 <button
                   className={styles.prevButton}

@@ -149,7 +149,7 @@ export default function WalkinConfirmation() {
           </div>
           <div className={styles.detailItem}>
             <span>Chair:</span>
-            <strong>#{booking.chairNumber}</strong>
+            <strong>{booking.chairNumber}</strong>
           </div>
           <div className={styles.detailItem}>
             <span>Service:</span>
@@ -174,26 +174,50 @@ export default function WalkinConfirmation() {
         >
           <span className={styles.statusDot}></span>
           <span>
-            {booking.queueStatus === "RED" && "🔴 Confirmed - Not Arrived"}
+            {booking.queueStatus === "RED" &&
+              (booking.barberId
+                ? `Position #${booking.queuePosition || 1} in ${
+                    booking.barberName || "barber"
+                  }'s queue`
+                : "Waiting for barber assignment")}
+
             {booking.queueStatus === "ORANGE" &&
-              `🟠 In Queue - Position #${booking.queuePosition || "?"}`}
+              `In Queue - Position #${booking.queuePosition || 1} with ${
+                booking.barberName || "barber"
+              }`}
+
             {booking.queueStatus === "GREEN" && "🟢 Service Started"}
-            {booking.queueStatus === "COMPLETED" && (
-              <div className={styles.feedbackSection}>
-                <h3>✨ Service Complete!</h3>
-                <p>How was your experience?</p>
-                <button
-                  onClick={() =>
-                    router.push(`/feedback?bookingId=${bookingId}`)
-                  }
-                  className={styles.feedbackBtn}
-                >
-                  📝 Give Feedback
-                </button>
-              </div>
-            )}
+
+            {booking.queueStatus === "COMPLETED" && "✅ Service Complete"}
           </span>
         </div>
+
+        {/* ✅ Queue Explanation - OUTSIDE status badge */}
+        {booking.barberId && booking.queuePosition && booking.barberName && (
+          <div className={styles.queueExplanation}>
+            <p>
+              📌 <strong>Your position:</strong> #{booking.queuePosition} in{" "}
+              {booking.barberName}&#39;s queue
+            </p>
+            <p className={styles.queueNote}>
+              Each barber has their own queue. Your position is specific to{" "}
+              {booking.barberName}&#39;s customers.
+            </p>
+          </div>
+        )}
+
+        {booking.queueStatus === "COMPLETED" && (
+          <div className={styles.feedbackSection}>
+            <h3>✨ Service Complete!</h3>
+            <p>How was your experience?</p>
+            <button
+              onClick={() => router.push(`/feedback?bookingId=${bookingId}`)}
+              className={styles.feedbackBtn}
+            >
+              📝 Give Feedback
+            </button>
+          </div>
+        )}
 
         {/* Expiry Timer */}
         {booking.queueStatus === "RED" && (

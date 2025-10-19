@@ -6,10 +6,8 @@ export default function useNetworkStatus() {
   const [connectionType, setConnectionType] = useState("unknown");
 
   useEffect(() => {
-    // Check initial online status
     setIsOnline(navigator.onLine);
 
-    // Get connection info if available
     const connection =
       navigator.connection ||
       navigator.mozConnection ||
@@ -18,77 +16,65 @@ export default function useNetworkStatus() {
     const updateConnectionInfo = () => {
       if (connection) {
         setConnectionType(connection.effectiveType || "unknown");
-        // Consider 2g and slow-2g as slow connections
         setIsSlowConnection(
-          connection.effectiveType === "2g" ||
-            connection.effectiveType === "slow-2g" ||
-            connection.downlink < 1.5 // Less than 1.5 Mbps
+          ["2g", "slow-2g"].includes(connection.effectiveType) ||
+            connection.downlink < 1.5
         );
       }
     };
 
-    // Test connection speed
     const testConnectionSpeed = async () => {
       if (!navigator.onLine) return;
-
       try {
-        const startTime = Date.now();
-        const response = await fetch("/api/ping", {
-          method: "HEAD",
-          cache: "no-cache",
-        });
-        const endTime = Date.now();
-        const latency = endTime - startTime;
-
-        // Consider connection slow if latency > 3 seconds or request fails
-        setIsSlowConnection(latency > 3000 || !response.ok);
-      } catch (error) {
+        const samples = [];
+        for (let i = 0; i < 2; i++) {
+          const start = Date.now();
+          const response = await fetch("/api/ping", {
+            method: "HEAD",
+            cache: "no-cache",
+          });
+          const latency = Date.now() - start;
+          if (!response.ok) throw new Error();
+          samples.push(latency);
+        }
+        const avgLatency = samples.reduce((a, b) => a + b, 0) / samples.length;
+        setIsSlowConnection(avgLatency > 5000);
+      } catch {
         setIsSlowConnection(true);
       }
     };
 
-    // Event listeners
     const handleOnline = () => {
       setIsOnline(true);
-      testConnectionSpeed();
+      setTimeout(testConnectionSpeed, 3000); // delay first test
     };
-
     const handleOffline = () => {
       setIsOnline(false);
       setIsSlowConnection(false);
     };
 
-    const handleConnectionChange = () => updateConnectionInfo();
-
-    // Add event listeners
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
     if (connection) {
-      connection.addEventListener("change", handleConnectionChange);
+      connection.addEventListener("change", updateConnectionInfo);
     }
 
-    // Initial checks
     updateConnectionInfo();
-    if (navigator.onLine) {
-      testConnectionSpeed();
-    }
+    setTimeout(() => {
+      if (navigator.onLine) testConnectionSpeed();
+    }, 3000);
 
-    // Periodic speed test (every 30 seconds when online)
-    const speedTestInterval = setInterval(() => {
-      if (navigator.onLine) {
-        testConnectionSpeed();
-      }
+    const interval = setInterval(() => {
+      if (navigator.onLine) testConnectionSpeed();
     }, 30000);
 
-    // Cleanup
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
-      if (connection) {
-        connection.removeEventListener("change", handleConnectionChange);
-      }
-      clearInterval(speedTestInterval);
+      if (connection)
+        connection.removeEventListener("change", updateConnectionInfo);
+      clearInterval(interval);
     };
   }, []);
 

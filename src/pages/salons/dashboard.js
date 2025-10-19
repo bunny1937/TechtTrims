@@ -52,6 +52,31 @@ export default function DashboardPage() {
   const [serviceTimers, setServiceTimers] = useState({});
   const [pausedBarbers, setPausedBarbers] = useState(new Set());
   const [mounted, setMounted] = useState(false);
+  const [salonStatus, setSalonStatus] = useState({
+    isOpen: true,
+    isPaused: false,
+    pauseReason: null,
+    pauseUntil: null,
+    closingTime: null,
+  });
+  const [showOpeningModal, setShowOpeningModal] = useState(false);
+  const [openingHour, setOpeningHour] = useState("09");
+  const [openingMinute, setOpeningMinute] = useState("00");
+  const [showPauseModal, setShowPauseModal] = useState(false);
+  const [pauseType, setPauseType] = useState("");
+  const [pauseDuration, setPauseDuration] = useState(30);
+  const [showClosingModal, setShowClosingModal] = useState(false);
+  const [closingHour, setClosingHour] = useState("21");
+  const [closingMinute, setClosingMinute] = useState("00");
+  const [barberBreaks, setBarberBreaks] = useState({});
+  const [showSalonControls, setShowSalonControls] = useState(false);
+  const [showBreakModal, setShowBreakModal] = useState(false);
+  const [selectedBarberForBreak, setSelectedBarberForBreak] = useState(null);
+  const [customBreakTime, setCustomBreakTime] = useState("");
+  const [assignmentInputs, setAssignmentInputs] = useState({}); // { barberId: bookingCode }
+  const [assigningBarber, setAssigningBarber] = useState(null);
+  const [closingCountdown, setClosingCountdown] = useState(null);
+  const [showClosingAlert, setShowClosingAlert] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -116,6 +141,34 @@ export default function DashboardPage() {
 
     return () => clearInterval(interval);
   }, [bookings, serviceTimers]);
+
+  // Dashboard closing countdown
+  useEffect(() => {
+    if (!salon?.closingTime) return;
+
+    const checkClosing = () => {
+      const now = new Date();
+      const [hours, minutes] = salon.closingTime.split(":");
+      const closingTime = new Date();
+      closingTime.setHours(parseInt(hours), parseInt(minutes), 20, 0);
+
+      const secondsRemaining = Math.floor((closingTime - now) / 1000);
+
+      if (secondsRemaining <= 60 && secondsRemaining > 0) {
+        setShowClosingAlert(true);
+        setClosingCountdown(secondsRemaining);
+      } else if (secondsRemaining <= 0) {
+        setShowClosingAlert(false);
+        window.location.reload(); // Refresh to show closed state
+      } else {
+        setShowClosingAlert(false);
+      }
+    };
+
+    checkClosing();
+    const interval = setInterval(checkClosing, 1000);
+    return () => clearInterval(interval);
+  }, [salon?.closingTime]);
 
   // Notification helpers
   const playNotificationSound = () => {
@@ -188,7 +241,7 @@ export default function DashboardPage() {
     setSalon(salonData);
     loadBookings(salonData._id, selectedDate);
     loadBarbers(salonData._id);
-  }, [router, router.isReady, loadBookings, selectedDate]);
+  }, [router, router.isReady, loadBookings, selectedDate, loadBarbers]);
 
   // ✅ Only this check can come after all hooks
   if (!mounted) {
@@ -394,6 +447,105 @@ export default function DashboardPage() {
     }
   };
 
+  // Handle salon pause
+  const handleSalonPause = async (reason, duration) => {
+    try {
+      const until =
+        duration > 0 ? new Date(Date.now() + duration * 60000) : null;
+
+      const response = await fetch("/api/salons/toggle-pause", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId: salon._id,
+          isPaused: !salonStatus.isPaused,
+          reason,
+          until: until ? until.toISOString() : null,
+        }),
+      });
+
+      if (response.ok) {
+        setSalonStatus((prev) => ({
+          ...prev,
+          isPaused: !prev.isPaused,
+          pauseReason: reason,
+          pauseUntil: until ? until.toISOString() : null,
+        }));
+        alert(`Salon ${!salonStatus.isPaused ? "paused" : "resumed"}`);
+      }
+    } catch (error) {
+      console.error("Error toggling salon:", error);
+    }
+  };
+
+  const handleSetOpeningTime = async (time) => {
+    try {
+      const response = await fetch("/api/salons/set-opening", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId: salon._id,
+          openingTime: time,
+        }),
+      });
+
+      if (response.ok) {
+        alert(`Opening time set to ${time}`);
+      }
+    } catch (error) {
+      console.error("Error setting opening time:", error);
+    }
+  };
+
+  // Set closing time
+  const handleSetClosingTime = async (time) => {
+    try {
+      const response = await fetch("/api/salons/set-closing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId: salon._id,
+          closingTime: time,
+        }),
+      });
+
+      if (response.ok) {
+        setSalonStatus((prev) => ({ ...prev, closingTime: time }));
+        alert(`Closing time set to ${time}`);
+      }
+    } catch (error) {
+      console.error("Error setting closing time:", error);
+    }
+  };
+
+  // Handle barber break
+  const handleBarberBreak = async (barberId, type, duration) => {
+    try {
+      const until = new Date(Date.now() + duration * 60000);
+
+      const response = await fetch("/api/barber/set-break", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          barberId,
+          breakType: type,
+          until: until.toISOString(),
+        }),
+      });
+
+      if (response.ok) {
+        setBarberBreaks((prev) => ({
+          ...prev,
+          [barberId]: { type, until: until.toISOString() },
+        }));
+        alert(`Break set for ${type}`);
+        setShowBreakModal(false);
+      }
+    } catch (error) {
+      console.error("Error setting break:", error);
+    }
+  };
+
   const handleTogglePause = async (barberId, barberName) => {
     const isPaused = pausedBarbers.has(barberId);
 
@@ -433,6 +585,42 @@ export default function DashboardPage() {
     }
   };
 
+  const handleAssignBooking = async (barberId) => {
+    const bookingCode = assignmentInputs[barberId];
+
+    if (!bookingCode) {
+      alert("Please enter a booking code");
+      return;
+    }
+
+    setAssigningBarber(barberId);
+
+    try {
+      const response = await fetch("/api/bookings/assign-barber", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingCode, barberId }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`✅ ${data.message}`);
+        setAssignmentInputs({ ...assignmentInputs, [barberId]: "" });
+        if (salon?._id) {
+          await loadBookings(salon._id, selectedDate);
+        }
+      } else {
+        alert(`❌ ${data.message}`);
+      }
+    } catch (error) {
+      console.error("Error assigning booking:", error);
+      alert("Failed to assign booking. Please try again.");
+    } finally {
+      setAssigningBarber(null);
+    }
+  };
+
   if (loading && !salon) {
     return (
       <div className={styles.loadingContainer}>
@@ -446,6 +634,75 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.dashboardWrapper}>
+      {/* Closing Alert Banner */}
+      {showClosingAlert && closingCountdown > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            top: "20px",
+            right: "20px",
+            background: closingCountdown <= 20 ? "#ef4444" : "#f59e0b",
+            color: "white",
+            padding: "16px 24px",
+            borderRadius: "12px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            zIndex: 9999,
+            fontWeight: 600,
+            fontSize: "18px",
+          }}
+        >
+          {closingCountdown <= 20 ? "🚨" : "⏰"} Closing in {closingCountdown}s
+        </div>
+      )}
+
+      {/* Salon Closed Overlay */}
+      {salon?.isActive === false && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.9)",
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: "40px",
+              borderRadius: "16px",
+              textAlign: "center",
+            }}
+          >
+            <h2 style={{ fontSize: "32px", marginBottom: "16px" }}>
+              🔒 Salon Closed
+            </h2>
+            <p style={{ color: "#666", marginBottom: "24px" }}>
+              Dashboard is locked. Set opening time to resume.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: "12px 24px",
+                background: "#3b82f6",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar Desktop */}
       <aside className={styles.sidebarDesktop}>
         <OwnerSidebar />
@@ -482,174 +739,190 @@ export default function DashboardPage() {
 
           {/* Salon Info */}
           <div className={styles.card}>
-            <h1 className={styles.salonTitle}>{salon?.salonName}</h1>
-            <p className={styles.salonOwner}>Owner: {salon?.ownerName}</p>
-            <div className={styles.headerActions}>
-              <button
-                onClick={() => setShowScanner(true)}
-                className={styles.scannerBtn}
-              >
-                📷 Scan QR / Enter Code
-              </button>
-              {showScanner && (
-                <div className={styles.scannerModal}>
-                  <div className={styles.scannerContent}>
-                    <div className={styles.checkinHeader}>
-                      <h2 className={styles.checkinTitle}>Check-in Customer</h2>
-                      <button
-                        onClick={() => setShowScanner(false)}
-                        className={styles.closeModal}
-                      >
-                        ✕
-                      </button>
-                    </div>
+            <div className={styles.headerLeft}>
+              <div className={styles.salonInfo}>
+                <h1 className={styles.salonTitle}>
+                  {salon?.salonName}
+                  <span>
+                    <p className={styles.salonOwner}>
+                      Owner: {salon?.ownerName}
+                    </p>
+                  </span>
+                </h1>
+                <div
+                  className={`${styles.statusIndicator} ${
+                    salonStatus.isPaused
+                      ? styles.paused
+                      : salonStatus.isOpen
+                      ? styles.open
+                      : styles.closed
+                  }`}
+                >
+                  <span className={styles.statusDot}></span>
+                  {salonStatus.isPaused
+                    ? "Paused"
+                    : salonStatus.isOpen
+                    ? "Open"
+                    : "Closed"}
+                </div>
+              </div>
+            </div>
+            <div className={styles.headerRight}>
+              <div className={styles.headerActions}>
+                <button
+                  onClick={() => {
+                    setPauseType("Pause");
+                    setPauseDuration(30);
+                    setShowPauseModal(true);
+                    setShowSalonControls(false);
+                  }}
+                  className={styles.dropdownItem}
+                >
+                  ⏸️ Pause Salon
+                </button>
 
+                <button
+                  onClick={() => {
+                    setPauseType("Lunch Break");
+                    setPauseDuration(60);
+                    setShowPauseModal(true);
+                    setShowSalonControls(false);
+                  }}
+                  className={styles.dropdownItem}
+                >
+                  🍽️ Lunch Break
+                </button>
+
+                <button
+                  onClick={() => {
+                    setPauseType("Short Break");
+                    setPauseDuration(20);
+                    setShowPauseModal(true);
+                    setShowSalonControls(false);
+                  }}
+                  className={styles.dropdownItem}
+                >
+                  ☕ Short Break
+                </button>
+
+                <div className={styles.divider}></div>
+
+                <button
+                  onClick={() => {
+                    setShowOpeningModal(true);
+                    setShowSalonControls(false);
+                  }}
+                  className={styles.dropdownItem}
+                >
+                  🌅 Set Opening Time
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowClosingModal(true);
+                    setShowSalonControls(false);
+                  }}
+                  className={styles.dropdownItem}
+                >
+                  🕐 Set Closing Time
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowScanner(true)}
+              className={styles.scannerBtn}
+            >
+              📷 Scan QR / Enter Code
+            </button>
+            {showScanner && (
+              <div className={styles.scannerModal}>
+                <div className={styles.scannerContent}>
+                  <div className={styles.checkinHeader}>
+                    <h2 className={styles.checkinTitle}>Check-in Customer</h2>
                     <button
-                      onClick={() => {
-                        setShowScanner(false);
-                        setScanResult(null);
-                        setManualCode("");
-                      }}
+                      onClick={() => setShowScanner(false)}
                       className={styles.closeModal}
                     >
                       ✕
                     </button>
+                  </div>
 
-                    <h2>Check-in Customer</h2>
-
-                    {!scanResult ? (
-                      <>
-                        <div className={styles.manualInput}>
-                          <input
-                            type="text"
-                            placeholder="Enter booking code (e.g., ST-3842N)"
-                            value={manualCode}
-                            onChange={(e) =>
-                              setManualCode(e.target.value.toUpperCase())
-                            }
-                            className={styles.codeInput}
-                          />
-                          <button
-                            onClick={() => handleVerifyArrival(manualCode)}
-                            disabled={!manualCode}
-                            className={styles.verifyBtn}
-                          >
-                            Verify & Check-in
-                          </button>
-                        </div>
-
-                        <div className={styles.divider}>OR</div>
-
-                        <div className={styles.qrScanner}>
-                          <p>📷 QR Scanner Coming Soon</p>
-                          <p className={styles.note}>
-                            For now, manually enter the code shown on
-                            customer&apos;s screen
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <div
-                        className={`${styles.result} ${
-                          scanResult.success ? styles.success : styles.error
-                        }`}
-                      >
-                        <p>{scanResult.message}</p>
-                        {scanResult.success && (
-                          <p className={styles.queueInfo}>
-                            Queue Position: #{scanResult.queuePosition}
-                          </p>
-                        )}
+                  {!scanResult ? (
+                    <>
+                      <div className={styles.manualInput}>
+                        <input
+                          type="text"
+                          placeholder="Enter booking code (e.g., ST-3842N)"
+                          value={manualCode}
+                          onChange={(e) =>
+                            setManualCode(e.target.value.toUpperCase())
+                          }
+                          className={styles.codeInput}
+                        />
                         <button
-                          onClick={() => {
-                            setScanResult(null);
-                            setManualCode("");
-                          }}
-                          className={styles.scanAgainBtn}
+                          onClick={() => handleVerifyArrival(manualCode)}
+                          disabled={!manualCode}
+                          className={styles.verifyBtn}
                         >
-                          Check-in Another Customer
+                          Verify & Check-in
                         </button>
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              {/* Time Estimate Modal */}
-              {showTimeModal && (
-                <div className={styles.scannerModal}>
-                  <div className={styles.scannerContent}>
-                    <button
-                      onClick={() => {
-                        setShowTimeModal(false);
-                        setBookingToStart(null);
-                        setTimeEstimate(30);
-                      }}
-                      className={styles.closeModal}
+
+                      <div className={styles.divider}>OR</div>
+
+                      <div className={styles.qrScanner}>
+                        <p>📷 QR Scanner Coming Soon</p>
+                        <p className={styles.note}>
+                          For now, manually enter the code shown on
+                          customer&apos;s screen
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div
+                      className={`${styles.result} ${
+                        scanResult.success ? styles.success : styles.error
+                      }`}
                     >
-                      ✕
-                    </button>
-
-                    <h2>⏱️ Estimate Service Time</h2>
-                    <p className={styles.modalSubtext}>
-                      For: <strong>{bookingToStart?.customerName}</strong>
-                    </p>
-
-                    <div className={styles.timeInput}>
-                      <label>How long will this service take?</label>
-                      <div className={styles.timeButtons}>
-                        {[15, 20, 30, 45, 60].map((mins) => (
-                          <button
-                            key={mins}
-                            onClick={() => setTimeEstimate(mins)}
-                            className={`${styles.timeOption} ${
-                              timeEstimate === mins ? styles.selected : ""
-                            }`}
-                          >
-                            {mins} mins
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className={styles.customTime}>
-                        <input
-                          type="number"
-                          value={timeEstimate}
-                          onChange={(e) =>
-                            setTimeEstimate(parseInt(e.target.value) || 30)
-                          }
-                          min="5"
-                          max="120"
-                          className={styles.timeNumberInput}
-                        />
-                        <span>minutes</span>
-                      </div>
+                      <p>{scanResult.message}</p>
+                      {scanResult.success && (
+                        <p className={styles.queueInfo}>
+                          Queue Position: #{scanResult.queuePosition}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => {
+                          setScanResult(null);
+                          setManualCode("");
+                        }}
+                        className={styles.scanAgainBtn}
+                      >
+                        Check-in Another Customer
+                      </button>
                     </div>
-
-                    <button
-                      onClick={async () => {
-                        await updateBookingStatus(
-                          bookingToStart._id,
-                          "started",
-                          timeEstimate
-                        );
-                        setShowTimeModal(false);
-                        setBookingToStart(null);
-                        setTimeEstimate(30);
-                      }}
-                      className={styles.verifyBtn}
-                    >
-                      Start Service ({timeEstimate} mins)
-                    </button>
-                  </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Date Picker Section */}
-          <div className={styles.card}>
+          {/*  <div className={styles.card}>
             <h2 className={styles.filterTitle}>📅 Select Date</h2>
 
+           
+
+          Current Selection Display
+            <div className={styles.currentDateDisplay}>
+              <span className={styles.currentDateIcon}>🗓️</span>
+              <span className={styles.currentDateText}>
+                {getDateDisplayText()}
+              </span>
+            </div> 
+          </div>*/}
+
+          {/* Bookings */}
+          <div className={styles.card}>
             {/* Quick Date Buttons */}
             <div className={styles.filterButtons}>
               <button
@@ -703,18 +976,6 @@ export default function DashboardPage() {
                 />
               )}
             </div>
-
-            {/* Current Selection Display
-            <div className={styles.currentDateDisplay}>
-              <span className={styles.currentDateIcon}>🗓️</span>
-              <span className={styles.currentDateText}>
-                {getDateDisplayText()}
-              </span>
-            </div> */}
-          </div>
-
-          {/* Bookings */}
-          <div className={styles.card}>
             <div className={styles.bookingsHeader}>
               <div className={styles.bookingsInfo}>
                 <h2 className={styles.bookingsTitle}>
@@ -751,24 +1012,50 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div>
-                {/* Unassigned Bookings */}
+                {/* Unassigned Bookings - ENHANCED */}
                 {bookings.filter((b) => !b.barberId).length > 0 && (
-                  <div className={styles.unassignedSection}>
-                    <h3 className={styles.sectionTitle}>
-                      ⏳ Pending Assignment
-                    </h3>
+                  <div
+                    className={`${styles.unassignedSection} ${styles.prominentAlert}`}
+                  >
+                    <div className={styles.alertHeader}>
+                      <span className={styles.alertIcon}>⚠️</span>
+                      <h3 className={styles.alertTitle}>
+                        Pending Assignment -{" "}
+                        {bookings.filter((b) => !b.barberId).length} Booking(s)
+                      </h3>
+                    </div>
+                    <p className={styles.alertDescription}>
+                      These bookings need barber assignment. Copy the booking
+                      code and paste in any barber section below.
+                    </p>
+
                     <div className={styles.bookingsGrid}>
                       {bookings
                         .filter((b) => !b.barberId)
-                        .map((b) => (
+                        .map((b, index) => (
                           <div
                             key={b._id || b.id}
-                            className={styles.bookingCard}
+                            className={`${styles.bookingCard} ${styles.unassignedCard}`}
                           >
+                            <div className={styles.unassignedBadge}>
+                              <span className={styles.badgeText}>
+                                Queue Position: {index + 1}
+                              </span>
+                              <span className={styles.badgeWarning}>
+                                No Barber Assigned
+                              </span>
+                            </div>
+
                             <div className={styles.bookingDetails}>
                               <h3 className={styles.customerName}>
                                 {b.customerName}
                               </h3>
+                              <p className={styles.bookingInfo}>
+                                <strong>Code:</strong>{" "}
+                                <span className={styles.highlightCode}>
+                                  {b.bookingCode}
+                                </span>
+                              </p>
                               <p className={styles.bookingInfo}>
                                 📞 {b.customerPhone}
                               </p>
@@ -788,6 +1075,18 @@ export default function DashboardPage() {
                                   💰 ₹{b.price}
                                 </p>
                               )}
+                              {b.bookingType === "PREBOOK" && (
+                                <p className={styles.bookingInfo}>
+                                  <strong>Type:</strong> Pre-booked
+                                </p>
+                              )}
+                            </div>
+
+                            <div className={styles.instructionBox}>
+                              <p>
+                                📋 Copy <strong>{b.bookingCode}</strong> and
+                                paste in barber section below
+                              </p>
                             </div>
                           </div>
                         ))}
@@ -800,7 +1099,7 @@ export default function DashboardPage() {
                   <h3 className={styles.sectionTitle}>💈 Barbers</h3>
                   {barbers.map((barber) => {
                     const barberBookings = bookings.filter(
-                      (b) => b.barberId === barber._id
+                      (b) => b.barberId?.toString() === barber._id?.toString()
                     );
                     return (
                       <details
@@ -817,6 +1116,40 @@ export default function DashboardPage() {
                             </span>
                           )}
                         </summary>
+
+                        {/* NEW: Booking Assignment Section */}
+                        <div className={styles.assignBookingSection}>
+                          <h4 className={styles.assignTitle}>
+                            Assign Unassigned Booking
+                          </h4>
+                          <div className={styles.assignInputGroup}>
+                            <input
+                              type="text"
+                              placeholder="Enter Booking Code (e.g., ST-3842N)"
+                              value={assignmentInputs[barber._id] || ""}
+                              onChange={(e) =>
+                                setAssignmentInputs({
+                                  ...assignmentInputs,
+                                  [barber._id]: e.target.value.toUpperCase(),
+                                })
+                              }
+                              className={styles.bookingCodeInput}
+                              disabled={assigningBarber === barber._id}
+                            />
+                            <button
+                              onClick={() => handleAssignBooking(barber._id)}
+                              className={styles.assignBtn}
+                              disabled={
+                                !assignmentInputs[barber._id] ||
+                                assigningBarber === barber._id
+                              }
+                            >
+                              {assigningBarber === barber._id
+                                ? "Assigning..."
+                                : `Assign to ${barber.name}`}
+                            </button>
+                          </div>
+                        </div>
 
                         <div className={styles.barberBookings}>
                           {barberBookings.length === 0 ? (
@@ -957,6 +1290,346 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+      {/* Pause Time Modal */}
+      {showPauseModal && (
+        <div className={styles.modal} onClick={() => setShowPauseModal(false)}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>{pauseType}</h3>
+            <p>Set duration in minutes:</p>
+
+            <div className={styles.timeSlider}>
+              <input
+                type="range"
+                min="5"
+                max="180"
+                step="5"
+                value={pauseDuration}
+                onChange={(e) => setPauseDuration(parseInt(e.target.value))}
+                className={styles.slider}
+              />
+              <div className={styles.timeDisplay}>
+                <span className={styles.bigTime}>{pauseDuration}</span>
+                <span>minutes</span>
+              </div>
+            </div>
+
+            <div className={styles.quickButtons}>
+              <button onClick={() => setPauseDuration(15)}>15 min</button>
+              <button onClick={() => setPauseDuration(30)}>30 min</button>
+              <button onClick={() => setPauseDuration(60)}>1 hour</button>
+              <button onClick={() => setPauseDuration(120)}>2 hours</button>
+            </div>
+
+            <div className={styles.modalActions}>
+              <button
+                onClick={() => {
+                  handleSalonPause(pauseType, pauseDuration);
+                  setShowPauseModal(false);
+                }}
+                className={styles.confirmBtn}
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setShowPauseModal(false)}
+                className={styles.cancelBtn}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Opening Time Modal */}
+      {showOpeningModal && (
+        <div
+          className={styles.modal}
+          onClick={() => setShowOpeningModal(false)}
+        >
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Set Opening Time</h3>
+            <p>Salon will automatically open at this time:</p>
+
+            <div className={styles.timePicker}>
+              <div className={styles.timeColumn}>
+                <label>Hour</label>
+                <select
+                  value={openingHour}
+                  onChange={(e) => setOpeningHour(e.target.value)}
+                  className={styles.timeSelect}
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i.toString().padStart(2, "0")}>
+                      {i.toString().padStart(2, "0")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <span className={styles.timeSeparator}>:</span>
+
+              <div className={styles.timeColumn}>
+                <label>Minute</label>
+                <select
+                  value={openingMinute}
+                  onChange={(e) => setOpeningMinute(e.target.value)}
+                  className={styles.timeSelect}
+                >
+                  {Array.from({ length: 60 }, (_, i) => (
+                    <option key={i} value={i.toString().padStart(2, "0")}>
+                      {i.toString().padStart(2, "0")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.modalActions}>
+              <button
+                onClick={() => {
+                  handleSetOpeningTime(`${openingHour}:${openingMinute}`);
+                  setShowOpeningModal(false);
+                }}
+                className={styles.confirmBtn}
+              >
+                Set Time
+              </button>
+              <button
+                onClick={() => setShowOpeningModal(false)}
+                className={styles.cancelBtn}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Closing Time Modal */}
+      {showClosingModal && (
+        <div
+          className={styles.modal}
+          onClick={() => setShowClosingModal(false)}
+        >
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Set Closing Time</h3>
+            <p>Select when the salon should stop accepting bookings:</p>
+
+            <div className={styles.timePicker}>
+              <div className={styles.timeColumn}>
+                <label>Hour</label>
+                <select
+                  value={closingHour}
+                  onChange={(e) => setClosingHour(e.target.value)}
+                  className={styles.timeSelect}
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i.toString().padStart(2, "0")}>
+                      {i.toString().padStart(2, "0")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <span className={styles.timeSeparator}>:</span>
+
+              <div className={styles.timeColumn}>
+                <label>Minute</label>
+                <select
+                  value={closingMinute}
+                  onChange={(e) => setClosingMinute(e.target.value)}
+                  className={styles.timeSelect}
+                >
+                  {Array.from({ length: 60 }, (_, i) => (
+                    <option key={i} value={i.toString().padStart(2, "0")}>
+                      {i.toString().padStart(2, "0")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.modalActions}>
+              <button
+                onClick={() => {
+                  handleSetClosingTime(`${closingHour}:${closingMinute}`);
+                  setShowClosingModal(false);
+                }}
+                className={styles.confirmBtn}
+              >
+                Set Time
+              </button>
+              <button
+                onClick={() => setShowClosingModal(false)}
+                className={styles.cancelBtn}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Time Estimate Modal */}
+      {showTimeModal && (
+        <div className={styles.scannerModal}>
+          <div className={styles.scannerContent}>
+            <button
+              onClick={() => {
+                setShowTimeModal(false);
+                setBookingToStart(null);
+                setTimeEstimate(30);
+              }}
+              className={styles.closeModal}
+            >
+              ✕
+            </button>
+
+            <h2>⏱️ Estimate Service Time</h2>
+            <p className={styles.modalSubtext}>
+              For: <strong>{bookingToStart?.customerName}</strong>
+            </p>
+
+            <div className={styles.timeInput}>
+              <label>How long will this service take?</label>
+              <div className={styles.timeButtons}>
+                {[15, 20, 30, 45, 60].map((mins) => (
+                  <button
+                    key={mins}
+                    onClick={() => setTimeEstimate(mins)}
+                    className={`${styles.timeOption} ${
+                      timeEstimate === mins ? styles.selected : ""
+                    }`}
+                  >
+                    {mins} mins
+                  </button>
+                ))}
+              </div>
+
+              <div className={styles.customTime}>
+                <input
+                  type="number"
+                  value={timeEstimate}
+                  onChange={(e) =>
+                    setTimeEstimate(parseInt(e.target.value) || 30)
+                  }
+                  min="5"
+                  max="120"
+                  className={styles.timeNumberInput}
+                />
+                <span>minutes</span>
+              </div>
+            </div>
+
+            <button
+              onClick={async () => {
+                await updateBookingStatus(
+                  bookingToStart._id,
+                  "started",
+                  timeEstimate
+                );
+                setShowTimeModal(false);
+                setBookingToStart(null);
+                setTimeEstimate(30);
+              }}
+              className={styles.verifyBtn}
+            >
+              Start Service ({timeEstimate} mins)
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Pause Banner */}
+      {salonStatus.isPaused && (
+        <div className={styles.pauseBanner}>
+          <span>⏸️ {salonStatus.pauseReason}</span>
+          <span>
+            Until: {new Date(salonStatus.pauseUntil).toLocaleTimeString()}
+          </span>
+          <button onClick={() => handleSalonPause(null, 0)}>Resume</button>
+        </div>
+      )}
+      {/* Break Time Modal */}
+      {showBreakModal && (
+        <div className={styles.modal} onClick={() => setShowBreakModal(false)}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Set Break Time</h3>
+
+            <div className={styles.breakOptions}>
+              <button
+                onClick={() =>
+                  handleBarberBreak(selectedBarberForBreak, "Lunch Break", 60)
+                }
+                className={styles.breakOption}
+              >
+                🍽️ Lunch (1 hr)
+              </button>
+
+              <button
+                onClick={() =>
+                  handleBarberBreak(selectedBarberForBreak, "Short Break", 20)
+                }
+                className={styles.breakOption}
+              >
+                ☕ Short (20 min)
+              </button>
+
+              <button
+                onClick={() =>
+                  handleBarberBreak(selectedBarberForBreak, "Coffee Break", 15)
+                }
+                className={styles.breakOption}
+              >
+                ☕ Coffee (15 min)
+              </button>
+
+              <div className={styles.customBreak}>
+                <input
+                  type="number"
+                  placeholder="Custom minutes"
+                  value={customBreakTime}
+                  onChange={(e) => setCustomBreakTime(e.target.value)}
+                  className={styles.customInput}
+                />
+                <button
+                  onClick={() => {
+                    if (customBreakTime) {
+                      handleBarberBreak(
+                        selectedBarberForBreak,
+                        "Custom Break",
+                        parseInt(customBreakTime)
+                      );
+                      setCustomBreakTime("");
+                    }
+                  }}
+                  className={styles.customBtn}
+                >
+                  Set
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowBreakModal(false)}
+              className={styles.closeBtn}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

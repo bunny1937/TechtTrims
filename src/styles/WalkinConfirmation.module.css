@@ -6,6 +6,20 @@
   padding: 20px;
   background: white;
 }
+.queueExplanation {
+  background: linear-gradient(135deg, #e7f3ff 0%, #cfe7ff 100%);
+  border-left: 4px solid #0d6efd;
+  padding: 16px;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.unassignedNote {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+  border-left: 4px solid #ffc107;
+  padding: 16px;
+  text-align: center;
+}
 
 .card {
   background: white;
