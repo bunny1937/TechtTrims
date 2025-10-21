@@ -5,17 +5,18 @@ export default function OwnerSidebar({ closeSidebar }) {
   const router = useRouter();
 
   const menuItems = [
+    { icon: "🏠", label: "Home", path: "/salons/dashboard" },
     { icon: "👤", label: "Profile", path: "/salons/profile" },
     { icon: "📅", label: "Bookings", path: "/salons/bookings" },
     {
       icon: "👨‍💼",
       label: "Barber Management",
-      href: "/salons/barbers",
       path: "/salons/barbers",
     },
     { icon: "👥", label: "Staff", path: "/salons/staff" },
     { icon: "✂️", label: "Services", path: "/salons/services" },
     { icon: "💰", label: "Payments", path: "/salons/payments" },
+    { icon: "⭐", label: "Reviews", path: "/salons/reviews" },
     { icon: "📈", label: "Analytics", path: "/salons/analytics" },
     { icon: "⚙️", label: "Settings", path: "/salons/settings" },
   ];
@@ -63,7 +64,8 @@ export default function OwnerSidebar({ closeSidebar }) {
               if (closeSidebar) closeSidebar();
             }}
             className={`${styles.navButton} ${
-              router.pathname === item.path
+              router.pathname === item.path ||
+              router.pathname.startsWith(item.path)
                 ? styles.navButtonActive
                 : styles.navButtonInactive
             }`}

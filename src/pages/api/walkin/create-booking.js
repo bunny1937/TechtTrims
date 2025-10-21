@@ -129,6 +129,38 @@ export default async function handler(req, res) {
 
     const result = await db.collection("bookings").insertOne(bookingDoc);
 
+    // ✅ UPDATE BARBER STATS WHEN BOOKING IS CREATED
+    if (bookingDoc.barber) {
+      try {
+        // Find barber by name and salonId
+        const barber = await db.collection("barbers").findOne({
+          name: bookingDoc.barber,
+          salonId: bookingDoc.salonId,
+        });
+
+        if (barber) {
+          // Increment total bookings
+          await db.collection("barbers").updateOne(
+            { _id: barber._id },
+            {
+              $inc: { totalBookings: 1 },
+              $set: { updatedAt: new Date() },
+            }
+          );
+          console.log(
+            `✅ Updated barber ${barber.name} - totalBookings incremented`
+          );
+        } else {
+          console.log(`⚠️ Barber not found: ${bookingDoc.barber}`);
+        }
+      } catch (barberError) {
+        console.error(
+          "❌ Error updating barber stats on booking creation:",
+          barberError
+        );
+      }
+    }
+
     // Update barber queue count
     if (barberId && barberId !== "ANY") {
       await db

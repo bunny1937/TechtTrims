@@ -1,8 +1,10 @@
-// pages/salons/barbers/index.js
+// src/pages/salons/barbers/index.js - COMPLETE FILE WITH INLINE EDITING
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import axios from "axios";
-import Link from "next/link";
+import OwnerSidebar from "../../../components/OwnerSidebar";
+import styles from "../../../styles/salon/SalonBarbers.module.css";
+import dashboardStyles from "../../../styles/SalonDashboard.module.css";
 
 export default function SalonBarbersPage() {
   const router = useRouter();
@@ -11,6 +13,8 @@ export default function SalonBarbersPage() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [salonId, setSalonId] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [editingBarber, setEditingBarber] = useState(null);
   const [newBarber, setNewBarber] = useState({
     name: "",
     experience: 0,
@@ -28,65 +32,61 @@ export default function SalonBarbersPage() {
     "Facial",
   ];
 
-  // Get salonId from localStorage (salon session)
+  // Add polling to refresh barbers periodically
+  useEffect(() => {
+    if (!salonId) return;
+
+    // Set up polling every 30 seconds
+    const interval = setInterval(() => {
+      const fetchBarbers = async () => {
+        try {
+          const res = await axios.get(`/api/salons/barbers?salonId=${salonId}`);
+          setBarbers(res.data);
+        } catch (err) {
+          console.error("Error refreshing barbers:", err);
+        }
+      };
+
+      fetchBarbers();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [salonId]);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
-      console.log("Checking localStorage for salon session...");
-
-      // Check all possible keys
       const salonSession = localStorage.getItem("salonSession");
-      const salonToken = localStorage.getItem("salonToken");
-
-      console.log("Raw salonSession:", salonSession);
-      console.log("Raw salonToken:", salonToken);
 
       if (salonSession) {
         try {
           const salonData = JSON.parse(salonSession);
-          console.log("Parsed salon data:", salonData);
-
-          // Try multiple possible id fields
-          const id = salonData.id || salonData._id || salonData.salonId;
+          const id = salonData._id || salonData.id;
 
           if (id) {
             setSalonId(id);
-            console.log("Salon ID loaded from session:", id);
           } else {
-            console.error("No ID found in salon session data");
             setError("Invalid salon session data");
           }
         } catch (err) {
-          console.error("Failed to parse salon session:", err);
           setError("Failed to parse salon session");
         }
       } else {
-        console.error("No salon session found in localStorage");
         setError("No salon session found. Please login first.");
-        setTimeout(() => {
-          router.push("/auth/salon/login");
-        }, 2000);
+        setTimeout(() => router.push("/auth/salon/login"), 2000);
       }
     }
   }, [router]);
 
   useEffect(() => {
-    if (!salonId) {
-      console.log("No salonId yet, waiting...");
-      return;
-    }
+    if (!salonId) return;
 
-    console.log("Fetching barbers for salon:", salonId);
     const fetchBarbers = async () => {
       setLoading(true);
       try {
-        // Use the correct API endpoint
         const res = await axios.get(`/api/salons/barbers?salonId=${salonId}`);
-        console.log("Barbers API response:", res.data);
         setBarbers(res.data);
         setError("");
       } catch (err) {
-        console.error("Fetch barbers error:", err);
-        console.error("Error response:", err.response?.data);
         setError(
           `Failed to fetch barbers: ${err.response?.data?.error || err.message}`
         );
@@ -97,44 +97,50 @@ export default function SalonBarbersPage() {
     fetchBarbers();
   }, [salonId]);
 
-  // Rest of your component remains the same...
   const handleCreate = async () => {
     if (!newBarber.name) return alert("Name is required");
     if (!salonId) return alert("No salon session found");
 
     try {
-      console.log("Creating barber:", { ...newBarber, salonId });
       const res = await axios.post("/api/salons/barbers", {
         ...newBarber,
         salonId,
       });
-      console.log("Create response:", res.data);
       setBarbers([...barbers, res.data]);
       setNewBarber({ name: "", experience: 0, skills: [], bio: "", photo: "" });
       setShowForm(false);
       setError("");
     } catch (err) {
-      console.error("Create barber error:", err);
       setError(
         `Failed to create barber: ${err.response?.data?.error || err.message}`
       );
     }
   };
 
-  const handleSkillToggle = (skill) => {
-    setNewBarber((prev) => ({
-      ...prev,
-      skills: prev.skills.includes(skill)
-        ? prev.skills.filter((s) => s !== skill)
-        : [...prev.skills, skill],
-    }));
+  const handleSkillToggle = (skill, isEditing = false) => {
+    if (isEditing && editingBarber) {
+      setEditingBarber((prev) => ({
+        ...prev,
+        skills: prev.skills.includes(skill)
+          ? prev.skills.filter((s) => s !== skill)
+          : [...prev.skills, skill],
+      }));
+    } else {
+      setNewBarber((prev) => ({
+        ...prev,
+        skills: prev.skills.includes(skill)
+          ? prev.skills.filter((s) => s !== skill)
+          : [...prev.skills, skill],
+      }));
+    }
   };
 
   const toggleAvailability = async (barberId, currentStatus) => {
     try {
-      await axios.put(`/api/salons/barbers/${barberId}`, {
+      const res = await axios.put(`/api/salons/barbers/${barberId}`, {
         isAvailable: !currentStatus,
       });
+
       setBarbers(
         barbers.map((b) =>
           b._id === barberId ? { ...b, isAvailable: !currentStatus } : b
@@ -142,233 +148,337 @@ export default function SalonBarbersPage() {
       );
     } catch (err) {
       console.error("Toggle availability error:", err);
-      setError("Failed to update barber status");
+      alert(
+        "Failed to update barber status: " +
+          (err.response?.data?.error || err.message)
+      );
     }
   };
 
-  // Show debug info while loading
+  const startEditing = (barber) => {
+    setEditingBarber({ ...barber });
+  };
+
+  const cancelEditing = () => {
+    setEditingBarber(null);
+  };
+
+  const saveBarber = async () => {
+    if (!editingBarber.name) return alert("Name is required");
+
+    try {
+      const res = await axios.put(`/api/salons/barbers/${editingBarber._id}`, {
+        name: editingBarber.name,
+        experience: editingBarber.experience,
+        skills: editingBarber.skills,
+        bio: editingBarber.bio,
+      });
+
+      setBarbers(
+        barbers.map((b) => (b._id === editingBarber._id ? res.data : b))
+      );
+      setEditingBarber(null);
+      alert("Barber updated successfully!");
+    } catch (err) {
+      alert(
+        "Failed to update barber: " + (err.response?.data?.error || err.message)
+      );
+    }
+  };
+
   if (loading || !salonId) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
-          <h3 className="font-semibold text-blue-800 mb-2">
-            Loading Barbers...
-          </h3>
-          <div className="text-sm space-y-1">
-            <p>
-              <strong>Salon ID:</strong> {salonId || "Loading..."}
-            </p>
-            <p>
-              <strong>Loading:</strong> {loading.toString()}
-            </p>
-            <p>
-              <strong>Error:</strong> {error || "None"}
-            </p>
-            <p>
-              <strong>LocalStorage Keys:</strong>{" "}
-              {typeof window !== "undefined"
-                ? Object.keys(localStorage).join(", ")
-                : "Not available"}
-            </p>
-            {typeof window !== "undefined" &&
-              localStorage.getItem("salonSession") && (
-                <p>
-                  <strong>Session Data:</strong>{" "}
-                  {localStorage.getItem("salonSession")}
-                </p>
-              )}
-          </div>
+      <div className={dashboardStyles.dashboardWrapper}>
+        <div className={dashboardStyles.sidebarDesktop}>
+          <OwnerSidebar />
         </div>
-        {error && error.includes("No salon session") && (
-          <div className="text-center py-8">
-            <p className="text-red-600 mb-4">{error}</p>
-            <button
-              onClick={() => router.push("/auth/salon/login")}
-              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-            >
-              Go to Login
-            </button>
+        <main className={dashboardStyles.mainContent}>
+          <div className={styles.loading}>
+            <div className={styles.spinner}></div>
+            <p>Loading barbers...</p>
           </div>
-        )}
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Barber Management</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700"
+    <div className={dashboardStyles.dashboardWrapper}>
+      {sidebarOpen && (
+        <div
+          className={dashboardStyles.sidebarOverlay}
+          onClick={() => setSidebarOpen(false)}
         >
-          {showForm ? "Cancel" : "Add New Barber"}
-        </button>
-      </div>
-
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-
-      {/* Add Barber Form */}
-      {showForm && (
-        <div className="mb-8 p-6 border rounded-lg shadow bg-gray-50">
-          <h2 className="text-xl font-semibold mb-4">Add New Barber</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <input
-              type="text"
-              placeholder="Barber Name"
-              value={newBarber.name}
-              onChange={(e) =>
-                setNewBarber({ ...newBarber, name: e.target.value })
-              }
-              className="border rounded px-3 py-2 w-full"
-            />
-            <input
-              type="number"
-              placeholder="Years of Experience"
-              value={newBarber.experience}
-              onChange={(e) =>
-                setNewBarber({
-                  ...newBarber,
-                  experience: parseInt(e.target.value) || 0,
-                })
-              }
-              className="border rounded px-3 py-2 w-full"
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block font-medium mb-2">
-              Skills & Specializations
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {availableSkills.map((skill) => (
-                <label key={skill} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={newBarber.skills.includes(skill)}
-                    onChange={() => handleSkillToggle(skill)}
-                    className="mr-2"
-                  />
-                  {skill}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <label className="block font-medium mb-2">
-              Bio/Accomplishments
-            </label>
-            <textarea
-              placeholder="Describe achievements, awards, specialties..."
-              value={newBarber.bio}
-              onChange={(e) =>
-                setNewBarber({ ...newBarber, bio: e.target.value })
-              }
-              rows={3}
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-
-          <button
-            onClick={handleCreate}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          <div
+            className={dashboardStyles.sidebarMobile}
+            onClick={(e) => e.stopPropagation()}
           >
-            Add Barber
-          </button>
+            <OwnerSidebar closeSidebar={() => setSidebarOpen(false)} />
+          </div>
         </div>
       )}
 
-      {/* Barbers List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {barbers.map((barber) => (
-          <div
-            key={barber._id}
-            className="bg-white border rounded-lg shadow-md p-6"
+      <div className={dashboardStyles.sidebarDesktop}>
+        <OwnerSidebar />
+      </div>
+
+      <main className={dashboardStyles.mainContent}>
+        <div className={dashboardStyles.mobileTopBar}>
+          <button
+            className={dashboardStyles.menuButton}
+            onClick={() => setSidebarOpen(true)}
           >
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-semibold">{barber.name}</h3>
-                <p className="text-gray-600">
-                  {barber.experience} years experience
-                </p>
-                <div className="flex items-center mt-1">
-                  <span className="text-yellow-500">⭐</span>
-                  <span className="ml-1">{barber.rating}/5</span>
-                  <span className="text-gray-500 ml-2">
-                    ({barber.totalBookings} bookings)
-                  </span>
+            ☰
+          </button>
+          <h2 className={dashboardStyles.mobileTitle}>Barber Management</h2>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className={showForm ? styles.cancelButton : styles.addButton}
+          >
+            {showForm ? "Cancel" : "+ Add New Barber"}
+          </button>
+        </div>
+
+        <div className={styles.container}>
+          {error && <div className={styles.errorAlert}>{error}</div>}
+
+          {/* Add Form */}
+          {showForm && (
+            <div className={styles.formCard}>
+              <h2>Add New Barber</h2>
+
+              <div className={styles.formGrid}>
+                <div className={styles.formField}>
+                  <label>Barber Name *</label>
+                  <input
+                    type="text"
+                    placeholder="Enter barber name"
+                    value={newBarber.name}
+                    onChange={(e) =>
+                      setNewBarber({ ...newBarber, name: e.target.value })
+                    }
+                    className={styles.input}
+                  />
+                </div>
+
+                <div className={styles.formField}>
+                  <label>Years of Experience</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={newBarber.experience}
+                    onChange={(e) =>
+                      setNewBarber({
+                        ...newBarber,
+                        experience: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className={styles.input}
+                  />
                 </div>
               </div>
 
-              <button
-                onClick={() =>
-                  toggleAvailability(barber._id, barber.isAvailable)
-                }
-                className={`px-3 py-1 rounded text-sm ${
-                  barber.isAvailable
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                }`}
-              >
-                {barber.isAvailable ? "Available" : "Unavailable"}
+              <div className={styles.formField}>
+                <label className={styles.skillsLabel}>
+                  Skills & Specializations
+                </label>
+                <div className={styles.skillsGrid}>
+                  {availableSkills.map((skill) => (
+                    <label key={skill} className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={newBarber.skills.includes(skill)}
+                        onChange={() => handleSkillToggle(skill)}
+                        className={styles.checkbox}
+                      />
+                      <span>{skill}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.formField}>
+                <label>Bio/Accomplishments</label>
+                <textarea
+                  placeholder="Describe achievements, awards, specialties..."
+                  value={newBarber.bio}
+                  onChange={(e) =>
+                    setNewBarber({ ...newBarber, bio: e.target.value })
+                  }
+                  rows={3}
+                  className={styles.textarea}
+                />
+              </div>
+
+              <button onClick={handleCreate} className={styles.submitButton}>
+                Add Barber
               </button>
             </div>
+          )}
 
-            {/* Skills */}
-            <div className="mb-3">
-              <p className="font-medium text-sm mb-2">Specializations:</p>
-              <div className="flex flex-wrap gap-1">
-                {barber.skills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
+          {/* Barbers Grid */}
+          {barbers.length > 0 ? (
+            <div className={styles.barbersGrid}>
+              {barbers.map((barber) => (
+                <div key={barber._id} className={styles.barberCard}>
+                  {editingBarber && editingBarber._id === barber._id ? (
+                    /* EDIT MODE */
+                    <>
+                      <div className={styles.formField}>
+                        <label>Name</label>
+                        <input
+                          type="text"
+                          value={editingBarber.name}
+                          onChange={(e) =>
+                            setEditingBarber({
+                              ...editingBarber,
+                              name: e.target.value,
+                            })
+                          }
+                          className={styles.input}
+                        />
+                      </div>
+
+                      <div className={styles.formField}>
+                        <label>Experience (years)</label>
+                        <input
+                          type="number"
+                          value={editingBarber.experience}
+                          onChange={(e) =>
+                            setEditingBarber({
+                              ...editingBarber,
+                              experience: parseInt(e.target.value) || 0,
+                            })
+                          }
+                          className={styles.input}
+                        />
+                      </div>
+
+                      <div className={styles.formField}>
+                        <label>Skills</label>
+                        <div className={styles.skillsGrid}>
+                          {availableSkills.map((skill) => (
+                            <label key={skill} className={styles.checkboxLabel}>
+                              <input
+                                type="checkbox"
+                                checked={editingBarber.skills.includes(skill)}
+                                onChange={() => handleSkillToggle(skill, true)}
+                                className={styles.checkbox}
+                              />
+                              <span>{skill}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className={styles.formField}>
+                        <label>Bio</label>
+                        <textarea
+                          value={editingBarber.bio}
+                          onChange={(e) =>
+                            setEditingBarber({
+                              ...editingBarber,
+                              bio: e.target.value,
+                            })
+                          }
+                          rows={3}
+                          className={styles.textarea}
+                        />
+                      </div>
+
+                      <div className={styles.actions}>
+                        <button
+                          onClick={saveBarber}
+                          className={styles.submitButton}
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={cancelEditing}
+                          className={styles.cancelButton}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    /* VIEW MODE */
+                    <>
+                      <div className={styles.barberHeader}>
+                        <div className={styles.barberInfo}>
+                          <h3>{barber.name}</h3>
+                          <p className={styles.experience}>
+                            {barber.experience} years experience
+                          </p>
+                          <div className={styles.rating}>
+                            <span>⭐</span>
+                            <span className={styles.ratingValue}>
+                              {barber.rating}/5
+                            </span>
+                            <span className={styles.bookingsCount}>
+                              ({barber.totalBookings} bookings)
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() =>
+                            toggleAvailability(barber._id, barber.isAvailable)
+                          }
+                          className={`${styles.statusBadge} ${
+                            barber.isAvailable !== false
+                              ? styles.available
+                              : styles.unavailable
+                          }`}
+                        >
+                          {barber.isAvailable !== false
+                            ? "AVAILABLE"
+                            : "UNAVAILABLE"}
+                        </button>
+                      </div>
+
+                      {barber.skills && barber.skills.length > 0 && (
+                        <div className={styles.skillsSection}>
+                          <span className={styles.skillsLabel}>
+                            Specializations:
+                          </span>
+                          <div className={styles.skillsTags}>
+                            {barber.skills.map((skill) => (
+                              <span key={skill} className={styles.skillTag}>
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {barber.bio && (
+                        <div className={styles.bio}>{barber.bio}</div>
+                      )}
+
+                      <div className={styles.actions}>
+                        <button
+                          onClick={() => startEditing(barber)}
+                          className={styles.editButton}
+                        >
+                          Edit Details
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
-
-            {/* Bio */}
-            {barber.bio && (
-              <div className="mb-3">
-                <p className="text-gray-700 text-sm">{barber.bio}</p>
-              </div>
-            )}
-
-            <div className="flex gap-2 mt-4">
-              <Link href={`/salons/barbers/${barber._id}`} className="flex-1">
-                <button className="w-full bg-blue-600 text-white py-2 rounded text-sm hover:bg-blue-700">
-                  Edit Details
-                </button>
-              </Link>
+          ) : (
+            <div className={styles.emptyState}>
+              <p>No barbers found for this salon.</p>
+              <button onClick={() => setShowForm(true)}>
+                Add Your First Barber
+              </button>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {barbers.length === 0 && !loading && (
-        <div className="text-center py-12">
-          <p className="text-gray-500 mb-4">No barbers found for this salon.</p>
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-amber-600 text-white px-6 py-3 rounded hover:bg-amber-700"
-          >
-            Add Your First Barber
-          </button>
+          )}
         </div>
-      )}
-
-      {/* Debug Info */}
-      <div className="mt-8 p-4 bg-gray-100 rounded">
-        <h3 className="font-semibold mb-2">Debug Info:</h3>
-        <p>Salon ID: {salonId || "Not loaded"}</p>
-        <p>Barbers Count: {barbers.length}</p>
-        <p>Loading: {loading.toString()}</p>
-        <p>Error: {error || "None"}</p>
-      </div>
+      </main>
     </div>
   );
 }

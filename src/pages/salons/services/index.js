@@ -1,151 +1,541 @@
-// pages/salons/[salonId]/services.jsx
+// src/pages/salons/services/index.js - COMPLETE NEW FILE
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import axios from "axios";
-import Link from "next/link";
+import OwnerSidebar from "../../../components/OwnerSidebar";
+import styles from "../../../styles/salon/SalonServices.module.css";
+import dashboardStyles from "../../../styles/SalonDashboard.module.css";
 
-export default function SalonServicesPage() {
+export default function ServicesPage() {
   const router = useRouter();
-  const { salonId } = router.query;
-
-  const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [salon, setSalon] = useState(null);
+  const [services, setServices] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingService, setEditingService] = useState(null);
   const [newService, setNewService] = useState({
-    title: "",
+    name: "",
+    price: "",
     description: "",
-    price: 0,
+    duration: 30,
+    enabled: true,
   });
-  const [creating, setCreating] = useState(false);
 
-  // Fetch services
   useEffect(() => {
-    if (!salonId) return;
-
-    const fetchServices = async () => {
-      setLoading(true);
-      try {
-        const res = await axios.get(`/api/salons/services?salonId=${salonId}`);
-        setServices(res.data);
-        setError("");
-      } catch (err) {
-        console.error(err);
-        setError("Failed to fetch services");
-      }
-      setLoading(false);
-    };
-
-    fetchServices();
-  }, [salonId]);
-
-  // Handle input changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setNewService({ ...newService, [name]: value });
-  };
-
-  // Create new service
-  const handleCreate = async () => {
-    if (!newService.title) return alert("Title is required");
-    setCreating(true);
-    try {
-      const res = await axios.post("/api/salons/services", {
-        ...newService,
-        salonId,
-      });
-      setServices([...services, res.data]);
-      setNewService({ title: "", description: "", price: 0 });
-      setError("");
-    } catch (err) {
-      console.error(err);
-      setError("Failed to create service");
+    const salonSession = localStorage.getItem("salonSession");
+    if (!salonSession) {
+      router.push("/auth/salon/login");
+      return;
     }
-    setCreating(false);
+
+    const salonData = JSON.parse(salonSession);
+    setSalon(salonData);
+    const salonId = salonData._id || salonData.id;
+    loadServices(salonId);
+  }, [router]);
+
+  const loadServices = async (salonId) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/salons/profile?salonId=${salonId}`);
+      const data = await res.json();
+
+      // Convert services object to array
+      const servicesArray = Object.entries(data.services || {}).map(
+        ([key, value]) => ({
+          id: key,
+          name: value.name || key,
+          price: value.price || "0",
+          description: value.description || "",
+          duration: value.duration || 30,
+          enabled: value.enabled !== false,
+        })
+      );
+
+      setServices(servicesArray);
+      setSalon(data);
+    } catch (error) {
+      console.error("Error loading services:", error);
+      alert("Failed to load services");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) return <p className="p-6">Loading services...</p>;
+  const handleAddService = async () => {
+    if (!newService.name || !newService.price) {
+      alert("Name and price are required");
+      return;
+    }
+
+    try {
+      const salonId = salon._id || salon.id;
+
+      // Create new services object
+      const updatedServices = {
+        ...salon.services,
+        [newService.name]: {
+          name: newService.name,
+          price: newService.price,
+          description: newService.description,
+          duration: newService.duration,
+          enabled: newService.enabled,
+        },
+      };
+
+      const res = await fetch("/api/salons/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId,
+          services: updatedServices,
+        }),
+      });
+
+      if (res.ok) {
+        alert("Service added successfully!");
+        setShowAddForm(false);
+        setNewService({
+          name: "",
+          price: "",
+          description: "",
+          duration: 30,
+          enabled: true,
+        });
+        loadServices(salonId);
+      } else {
+        throw new Error("Failed to add service");
+      }
+    } catch (error) {
+      console.error("Error adding service:", error);
+      alert("Failed to add service");
+    }
+  };
+
+  const startEditing = (service) => {
+    setEditingService({ ...service });
+  };
+
+  const cancelEditing = () => {
+    setEditingService(null);
+  };
+
+  const saveService = async () => {
+    if (!editingService.name || !editingService.price) {
+      alert("Name and price are required");
+      return;
+    }
+
+    try {
+      const salonId = salon._id || salon.id;
+
+      // Update services object
+      const updatedServices = { ...salon.services };
+
+      // If name changed, delete old key and add new one
+      if (editingService.id !== editingService.name) {
+        delete updatedServices[editingService.id];
+      }
+
+      updatedServices[editingService.name] = {
+        name: editingService.name,
+        price: editingService.price,
+        description: editingService.description,
+        duration: editingService.duration,
+        enabled: editingService.enabled,
+      };
+
+      const res = await fetch("/api/salons/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId,
+          services: updatedServices,
+        }),
+      });
+
+      if (res.ok) {
+        alert("Service updated successfully!");
+        setEditingService(null);
+        loadServices(salonId);
+      } else {
+        throw new Error("Failed to update service");
+      }
+    } catch (error) {
+      console.error("Error updating service:", error);
+      alert("Failed to update service");
+    }
+  };
+
+  const deleteService = async (serviceId) => {
+    if (!confirm("Are you sure you want to delete this service?")) {
+      return;
+    }
+
+    try {
+      const salonId = salon._id || salon.id;
+
+      // Remove service from object
+      const updatedServices = { ...salon.services };
+      delete updatedServices[serviceId];
+
+      const res = await fetch("/api/salons/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId,
+          services: updatedServices,
+        }),
+      });
+
+      if (res.ok) {
+        alert("Service deleted successfully!");
+        loadServices(salonId);
+      } else {
+        throw new Error("Failed to delete service");
+      }
+    } catch (error) {
+      console.error("Error deleting service:", error);
+      alert("Failed to delete service");
+    }
+  };
+
+  const toggleEnabled = async (serviceId, currentStatus) => {
+    try {
+      const salonId = salon._id || salon.id;
+
+      const updatedServices = {
+        ...salon.services,
+        [serviceId]: {
+          ...salon.services[serviceId],
+          enabled: !currentStatus,
+        },
+      };
+
+      const res = await fetch("/api/salons/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId,
+          services: updatedServices,
+        }),
+      });
+
+      if (res.ok) {
+        loadServices(salonId);
+      }
+    } catch (error) {
+      console.error("Error toggling service:", error);
+      alert("Failed to toggle service status");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className={dashboardStyles.dashboardWrapper}>
+        <div className={dashboardStyles.sidebarDesktop}>
+          <OwnerSidebar />
+        </div>
+        <main className={dashboardStyles.mainContent}>
+          <div className={styles.loading}>
+            <div className={styles.spinner}></div>
+            <p>Loading services...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Services for Salon {salonId}</h1>
-
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-
-      {/* New Service Form */}
-      <div className="mb-8 p-4 border rounded shadow">
-        <h2 className="text-xl font-semibold mb-2">Add New Service</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input
-            type="text"
-            name="title"
-            placeholder="Title"
-            value={newService.title}
-            onChange={handleChange}
-            className="border rounded px-3 py-2 w-full"
-          />
-          <input
-            type="number"
-            name="price"
-            placeholder="Price"
-            value={newService.price}
-            onChange={handleChange}
-            className="border rounded px-3 py-2 w-full"
-          />
-          <input
-            type="text"
-            name="description"
-            placeholder="Description"
-            value={newService.description}
-            onChange={handleChange}
-            className="border rounded px-3 py-2 w-full"
-          />
-        </div>
-        <button
-          onClick={handleCreate}
-          disabled={creating}
-          className="mt-3 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+    <div className={dashboardStyles.dashboardWrapper}>
+      {sidebarOpen && (
+        <div
+          className={dashboardStyles.sidebarOverlay}
+          onClick={() => setSidebarOpen(false)}
         >
-          {creating ? "Creating..." : "Add Service"}
-        </button>
+          <div
+            className={dashboardStyles.sidebarMobile}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <OwnerSidebar closeSidebar={() => setSidebarOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      <div className={dashboardStyles.sidebarDesktop}>
+        <OwnerSidebar />
       </div>
 
-      {/* Services List */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Existing Services</h2>
-        {services.length === 0 ? (
-          <p>No services yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border rounded">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-4 py-2 border">Title</th>
-                  <th className="px-4 py-2 border">Description</th>
-                  <th className="px-4 py-2 border">Price</th>
-                  <th className="px-4 py-2 border">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {services.map((s) => (
-                  <tr key={s._id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 border">{s.title}</td>
-                    <td className="px-4 py-2 border">{s.description}</td>
-                    <td className="px-4 py-2 border">{s.price}</td>
-                    <td className="px-4 py-2 border">
-                      <Link
-                        href={`/salons/services/${s._id}`}
-                        className="text-blue-600 hover:underline mr-3"
-                      >
-                        Edit
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <main className={dashboardStyles.mainContent}>
+        <div className={dashboardStyles.mobileTopBar}>
+          <button
+            className={dashboardStyles.menuButton}
+            onClick={() => setSidebarOpen(true)}
+          >
+            ☰
+          </button>
+          <h2 className={dashboardStyles.mobileTitle}>Services</h2>
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className={showAddForm ? styles.cancelButton : styles.addButton}
+          >
+            {showAddForm ? "Cancel" : "+ Add New Service"}
+          </button>
+        </div>
+
+        <div className={styles.container}>
+          {/* Add Form */}
+          {showAddForm && (
+            <div className={styles.formCard}>
+              <h2>Add New Service</h2>
+
+              <div className={styles.formGrid}>
+                <div className={styles.formField}>
+                  <label>Service Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Haircut"
+                    value={newService.name}
+                    onChange={(e) =>
+                      setNewService({ ...newService, name: e.target.value })
+                    }
+                    className={styles.input}
+                  />
+                </div>
+
+                <div className={styles.formField}>
+                  <label>Price (₹) *</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={newService.price}
+                    onChange={(e) =>
+                      setNewService({ ...newService, price: e.target.value })
+                    }
+                    className={styles.input}
+                  />
+                </div>
+
+                <div className={styles.formField}>
+                  <label>Duration (minutes)</label>
+                  <input
+                    type="number"
+                    placeholder="30"
+                    value={newService.duration}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        duration: parseInt(e.target.value) || 30,
+                      })
+                    }
+                    className={styles.input}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.formField}>
+                <label>Description</label>
+                <textarea
+                  placeholder="Describe the service..."
+                  value={newService.description}
+                  onChange={(e) =>
+                    setNewService({
+                      ...newService,
+                      description: e.target.value,
+                    })
+                  }
+                  rows={3}
+                  className={styles.textarea}
+                />
+              </div>
+
+              <div className={styles.formField}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={newService.enabled}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        enabled: e.target.checked,
+                      })
+                    }
+                    className={styles.checkbox}
+                  />
+                  <span>Enable this service</span>
+                </label>
+              </div>
+
+              <button
+                onClick={handleAddService}
+                className={styles.submitButton}
+              >
+                Add Service
+              </button>
+            </div>
+          )}
+
+          {/* Services Grid */}
+          {services.length > 0 ? (
+            <div className={styles.servicesGrid}>
+              {services.map((service) => (
+                <div key={service.id} className={styles.serviceCard}>
+                  {editingService && editingService.id === service.id ? (
+                    /* EDIT MODE */
+                    <>
+                      <div className={styles.formField}>
+                        <label>Name</label>
+                        <input
+                          type="text"
+                          value={editingService.name}
+                          onChange={(e) =>
+                            setEditingService({
+                              ...editingService,
+                              name: e.target.value,
+                            })
+                          }
+                          className={styles.input}
+                        />
+                      </div>
+
+                      <div className={styles.formField}>
+                        <label>Price (₹)</label>
+                        <input
+                          type="number"
+                          value={editingService.price}
+                          onChange={(e) =>
+                            setEditingService({
+                              ...editingService,
+                              price: e.target.value,
+                            })
+                          }
+                          className={styles.input}
+                        />
+                      </div>
+
+                      <div className={styles.formField}>
+                        <label>Duration (minutes)</label>
+                        <input
+                          type="number"
+                          value={editingService.duration}
+                          onChange={(e) =>
+                            setEditingService({
+                              ...editingService,
+                              duration: parseInt(e.target.value) || 30,
+                            })
+                          }
+                          className={styles.input}
+                        />
+                      </div>
+
+                      <div className={styles.formField}>
+                        <label>Description</label>
+                        <textarea
+                          value={editingService.description}
+                          onChange={(e) =>
+                            setEditingService({
+                              ...editingService,
+                              description: e.target.value,
+                            })
+                          }
+                          rows={3}
+                          className={styles.textarea}
+                        />
+                      </div>
+
+                      <div className={styles.formField}>
+                        <label className={styles.checkboxLabel}>
+                          <input
+                            type="checkbox"
+                            checked={editingService.enabled}
+                            onChange={(e) =>
+                              setEditingService({
+                                ...editingService,
+                                enabled: e.target.checked,
+                              })
+                            }
+                            className={styles.checkbox}
+                          />
+                          <span>Enabled</span>
+                        </label>
+                      </div>
+
+                      <div className={styles.actions}>
+                        <button
+                          onClick={saveService}
+                          className={styles.submitButton}
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={cancelEditing}
+                          className={styles.cancelButton}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    /* VIEW MODE */
+                    <>
+                      <div className={styles.serviceHeader}>
+                        <div className={styles.serviceInfo}>
+                          <h3>{service.name}</h3>
+                          <p className={styles.servicePrice}>
+                            ₹{service.price}
+                          </p>
+                          <p className={styles.serviceDuration}>
+                            {service.duration} minutes
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() =>
+                            toggleEnabled(service.id, service.enabled)
+                          }
+                          className={`${styles.statusBadge} ${
+                            service.enabled ? styles.enabled : styles.disabled
+                          }`}
+                        >
+                          {service.enabled ? "ENABLED" : "DISABLED"}
+                        </button>
+                      </div>
+
+                      {service.description && (
+                        <div className={styles.serviceDescription}>
+                          <p>{service.description}</p>
+                        </div>
+                      )}
+
+                      <div className={styles.actions}>
+                        <button
+                          onClick={() => startEditing(service)}
+                          className={styles.editButton}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteService(service.id)}
+                          className={styles.deleteButton}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.emptyState}>
+              <p>No services found.</p>
+              <button onClick={() => setShowAddForm(true)}>
+                Add Your First Service
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
