@@ -906,21 +906,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Date Picker Section */}
-          {/*  <div className={styles.card}>
-            <h2 className={styles.filterTitle}>📅 Select Date</h2>
-
-           
-
-          Current Selection Display
-            <div className={styles.currentDateDisplay}>
-              <span className={styles.currentDateIcon}>🗓️</span>
-              <span className={styles.currentDateText}>
-                {getDateDisplayText()}
-              </span>
-            </div> 
-          </div>*/}
-
           {/* Bookings */}
           <div className={styles.card}>
             {/* Quick Date Buttons */}

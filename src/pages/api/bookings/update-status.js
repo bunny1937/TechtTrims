@@ -60,11 +60,12 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Booking not found" });
     }
 
-    // ✅ UPDATE BARBER STATUS WHEN SERVICE STARTS/ENDS
+    // ✅ Fetch updated booking
     const updatedBooking = await db.collection("bookings").findOne({
       _id: new ObjectId(bookingId),
     });
 
+    // ✅ UPDATE BARBER STATUS WHEN SERVICE STARTS/ENDS
     if (status === "started" && updatedBooking?.barberId) {
       const endTime = new Date(Date.now() + (estimatedDuration || 45) * 60000);
 
@@ -133,14 +134,41 @@ export default async function handler(req, res) {
 
     // ✅ UPDATE BARBER STATS IF COMPLETED
     if (status === "completed" && updatedBooking?.barber) {
-      const barber = await db.collection("barbers").findOne({
-        name: updatedBooking.barber,
-      });
-      if (barber) {
-        await updateBarberStats(
-          barber._id,
-          barber.name,
-          updatedBooking.salonId
+      try {
+        const barber = await db.collection("barbers").findOne({
+          name: updatedBooking.barber,
+          salonId: updatedBooking.salonId,
+        });
+
+        if (barber) {
+          await db.collection("barbers").updateOne(
+            { _id: barber._id },
+            {
+              $inc: {
+                completedBookings: 1,
+              },
+              $set: {
+                lastActiveAt: new Date(),
+                updatedAt: new Date(),
+              },
+            }
+          );
+
+          // Update barber rating/stats
+          await updateBarberStats(
+            barber._id,
+            barber.name,
+            updatedBooking.salonId
+          );
+
+          console.log(
+            `✅ Updated barber ${barber.name} - completed bookings incremented`
+          );
+        }
+      } catch (barberError) {
+        console.error(
+          "❌ Error updating barber stats on completion:",
+          barberError
         );
       }
     }
