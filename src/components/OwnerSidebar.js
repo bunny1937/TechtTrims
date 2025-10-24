@@ -8,11 +8,7 @@ export default function OwnerSidebar({ closeSidebar }) {
     { icon: "🏠", label: "Home", path: "/salons/dashboard" },
     { icon: "👤", label: "Profile", path: "/salons/profile" },
     { icon: "📅", label: "Bookings", path: "/salons/bookings" },
-    {
-      icon: "👨‍💼",
-      label: "Barber Management",
-      path: "/salons/barbers",
-    },
+    { icon: "👨‍💼", label: "Barbers", path: "/salons/barbers" },
     { icon: "👥", label: "Staff", path: "/salons/staff" },
     { icon: "✂️", label: "Services", path: "/salons/services" },
     { icon: "💰", label: "Payments", path: "/salons/payments" },

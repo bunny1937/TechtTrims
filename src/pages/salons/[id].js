@@ -8,6 +8,9 @@ import Image from "next/image";
 import { UserDataManager } from "../../lib/userData";
 import RetryButton from "@/components/RetryButton";
 import ReviewsSection from "@/components/Salon/ReviewSection";
+import ImageCarousel from "@/components/ImageCarousel";
+import LocationMap from "@/components/Maps/LocationMap";
+import { useLocation } from "@/hooks/useLocation";
 
 // Dynamic map import to avoid SSR issues
 const MapContainer = dynamic(
@@ -22,6 +25,9 @@ const Marker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
   { ssr: false }
 );
+const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
+  ssr: false,
+});
 
 export default function SalonDetail({ initialSalon }) {
   const router = useRouter();
@@ -46,6 +52,7 @@ export default function SalonDetail({ initialSalon }) {
   const [timeSlots, setTimeSlots] = useState([]); // ✅ added this
   const [userOnboarding, setUserOnboarding] = useState(null);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [isWalkinBooking, setIsWalkinBooking] = useState(false); // ADD THIS
   const [isBooking, setIsBooking] = useState(false);
   const [regName, setRegName] = useState("");
   const [regMobile, setRegMobile] = useState("");
@@ -57,6 +64,8 @@ export default function SalonDetail({ initialSalon }) {
   const [closingCountdown, setClosingCountdown] = useState(null); // seconds remaining
   const [showClosingTimer, setShowClosingTimer] = useState(false);
   const [salonClosed, setSalonClosed] = useState(false);
+  const { userLocation, locationStatus, requestLocationPermission } =
+    useLocation();
 
   useEffect(() => {
     // Only run once when component mounts
@@ -446,6 +455,8 @@ export default function SalonDetail({ initialSalon }) {
   };
 
   const handleBooking = async () => {
+    if (isWalkinBooking || isBooking) return;
+    setIsWalkinBooking(true);
     // ✅ Basic service validation (required for both modes)
     if (selectedServices.length === 0) {
       alert("Please select at least one service");
@@ -613,6 +624,9 @@ export default function SalonDetail({ initialSalon }) {
     } catch (error) {
       console.error("❌ Booking error:", error);
       alert(`Booking failed: ${error.message}`);
+    } finally {
+      setIsWalkinBooking(false);
+      setIsBooking(false);
     }
   };
 
@@ -833,19 +847,8 @@ export default function SalonDetail({ initialSalon }) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
       >
-        <div className={styles.imageGallery}>
-          {salon.salonImages && salon.salonImages.length > 0 ? (
-            <Image
-              src={salon.salonImages[0]}
-              alt={salon.salonName}
-              className={styles.mainImage}
-            />
-          ) : (
-            <div className={styles.placeholderImage}>
-              <span>📸</span>
-              <p>No images available</p>
-            </div>
-          )}
+        <div className={styles.CarouselContainer}>
+          <ImageCarousel images={salon.galleryImages} autoPlayInterval={4000} />
         </div>
 
         <div className={styles.salonBasicInfo}>
@@ -857,12 +860,19 @@ export default function SalonDetail({ initialSalon }) {
               ({salon.ratings.totalReviews} reviews)
             </div>
           </div> */}
-
+          {/* 
           <div className={styles.locationInfo}>
             <p>📍 {salon.location.address}</p>
             <p>📞 {salon.phone}</p>
-          </div>
-
+          </div> */}
+          {/* Map Section */}
+          <LocationMap
+            location={salon.location}
+            userLocation={userLocation} // This now comes from useLocation hook
+            salonName={salon.salonName}
+            address={salon.location?.address}
+            phone={salon.phone}
+          />
           <div className={styles.quickStats}>
             <div className={styles.stat}>
               <span className={styles.statNumber}>
@@ -1259,6 +1269,8 @@ export default function SalonDetail({ initialSalon }) {
                   <button
                     onClick={handleBooking}
                     disabled={
+                      isWalkinBooking ||
+                      isBooking ||
                       selectedServices.length === 0 ||
                       !selectedBarber ||
                       (bookingMode === "prebook" && !selectedSlot) ||
@@ -1273,11 +1285,14 @@ export default function SalonDetail({ initialSalon }) {
                         : ""
                     }`}
                   >
-                    {bookingMode === "walkin" && !isSalonOpen()
+                    {isWalkinBooking || isBooking
+                      ? "Processing..."
+                      : bookingMode === "walkin" && !isSalonOpen()
                       ? "Salon is Closed"
                       : bookingMode === "walkin"
                       ? "Book Walk-in Now"
                       : "Book Appointment"}
+
                     {availableBarbers.length === 0 &&
                       selectedServices.length > 0 && (
                         <small className={styles.buttonSubtext}>
@@ -1342,7 +1357,7 @@ export default function SalonDetail({ initialSalon }) {
         </AnimatePresence>
       </div>
 
-      {/* Map Section */}
+      {/* Map Section 
       {salon.location.latitude && salon.location.longitude && (
         <motion.section
           className={styles.mapSection}
@@ -1365,7 +1380,7 @@ export default function SalonDetail({ initialSalon }) {
             />
           </MapContainer>
         </motion.section>
-      )}
+      )}*/}
 
       {/* Book Appointment Button */}
 

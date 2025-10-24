@@ -547,13 +547,19 @@
 }
 
 .barberPhoto {
-  width: 100px;
-  height: 100px;
+  width: 120px !important;
+  height: 120px !important;
+  min-width: 120px;
+  min-height: 120px;
+  max-width: 120px;
+  max-height: 120px;
   margin: 0 auto 16px;
   border-radius: 50%;
   overflow: hidden;
-  border: 4px solid #e2e8f0;
+  border: 4px solid #4b4c50;
   transition: all 0.3s ease;
+  display: block;
+  flex-shrink: 0;
 }
 
 .cardContent .barberCard.selected .barberPhoto {
@@ -565,6 +571,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .barberName {
@@ -761,7 +768,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-6) var(--space-8);
+  padding: var(--space-1) var(--space-8);
   background: var(--background-secondary);
   border-bottom: 1px solid var(--border-color);
   position: sticky;
@@ -806,7 +813,7 @@
   display: flex;
   gap: 12px;
   justify-content: center;
-  margin: 20px auto;
+  margin: 10px auto;
   max-width: 400px;
 }
 
@@ -978,27 +985,15 @@
 
 /* Hero Section */
 .heroSection {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: var(--space-6);
   padding: var(--space-6) var(--space-8);
   max-width: 1400px;
   margin: 0 auto;
 }
 
-.imageGallery {
-  position: relative;
-  width: 100%;
-  height: 500px;
-  border-radius: var(--radius-2xl);
-  overflow: hidden;
-  box-shadow: var(--shadow-luxury);
-}
-
-.mainImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.CarouselContainer {
+  width: 110%;
 }
 
 .placeholderImage {
@@ -1024,8 +1019,8 @@
 
 /* Salon Basic Info */
 .salonBasicInfo {
-  display: grid;
-  grid-template-rows: auto auto auto;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
 }
 
@@ -1611,12 +1606,9 @@
 }
 
 .barberImage {
-  width: 80px;
-  height: 80px;
-  margin: 0 auto var(--space-4);
-  border-radius: var(--radius-full);
+  width: 120px;
+  height: 120px;
   overflow: hidden;
-  border: 3px solid var(--primary);
   box-shadow: var(--shadow-lg);
 }
 
@@ -2019,11 +2011,11 @@
 /* Tablet Responsive */
 @media (max-width: 1024px) {
   .heroSection {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 
-  .imageGallery {
-    height: 400px;
+  .CarouselContainer {
+    width: 100%;
   }
 
   .servicesGrid {
@@ -2062,7 +2054,7 @@
   }
 
   .heroSection {
-    padding: var(--space-6) var(--space-4);
+    padding: var(--space-1);
   }
 
   .imageGallery {

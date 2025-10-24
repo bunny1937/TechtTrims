@@ -1,3 +1,5 @@
+//pages/api/auth/salon/register.js
+
 import clientPromise from "../../../../lib/mongodb";
 import {
   hashPassword,
@@ -39,6 +41,8 @@ export default async function handler(req, res) {
       address,
       latitude,
       longitude,
+      profilePicture, // new string URL for salon profile pic
+      galleryImages, // new array of URLs for salon gallery
       services,
       barbers = [],
       operatingHours,
@@ -190,11 +194,16 @@ export default async function handler(req, res) {
         country: locationDetails?.country || "India",
         postcode: locationDetails?.postcode || "",
       },
+      profilePicture: profilePicture || "", // now saved as full ImageKit CDN URL
+      galleryImages: Array.isArray(galleryImages) ? galleryImages : [],
+      salonImages: Array.isArray(salonImages) ? salonImages : [],
+
+      services: services || {},
       services: defaultServices,
       operatingHours: defaultOperatingHours,
       description: description || "",
       amenities: amenities || ["WiFi", "Air Conditioning", "Parking"],
-      salonImages: salonImages || [],
+
       barbers: [],
       ratings: {
         overall: 0,

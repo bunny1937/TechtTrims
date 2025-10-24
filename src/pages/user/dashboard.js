@@ -8,6 +8,11 @@ export default function UserDashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [paymentMethods, setPaymentMethods] = useState([
+    { id: 1, type: "UPI", details: "example@upi", default: true },
+    { id: 2, type: "Card", details: "**** **** **** 4532", default: false },
+  ]);
+  const [showAddPayment, setShowAddPayment] = useState(false);
   const [bookings, setBookings] = useState([]);
   const [payments, setPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -147,7 +152,9 @@ export default function UserDashboard() {
       <div className={styles.sidebar}>
         <div className={styles.userProfile}>
           <h2>Welcome, {user?.name || "User"}</h2>
-          <p>{user?.email || "No email"}</p>
+          <p>
+            {user?.email || "No email"} || {user?.phoneNumber}
+          </p>
         </div>
 
         <nav className={styles.nav}>
@@ -177,9 +184,9 @@ export default function UserDashboard() {
           </button>
           <button
             className={`${styles.navItem} ${
-              activeTab === "feedback" ? styles.active : ""
+              activeTab === "reviews" ? styles.active : ""
             }`}
-            onClick={() => setActiveTab("feedback")}
+            onClick={() => setActiveTab("reviews")}
           >
             ⭐ My Reviews
           </button>
@@ -191,11 +198,10 @@ export default function UserDashboard() {
           >
             👤 Profile
           </button>
+          <button className={styles.logoutButton} onClick={handleLogout}>
+            🚪 Logout
+          </button>
         </nav>
-
-        <button className={styles.logoutButton} onClick={handleLogout}>
-          🚪 Logout
-        </button>
       </div>
 
       <div className={styles.content}>
@@ -204,100 +210,113 @@ export default function UserDashboard() {
             <h1>My Bookings ({bookings.length})</h1>
             <div className={styles.bookingsList}>
               {bookings.map((booking) => (
-                <div key={booking._id} className={styles.bookingCard}>
-                  <div className={styles.bookingHeader}>
-                    <h3>{booking.service}</h3>
-                    <div className={styles.badges}>
-                      <span
-                        className={`${styles.statusBadge} ${
-                          styles[booking.status]
-                        }`}
-                      >
-                        {booking.status}
-                      </span>
-                      {booking.bookingType && (
+                <div
+                  key={booking._id || booking.id || booking.bookingCode}
+                  className={styles.bookingCard}
+                  onClick={() =>
+                    router.push(
+                      `/walkin/confirmation?bookingId=${
+                        booking._id || booking.id
+                      }`
+                    )
+                  }
+                  style={{ cursor: "pointer" }}
+                >
+                  <div key={booking._id} className={styles.bookingCard}>
+                    <div className={styles.bookingHeader}>
+                      <h3>{booking.service}</h3>
+                      <div className={styles.badges}>
                         <span
-                          className={`${styles.typeBadge} ${
-                            booking.bookingType === "WALKIN"
-                              ? styles.walkin
-                              : styles.prebook
+                          className={`${styles.statusBadge} ${
+                            styles[booking.status]
                           }`}
                         >
-                          {booking.bookingType === "WALKIN"
-                            ? "🚶 Walk-in"
-                            : "📅 Pre-book"}
+                          {booking.status}
                         </span>
+                        {booking.bookingType && (
+                          <span
+                            className={`${styles.typeBadge} ${
+                              booking.bookingType === "WALKIN"
+                                ? styles.walkin
+                                : styles.prebook
+                            }`}
+                          >
+                            {booking.bookingType === "WALKIN"
+                              ? "🚶 Walk-in"
+                              : "📅 Pre-book"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className={styles.bookingDetails}>
+                      {booking.bookingType === "WALKIN" ? (
+                        <>
+                          <p>
+                            <strong>📅 Date:</strong>{" "}
+                            {booking.createdAt
+                              ? new Date(booking.createdAt).toLocaleDateString()
+                              : "N/A"}
+                          </p>
+                          <p>
+                            <strong>⏰ Time:</strong>{" "}
+                            {booking.createdAt
+                              ? new Date(booking.createdAt).toLocaleTimeString()
+                              : "N/A"}
+                          </p>
+                          <p>
+                            <strong>🏪 Salon:</strong> {booking.salonName}
+                          </p>
+                          <p>
+                            <strong>💈 Barber:</strong>{" "}
+                            {booking.barberName || "Not assigned"}
+                          </p>
+                          <p>
+                            <strong>💰 Price:</strong>{" "}
+                            {booking.price
+                              ? `₹${booking.price}`
+                              : "Paid at salon"}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p>
+                            <strong>📅 Date:</strong> {booking.date}
+                          </p>
+                          <p>
+                            <strong>⏰ Time:</strong> {booking.time}
+                          </p>
+                          <p>
+                            <strong>🏪 Salon:</strong> {booking.salonName}
+                          </p>
+                          {booking.barber && (
+                            <p>
+                              <strong>💈 Barber:</strong> {booking.barber}
+                            </p>
+                          )}
+                          <p>
+                            <strong>💰 Price:</strong> ₹{booking.price || 0}
+                          </p>
+                        </>
+                      )}
+                      {booking.feedback?.ratings?.overall && (
+                        <p>
+                          <strong>⭐ Your Rating:</strong>{" "}
+                          {booking.feedback.ratings.overall}/5
+                        </p>
                       )}
                     </div>
+                    {booking.status === "completed" &&
+                      !booking.feedback?.submitted && (
+                        <button
+                          className={styles.feedbackButton}
+                          onClick={() =>
+                            router.push(`/feedback?bookingId=${booking._id}`)
+                          }
+                        >
+                          📝 Give Feedback
+                        </button>
+                      )}
                   </div>
-                  <div className={styles.bookingDetails}>
-                    {booking.bookingType === "WALKIN" ? (
-                      <>
-                        <p>
-                          <strong>📅 Date:</strong>{" "}
-                          {booking.createdAt
-                            ? new Date(booking.createdAt).toLocaleDateString()
-                            : "N/A"}
-                        </p>
-                        <p>
-                          <strong>⏰ Time:</strong>{" "}
-                          {booking.createdAt
-                            ? new Date(booking.createdAt).toLocaleTimeString()
-                            : "N/A"}
-                        </p>
-                        <p>
-                          <strong>🏪 Salon:</strong> {booking.salonName}
-                        </p>
-                        <p>
-                          <strong>💈 Barber:</strong>{" "}
-                          {booking.barberName || "Not assigned"}
-                        </p>
-                        <p>
-                          <strong>💰 Price:</strong>{" "}
-                          {booking.price
-                            ? `₹${booking.price}`
-                            : "Paid at salon"}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p>
-                          <strong>📅 Date:</strong> {booking.date}
-                        </p>
-                        <p>
-                          <strong>⏰ Time:</strong> {booking.time}
-                        </p>
-                        <p>
-                          <strong>🏪 Salon:</strong> {booking.salonName}
-                        </p>
-                        {booking.barber && (
-                          <p>
-                            <strong>💈 Barber:</strong> {booking.barber}
-                          </p>
-                        )}
-                        <p>
-                          <strong>💰 Price:</strong> ₹{booking.price || 0}
-                        </p>
-                      </>
-                    )}
-                    {booking.feedback?.ratings?.overall && (
-                      <p>
-                        <strong>⭐ Your Rating:</strong>{" "}
-                        {booking.feedback.ratings.overall}/5
-                      </p>
-                    )}
-                  </div>
-                  {booking.status === "completed" &&
-                    !booking.feedback?.submitted && (
-                      <button
-                        className={styles.feedbackButton}
-                        onClick={() =>
-                          router.push(`/feedback?bookingId=${booking._id}`)
-                        }
-                      >
-                        📝 Give Feedback
-                      </button>
-                    )}
                 </div>
               ))}
               {bookings.length === 0 && (
@@ -477,7 +496,275 @@ export default function UserDashboard() {
           </div>
         )}
 
-        {/* Include payments and feedback tabs as they were */}
+        {/* Reviews Section */}
+        {activeTab === "reviews" && (
+          <div className={styles.reviewsSection}>
+            <div className={styles.sectionHeader}>
+              <h2>📝 My Reviews</h2>
+              <p className={styles.subtitle}>
+                {bookings.filter((b) => b.feedback?.submitted).length} reviews
+                submitted
+              </p>
+            </div>
+
+            {bookings.filter((b) => b.feedback?.submitted).length === 0 ? (
+              <div className={styles.emptyState}>
+                <p>🎭 No reviews yet</p>
+                <p>Complete a booking and share your experience!</p>
+              </div>
+            ) : (
+              <div className={styles.reviewsList}>
+                {bookings
+                  .filter((b) => b.feedback?.submitted)
+                  .map((booking) => (
+                    <div key={booking._id} className={styles.reviewCard}>
+                      <div className={styles.reviewHeader}>
+                        <div className={styles.reviewSalon}>
+                          <h3>{booking.salonName}</h3>
+                          <p className={styles.reviewDate}>
+                            {new Date(
+                              booking.feedback.submittedAt
+                            ).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}{" "}
+                            at{" "}
+                            {new Date(
+                              booking.feedback.submittedAt
+                            ).toLocaleTimeString("en-IN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                        <div className={styles.overallRating}>
+                          <span className={styles.ratingNumber}>
+                            {booking.feedback.ratings.overall}
+                          </span>
+                          <span className={styles.ratingStars}>⭐</span>
+                        </div>
+                      </div>
+
+                      <div className={styles.reviewDetails}>
+                        <p>
+                          <strong>Service:</strong> {booking.service}
+                        </p>
+                        <p>
+                          <strong>Barber:</strong> {booking.barberName}
+                        </p>
+                        <p>
+                          <strong>Price:</strong> ₹{booking.price}
+                        </p>
+                      </div>
+
+                      <div className={styles.ratingsGrid}>
+                        <div className={styles.ratingItem}>
+                          <span className={styles.ratingLabel}>
+                            Service Quality
+                          </span>
+                          <span className={styles.ratingValue}>
+                            {booking.feedback.ratings.serviceQuality}/5 ⭐
+                          </span>
+                        </div>
+                        <div className={styles.ratingItem}>
+                          <span className={styles.ratingLabel}>Timing</span>
+                          <span className={styles.ratingValue}>
+                            {booking.feedback.ratings.timing}/5 ⭐
+                          </span>
+                        </div>
+                        <div className={styles.ratingItem}>
+                          <span className={styles.ratingLabel}>Barber</span>
+                          <span className={styles.ratingValue}>
+                            {booking.feedback.ratings.barberPerformance}/5 ⭐
+                          </span>
+                        </div>
+                        <div className={styles.ratingItem}>
+                          <span className={styles.ratingLabel}>Ambience</span>
+                          <span className={styles.ratingValue}>
+                            {booking.feedback.ratings.ambience}/5 ⭐
+                          </span>
+                        </div>
+                        <div className={styles.ratingItem}>
+                          <span className={styles.ratingLabel}>
+                            Cleanliness
+                          </span>
+                          <span className={styles.ratingValue}>
+                            {booking.feedback.ratings.cleanliness}/5 ⭐
+                          </span>
+                        </div>
+                      </div>
+
+                      {booking.feedback.comment && (
+                        <div className={styles.reviewComment}>
+                          <p className={styles.commentLabel}>
+                            💬 Your Comment:
+                          </p>
+                          <p className={styles.commentText}>
+                            {booking.feedback.comment}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+        {/* Payments Section */}
+        {activeTab === "payments" && (
+          <div className={styles.paymentsSection}>
+            <div className={styles.sectionHeader}>
+              <h2>💳 Payment Methods</h2>
+              <button
+                className={styles.addPaymentBtn}
+                onClick={() => setShowAddPayment(!showAddPayment)}
+              >
+                {showAddPayment ? "Cancel" : "+ Add Payment Method"}
+              </button>
+            </div>
+
+            {/* Add Payment Form */}
+            {showAddPayment && (
+              <div className={styles.addPaymentForm}>
+                <h3>Add New Payment Method</h3>
+                <div className={styles.paymentOptions}>
+                  <button className={styles.paymentOption}>
+                    <span className={styles.paymentIcon}>📱</span>
+                    <span>UPI</span>
+                  </button>
+                  <button className={styles.paymentOption}>
+                    <span className={styles.paymentIcon}>💳</span>
+                    <span>Credit/Debit Card</span>
+                  </button>
+                  <button className={styles.paymentOption}>
+                    <span className={styles.paymentIcon}>💵</span>
+                    <span>Cash</span>
+                  </button>
+                </div>
+
+                {/* UPI Form Example */}
+                <div className={styles.paymentForm}>
+                  <label>UPI ID</label>
+                  <input
+                    type="text"
+                    placeholder="yourname@upi"
+                    className={styles.input}
+                  />
+                  <button className={styles.saveBtn}>Save UPI</button>
+                </div>
+              </div>
+            )}
+
+            {/* Saved Payment Methods */}
+            <div className={styles.paymentMethodsList}>
+              {paymentMethods.map((method) => (
+                <div key={method.id} className={styles.paymentCard}>
+                  <div className={styles.paymentCardHeader}>
+                    <div className={styles.paymentType}>
+                      <span className={styles.paymentIcon}>
+                        {method.type === "UPI"
+                          ? "📱"
+                          : method.type === "Card"
+                          ? "💳"
+                          : "💵"}
+                      </span>
+                      <div>
+                        <h4>{method.type}</h4>
+                        <p className={styles.paymentDetails}>
+                          {method.details}
+                        </p>
+                      </div>
+                    </div>
+                    {method.default && (
+                      <span className={styles.defaultBadge}>Default</span>
+                    )}
+                  </div>
+                  <div className={styles.paymentCardActions}>
+                    {!method.default && (
+                      <button className={styles.setDefaultBtn}>
+                        Set as Default
+                      </button>
+                    )}
+                    <button className={styles.removeBtn}>Remove</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Payment History */}
+            <div className={styles.paymentHistory}>
+              <h3>💰 Payment History</h3>
+              <div className={styles.historyList}>
+                {bookings
+                  .filter((b) => b.status === "completed")
+                  .map((booking) => (
+                    <div key={booking._id} className={styles.historyItem}>
+                      <div className={styles.historyLeft}>
+                        <p className={styles.historyService}>
+                          {booking.service}
+                        </p>
+                        <p className={styles.historySalon}>
+                          {booking.salonName}
+                        </p>
+                        <p className={styles.historyDate}>
+                          {new Date(
+                            booking.completedAt || booking.createdAt
+                          ).toLocaleDateString("en-IN")}
+                        </p>
+                      </div>
+                      <div className={styles.historyRight}>
+                        <p className={styles.historyAmount}>₹{booking.price}</p>
+                        <span className={styles.historyStatus}>
+                          {booking.paymentMethod || "Cash"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                {bookings.filter((b) => b.status === "completed").length ===
+                  0 && (
+                  <div className={styles.emptyState}>
+                    <p>💸 No payments yet</p>
+                    <p>Your payment history will appear here</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Payment Stats */}
+            <div className={styles.paymentStats}>
+              <div className={styles.statCard}>
+                <h4>Total Spent</h4>
+                <p className={styles.statValue}>
+                  ₹
+                  {bookings
+                    .filter((b) => b.status === "completed")
+                    .reduce((sum, b) => sum + (b.price || 0), 0)}
+                </p>
+              </div>
+              <div className={styles.statCard}>
+                <h4>Avg Per Visit</h4>
+                <p className={styles.statValue}>
+                  ₹
+                  {Math.round(
+                    bookings
+                      .filter((b) => b.status === "completed")
+                      .reduce((sum, b) => sum + (b.price || 0), 0) /
+                      (bookings.filter((b) => b.status === "completed")
+                        .length || 1)
+                  )}
+                </p>
+              </div>
+              <div className={styles.statCard}>
+                <h4>Total Visits</h4>
+                <p className={styles.statValue}>
+                  {bookings.filter((b) => b.status === "completed").length}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

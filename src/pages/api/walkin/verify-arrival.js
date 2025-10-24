@@ -30,12 +30,10 @@ export default async function handler(req, res) {
     console.log("Found booking:", booking);
 
     if (!booking) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Booking not found. Check the code.",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found. Check the code.",
+      });
     }
 
     if (booking.queueStatus !== "RED") {
@@ -45,11 +43,23 @@ export default async function handler(req, res) {
       });
     }
 
+    // Calculate correct position based on who checked in BEFORE this booking
+    const position = await db.collection("bookings").countDocuments({
+      salonId: new ObjectId(salonId),
+      barberId: booking.barberId,
+      queueStatus: "ORANGE",
+      isExpired: { $ne: true },
+    });
+
+    const correctQueuePosition = position + 1;
+
+    // Update booking to ORANGE with correct position
     await db.collection("bookings").updateOne(
       { _id: booking._id },
       {
         $set: {
           queueStatus: "ORANGE",
+          queuePosition: correctQueuePosition,
           status: "arrived",
           arrivedAt: new Date(),
           updatedAt: new Date(),
@@ -57,9 +67,12 @@ export default async function handler(req, res) {
       }
     );
 
-    const queuePosition = await db.collection("bookings").countDocuments({
-      salonId: new ObjectId(salonId),
-      queueStatus: "ORANGE",
+    console.log("✅ Checked in:", {
+      code: booking.bookingCode,
+      customer: booking.customerName,
+      barber: booking.barber,
+      position: correctQueuePosition,
+      arrivedAt: new Date().toLocaleTimeString(),
     });
 
     res.status(200).json({
@@ -67,7 +80,8 @@ export default async function handler(req, res) {
       message: "Customer checked in successfully",
       booking: {
         customerName: booking.customerName,
-        queuePosition,
+        queuePosition: correctQueuePosition,
+        barber: booking.barber,
       },
     });
   } catch (error) {

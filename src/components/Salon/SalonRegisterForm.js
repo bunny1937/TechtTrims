@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { MapPin, Clock, Store, Scissors, Star } from "lucide-react";
+import Image from "next/image";
 import styles from "../../styles/SalonRegister.module.css";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import UploadImageButton from "../Upload/UploadImageButton";
 
 // Dynamically import LocationPicker to avoid SSR issues with Leaflet
 const LocationPicker = dynamic(() => import("../Maps/LocationPicker"), {
@@ -25,28 +27,24 @@ const SalonRegisterForm = () => {
     address: "",
     locationData: null,
     latitude: "",
-    longitude: "", // Will store coordinates and formatted address
+    longitude: "",
     openingTime: "09:00",
     closingTime: "21:00",
 
+    // IMAGE ADDITIONS
+    profilePicture: "",
+    galleryImages: [],
+
     // Basic Services & Pricing
     services: {
-      haircut: { enabled: false, price: "" },
-      shave: { enabled: false, price: "" },
-      hairWash: { enabled: false, price: "" },
-      hairStyling: { enabled: false, price: "" },
-      facial: { enabled: false, price: "" },
-      hairColor: { enabled: false, price: "" },
+      haircut: { enabled: false, price: "", image: "" },
+      shave: { enabled: false, price: "", image: "" },
+      hairWash: { enabled: false, price: "", image: "" },
+      hairStyling: { enabled: false, price: "", image: "" },
+      facial: { enabled: false, price: "", image: "" },
+      hairColor: { enabled: false, price: "", image: "" },
     },
     barbers: [],
-    services: {
-      haircut: { enabled: false, price: "" },
-      shave: { enabled: false, price: "" },
-      hairWash: { enabled: false, price: "" },
-      hairStyling: { enabled: false, price: "" },
-      facial: { enabled: false, price: "" },
-      hairColor: { enabled: false, price: "" },
-    },
   });
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -54,6 +52,7 @@ const SalonRegisterForm = () => {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
@@ -65,6 +64,7 @@ const SalonRegisterForm = () => {
       });
     }
   }, []);
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -107,7 +107,6 @@ const SalonRegisterForm = () => {
       [field]: value,
     }));
 
-    // Clear validation error when field is updated
     if (validationErrors[field]) {
       setValidationErrors((prev) => {
         const newErrors = { ...prev };
@@ -130,7 +129,6 @@ const SalonRegisterForm = () => {
     }));
   };
 
-  // Add barber management functions
   const addBarber = () => {
     setFormData((prev) => ({
       ...prev,
@@ -244,9 +242,10 @@ const SalonRegisterForm = () => {
         closingTime: formData.closingTime,
         services: formData.services,
         barbers: formData.barbers,
+        profilePicture: formData.profilePicture,
+        galleryImages: formData.galleryImages,
       };
 
-      // Here you would send data to your backend API
       const response = await fetch("/api/auth/salon/register", {
         method: "POST",
         headers: {
@@ -259,7 +258,6 @@ const SalonRegisterForm = () => {
         const result = await response.json();
         console.log("Registration result:", result);
 
-        // Store salon session with proper structure
         const salonSession = {
           id: result.salon._id || result.salon.id,
           salonName: result.salon.salonName,
@@ -269,14 +267,12 @@ const SalonRegisterForm = () => {
 
         localStorage.setItem("salonSession", JSON.stringify(salonSession));
         localStorage.setItem("salonToken", result.token);
-        // alert("Salon registered successfully! Welcome to the platform.");
         alert(
           `Salon registered successfully! ${
             result.barbersCreated || 0
           } barbers added. Welcome!`
         );
 
-        // Redirect to dashboard or login
         window.location.href = "/auth/salon/login";
       } else {
         const error = await response.json();
@@ -312,7 +308,6 @@ const SalonRegisterForm = () => {
     },
   ];
 
-  // Don't render until client-side to avoid hydration issues
   if (!isClient) {
     return (
       <div className="min-h-screen bg-[var(--background-primary)] flex items-center justify-center">
@@ -404,7 +399,25 @@ const SalonRegisterForm = () => {
                     <p className={styles.errorText}>{validationErrors.phone}</p>
                   )}
                 </div>
-
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Salon Name</label>
+                  <input
+                    type="text"
+                    placeholder="Your salon name"
+                    value={formData.salonName}
+                    onChange={(e) =>
+                      handleInputChange("salonName", e.target.value)
+                    }
+                    className={`${styles.formInput} ${
+                      validationErrors.salonName ? styles.inputError : ""
+                    }`}
+                  />
+                  {validationErrors.salonName && (
+                    <p className={styles.errorText}>
+                      {validationErrors.salonName}
+                    </p>
+                  )}
+                </div>
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel}>Email</label>
                   <input
@@ -453,26 +466,6 @@ const SalonRegisterForm = () => {
               </h2>
 
               <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Salon Name</label>
-                  <input
-                    type="text"
-                    placeholder="Your salon name"
-                    value={formData.salonName}
-                    onChange={(e) =>
-                      handleInputChange("salonName", e.target.value)
-                    }
-                    className={`${styles.formInput} ${
-                      validationErrors.salonName ? styles.inputError : ""
-                    }`}
-                  />
-                  {validationErrors.salonName && (
-                    <p className={styles.errorText}>
-                      {validationErrors.salonName}
-                    </p>
-                  )}
-                </div>
-
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel}>Location Pin</label>
                   <div className={styles.inputWithIcon}>
@@ -570,6 +563,86 @@ const SalonRegisterForm = () => {
                     />
                   </div>
                 </div>
+
+                {/* IMAGE UPLOAD: Salon Profile Picture */}
+                <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+                  <label className={styles.formLabel}>
+                    Salon Profile Picture
+                  </label>
+                  <UploadImageButton
+                    salonName={formData.salonName}
+                    endpoint="profilePic"
+                    label="Upload Salon Profile Picture"
+                    onUploaded={(url) =>
+                      setFormData((prev) => ({ ...prev, profilePicture: url }))
+                    }
+                  />
+                  {formData.profilePicture && (
+                    <img
+                      src={formData.profilePicture}
+                      alt="Salon Profile"
+                      style={{
+                        width: "100px",
+                        height: "100px",
+                        objectFit: "cover",
+                        borderRadius: "8px",
+                        marginTop: "8px",
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* IMAGE UPLOAD: Salon Gallery */}
+                <div className={`${styles.formGroup} ${styles.formGridFull}`}>
+                  <label className={styles.formLabel}>
+                    Salon Gallery Images
+                  </label>
+                  <UploadImageButton
+                    salonName={formData.salonName}
+                    endpoint="galleryImages"
+                    multiple={true}
+                    maxFiles={10}
+                    label="Upload Gallery Images"
+                    onUploaded={(urls) =>
+                      setFormData((prev) => ({ ...prev, galleryImages: urls }))
+                    }
+                  />
+                  {formData.galleryImages.length > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginTop: 8,
+                      }}
+                    >
+                      {formData.galleryImages.length > 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 8,
+                            marginTop: 8,
+                          }}
+                        >
+                          {formData.galleryImages.map((img, idx) => (
+                            <img
+                              key={idx}
+                              src={img}
+                              alt={`Gallery ${idx + 1}`}
+                              style={{
+                                width: "80px",
+                                height: "80px",
+                                objectFit: "cover",
+                                borderRadius: "6px",
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -666,6 +739,31 @@ const SalonRegisterForm = () => {
                         className={styles.textarea}
                       />
                     </div>
+
+                    {/* IMAGE UPLOAD: Barber Photo */}
+                    <div className="mt-4">
+                      <label className={styles.skillsLabel}>Barber Photo</label>
+                      <UploadImageButton
+                        endpoint="profilePic"
+                        label="Upload Barber Photo"
+                        onUploaded={(url) =>
+                          handleBarberChange(index, "photo", url)
+                        }
+                      />
+                      {barber.photo && (
+                        <img
+                          src={barber.photo}
+                          alt={`Barber ${index + 1}`}
+                          style={{
+                            width: "80px",
+                            height: "80px",
+                            objectFit: "cover",
+                            borderRadius: "6px",
+                            marginTop: "8px",
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
                 ))}
 
@@ -725,21 +823,47 @@ const SalonRegisterForm = () => {
                       </div>
 
                       {formData.services[service.key].enabled && (
-                        <div className={styles.priceInput}>
-                          <span className={styles.priceSymbol}>₹</span>
-                          <input
-                            type="number"
-                            placeholder={service.defaultPrice}
-                            value={formData.services[service.key].price}
-                            onChange={(e) =>
-                              handleServiceChange(
-                                service.key,
-                                "price",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
+                        <>
+                          <div className={styles.priceInput}>
+                            <span className={styles.priceSymbol}>₹</span>
+                            <input
+                              type="number"
+                              placeholder={service.defaultPrice}
+                              value={formData.services[service.key].price}
+                              onChange={(e) =>
+                                handleServiceChange(
+                                  service.key,
+                                  "price",
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
+
+                          {/* IMAGE UPLOAD: Service Image */}
+                          <div style={{ marginTop: 8 }}>
+                            <UploadImageButton
+                              endpoint="serviceImages"
+                              label={`Upload ${service.label} Image`}
+                              onUploaded={(url) =>
+                                handleServiceChange(service.key, "image", url)
+                              }
+                            />
+                            {formData.services[service.key].image && (
+                              <img
+                                src={formData.services[service.key].image}
+                                alt={`${service.label}`}
+                                style={{
+                                  width: "60px",
+                                  height: "60px",
+                                  objectFit: "cover",
+                                  borderRadius: "6px",
+                                  marginTop: "8px",
+                                }}
+                              />
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
                   );
