@@ -1,3 +1,5 @@
+//pages/user/dashboard.js
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../styles/User.module.css";
