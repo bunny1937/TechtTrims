@@ -1,223 +1,204 @@
-// techtrims/src/components/Maps/LocationMap.js
-import React, { useEffect, useState } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  Polyline,
-} from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import React, { useEffect, useState, useRef } from "react";
+
+import { Navigation } from "lucide-react";
 import styles from "../../styles/LocationMap.module.css";
 
-// Fix for default markers
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
-
-// Custom icons
-const salonIcon = new L.Icon({
-  iconUrl:
-    "data:image/svg+xml;base64," +
-    btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#f59e0b" width="35" height="35">
-      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-    </svg>
-  `),
-  iconSize: [35, 35],
-  iconAnchor: [17.5, 35],
-  popupAnchor: [0, -35],
-});
-
-const userIcon = new L.Icon({
-  iconUrl:
-    "data:image/svg+xml;base64," +
-    btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3b82f6" width="25" height="25">
-      <circle cx="12" cy="12" r="8" stroke="#fff" stroke-width="2"/>
-      <circle cx="12" cy="12" r="4"/>
-    </svg>
-  `),
-  iconSize: [25, 25],
-  iconAnchor: [12.5, 12.5],
-});
-
-const LocationMap = ({ salonLocation, userLocation, salonName, address }) => {
-  const [routeCoordinates, setRouteCoordinates] = useState([]);
+const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
   const [distance, setDistance] = useState(null);
   const [duration, setDuration] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const center = salonLocation || [19.076, 72.8777];
-
-  const calculateDirectRoute = useCallback(() => {
-    if (userLocation && salonLocation) {
-      const route = [
-        [userLocation.lat, userLocation.lng],
-        [salonLocation[0], salonLocation[1]],
-      ];
-      setRouteCoordinates(route);
-
-      const R = 6371;
-      const dLat = ((salonLocation[0] - userLocation.lat) * Math.PI) / 180;
-      const dLon = ((salonLocation[1] - userLocation.lng) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos((userLocation.lat * Math.PI) / 180) *
-          Math.cos((salonLocation[0] * Math.PI) / 180) *
-          Math.sin(dLon / 2) *
-          Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const dist = R * c;
-
-      setDistance(dist.toFixed(1));
-      setDuration(Math.round(dist * 3));
-    }
-  }, [userLocation, salonLocation]);
-
-  const getAdvancedDirections = async () => {
-    if (!userLocation || !salonLocation) return;
-
-    setLoading(true);
-    try {
-      // Using OpenRouteService for routing (free alternative to Google)
-      const response = await fetch(
-        `https://api.openrouteservice.org/v2/directions/driving-car?api_key=YOUR_API_KEY&start=${userLocation.lng},${userLocation.lat}&end=${salonLocation[1]},${salonLocation[0]}`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const coordinates = data.features[0].geometry.coordinates.map(
-          (coord) => [coord[1], coord[0]]
-        );
-        setRouteCoordinates(coordinates);
-
-        const route = data.features[0].properties.segments[0];
-        setDistance((route.distance / 1000).toFixed(1));
-        setDuration(Math.round(route.duration / 60));
-      } else {
-        // Fallback to direct route
-        calculateDirectRoute();
-      }
-    } catch (error) {
-      calculateDirectRoute();
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const mapInstanceRef = useRef(null); // ADD THIS LINE
 
   useEffect(() => {
-    if (userLocation && salonLocation) {
-      calculateDirectRoute();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calculateDirectRoute]);
+    if (!location?.coordinates || !userLocation) return;
 
-  // In SalonMap.js or LocationMap.js
-  const openInGoogleMaps = () => {
-    if (salonLocation) {
-      const [salonLat, salonLng] = salonLocation;
-      let url;
+    const [lng, lat] = location.coordinates;
 
-      if (userLocation) {
-        // Directions from user location to salon
-        url = `https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${salonLat},${salonLng}`;
-      } else {
-        // Just show salon location
-        url = `https://www.google.com/maps/search/?api=1&query=${salonLat},${salonLng}`;
+    // Calculate distance
+    const R = 6371;
+    const dLat = ((lat - userLocation.lat) * Math.PI) / 180;
+    const dLon = ((lng - userLocation.lng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((userLocation.lat * Math.PI) / 180) *
+        Math.cos((lat * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const dist = R * c;
+
+    setDistance(dist.toFixed(1));
+    setDuration(Math.round(dist * 3));
+  }, [location, userLocation]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !location?.coordinates) return;
+
+    let mapInstance = null;
+    let timeoutId = null;
+
+    const loadMap = async () => {
+      try {
+        timeoutId = setTimeout(async () => {
+          const L = await import("leaflet");
+          await import("leaflet/dist/leaflet.css");
+
+          const mapContainer = document.getElementById("salon-detail-map");
+
+          if (!mapContainer || mapContainer._leaflet_id) return;
+
+          const [lng, lat] = location.coordinates;
+
+          mapInstance = L.map(mapContainer).setView([lat, lng], 16);
+          mapInstanceRef.current = mapInstance; // ADD THIS LINE
+
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "© OpenStreetMap",
+          }).addTo(mapInstance);
+
+          // Custom salon marker icon - bigger and more visible
+          const salonIcon = L.divIcon({
+            html: `<div style="font-size: 48px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));">📍</div>`,
+            iconSize: [48, 48],
+            iconAnchor: [24, 48],
+            popupAnchor: [0, -50], // Move popup 50px above the pin
+            className: "fixed-marker-icon",
+          });
+
+          // Add salon marker with offset popup
+          L.marker([lat, lng], { icon: salonIcon })
+            .addTo(mapInstance)
+            .bindPopup(`<b>${salonName}</b><br>${address}`, {
+              offset: [0, -1], // Additional offset
+              closeButton: true,
+              autoClose: false,
+              closeOnClick: false,
+            })
+            .openPopup();
+
+          // Add user location marker if available
+          if (userLocation) {
+            const userIcon = L.divIcon({
+              html: `<div style="font-size: 32px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));">📍</div>`,
+              iconSize: [32, 32],
+              iconAnchor: [16, 32],
+              className: "fixed-user-icon",
+            });
+
+            L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+              .addTo(mapInstance)
+              .bindPopup("<b>Your Location</b>");
+
+            // Draw route line
+            L.polyline(
+              [
+                [userLocation.lat, userLocation.lng],
+                [lat, lng],
+              ],
+              { color: "#f59e0b", weight: 3, opacity: 0.7, dashArray: "10, 5" }
+            ).addTo(mapInstance);
+          }
+
+          setMapLoaded(true);
+        }, 100);
+      } catch (error) {
+        console.error("Map loading error:", error);
       }
+    };
 
-      // Use location.href instead of window.open for better mobile compatibility
-      window.location.href = url;
+    loadMap();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (mapInstance) {
+        try {
+          mapInstance.remove();
+          mapInstanceRef.current = null; // ADD THIS LINE
+        } catch (e) {
+          console.error("Map cleanup error:", e);
+        }
+      }
+    };
+  }, [location, userLocation, salonName, address]);
+
+  const openInGoogleMaps = () => {
+    if (!location?.coordinates) return;
+    const [lng, lat] = location.coordinates;
+    let url;
+
+    if (userLocation) {
+      url = `https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${lat},${lng}`;
+    } else {
+      url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
     }
+
+    window.open(url, "_blank");
   };
+
+  const centerOnUser = () => {
+    if (!userLocation || !mapInstanceRef.current) return;
+
+    setLocating(true);
+
+    // Use the existing map instance
+    mapInstanceRef.current.flyTo([userLocation.lat, userLocation.lng], 16, {
+      animate: true,
+      duration: 1.5,
+    });
+
+    setTimeout(() => setLocating(false), 1500);
+  };
+
+  if (!location?.coordinates) {
+    return null;
+  }
 
   return (
     <div className={styles.mapContainer}>
       <div className={styles.mapHeader}>
-        <div className={styles.mapInfo}>
-          <h3>{salonName}</h3>
-          <p>{address}</p>
+        <div className={styles.headerInfo}>
+          <h3 className={styles.mapTitle}>{salonName || "Salon"}</h3>
+          <p className={styles.address}>{address || "Address not available"}</p>
+          {phone && <p className={styles.phone}>{phone}</p>}
           {distance && (
             <div className={styles.routeInfo}>
               <span>📍 {distance} km</span>
-              {duration && <span>🕐 ~{duration} min</span>}
+              {duration && <span> 🕐 ~{duration} min</span>}
+              <button
+                className={styles.directionsButton}
+                onClick={openInGoogleMaps}
+              >
+                <Navigation size={18} />
+                Get Directions
+              </button>
             </div>
-          )}
-        </div>
-        <div className={styles.mapActions}>
-          <button className={styles.directionsBtn} onClick={openInGoogleMaps}>
-            Get Directions
-          </button>
-          {userLocation && (
-            <button
-              className={styles.routeBtn}
-              onClick={getAdvancedDirections}
-              disabled={loading}
-            >
-              {loading ? "Loading..." : "Show Route"}
-            </button>
           )}
         </div>
       </div>
 
-      <MapContainer
-        center={center}
-        zoom={userLocation ? 13 : 15}
-        className={styles.map}
+      <div
+        style={{
+          position: "relative",
+          marginTop: "10px",
+          height: "300px",
+        }}
       >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
+        <div id="salon-detail-map" className={styles.mapWrapper}></div>
 
-        {/* Salon marker */}
-        {salonLocation && (
-          <Marker position={salonLocation} icon={salonIcon}>
-            <Popup>
-              <div className={styles.popupContent}>
-                <strong>{salonName}</strong>
-                <p>{address}</p>
-                <button onClick={openInGoogleMaps} className={styles.popupBtn}>
-                  Get Directions
-                </button>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-
-        {/* User location marker */}
+        {/* My Location Button */}
         {userLocation && (
-          <Marker
-            position={[userLocation.lat, userLocation.lng]}
-            icon={userIcon}
+          <button
+            className={styles.liveLocationBtn}
+            onClick={centerOnUser}
+            disabled={locating}
+            style={{ zIndex: 9999 }}
           >
-            <Popup>
-              <div className={styles.popupContent}>
-                <strong>Your Location</strong>
-              </div>
-            </Popup>
-          </Marker>
+            <span className={locating ? styles.spinning : ""}>📍</span>
+            {locating ? "Locating..." : "My Location"}
+          </button>
         )}
-
-        {/* Route polyline */}
-        {routeCoordinates.length > 0 && (
-          <Polyline
-            positions={routeCoordinates}
-            color="#f59e0b"
-            weight={4}
-            opacity={0.7}
-            dashArray="10, 10"
-          />
-        )}
-      </MapContainer>
+      </div>
     </div>
   );
 };

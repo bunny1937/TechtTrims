@@ -4,10 +4,7 @@ import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import styles from "../styles/Home.module.css";
-import Image from "next/image";
-import { UserDataManager } from "../lib/userData";
-import TextMorph from "../components/TextMorph";
-import OnboardingLogoutButton from "../components/OnBoardingLogout";
+import { useLocation } from "@/hooks/useLocation";
 
 export default function Home() {
   const router = useRouter();
@@ -21,8 +18,13 @@ export default function Home() {
   const [selectedService, setSelectedService] = useState("");
   const [filteredSalons, setFilteredSalons] = useState([]);
   const [isPrebook, setIsPrebook] = useState(false);
-  const [userLocation, setUserLocation] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
+  const {
+    userLocation: liveUserLocation,
+    locationStatus,
+    requestLocationPermission,
+  } = useLocation();
+  const PLACEHOLDER_IMAGE = process.env.NEXT_PUBLIC_PLACEHOLDER_SALON_IMAGE;
 
   // Dynamic import for map component
   const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
@@ -38,12 +40,9 @@ export default function Home() {
       const authenticatedUserData = localStorage.getItem(
         "authenticatedUserData"
       );
-      const hasOnboarded = localStorage.getItem("hasOnboarded");
 
-      // If user is logged in, proceed with dashboard
+      // If user is logged in, get API data
       if (userToken || authenticatedUserData) {
-        // User is logged in - get API data
-
         try {
           const response = await fetch("/api/user/profile", {
             headers: { Authorization: `Bearer ${userToken}` },
@@ -51,27 +50,16 @@ export default function Home() {
 
           if (response.ok) {
             const apiUserData = await response.json();
+            setUserOnboarding(apiUserData);
 
-            // Use API data with hardcoded location (temporary fix)
-            const userData = {
-              ...apiUserData,
-              location: {
-                latitude: 19.248192,
-                longitude: 73.157593,
-                address:
-                  "Shahad, Ambivali, Kalyan-Dombivli, Kalyan Taluka, Thane, Maharashtra, 410209, India",
-              },
-            };
-            setUserOnboarding(userData);
-            setUserLocation(userData.location);
-            setUserOnboarding(userData);
-
-            // Load salons with the location
-            loadNearbySalons(
-              userData.location.latitude,
-              userData.location.longitude,
-              userData.gender
-            );
+            // Use live location from hook
+            if (liveUserLocation) {
+              loadNearbySalons(
+                liveUserLocation.lat,
+                liveUserLocation.lng,
+                apiUserData.gender
+              );
+            }
           }
         } catch (error) {
           console.error("Error loading user data:", error);
@@ -83,11 +71,12 @@ export default function Home() {
           try {
             const userData = JSON.parse(onboardingData);
             setUserOnboarding(userData);
-            setUserLocation(userData.location);
-            if (userData.location?.latitude && userData.location?.longitude) {
+
+            // Use live location from hook
+            if (liveUserLocation) {
               loadNearbySalons(
-                userData.location.latitude,
-                userData.location.longitude,
+                liveUserLocation.lat,
+                liveUserLocation.lng,
                 userData.gender
               );
             }
@@ -97,18 +86,12 @@ export default function Home() {
         }
       }
 
-      // Check theme preference
-      // const darkMode = localStorage.getItem("darkMode") === "true";
-      // setIsDarkMode(darkMode);
-      // if (darkMode) {
-      //   document.documentElement.setAttribute("data-theme", "dark");
-      // }
-
       setIsLoading(false);
     };
 
     initializeUser();
-  }, [router]);
+  }, [router, liveUserLocation]);
+
   useEffect(() => {
     if (!nearbySalons.length) {
       setFilteredSalons([]);
@@ -256,10 +239,24 @@ export default function Home() {
 
   const formatTime = (time) => {
     if (!time) return "";
-    const hours = parseInt(time.substring(0, 2));
-    const mins = time.substring(2, 4) || time.substring(3, 5);
+
+    // Remove any extra colons and normalize
+    const cleaned = time.replace(/::+/g, ":").trim();
+
+    let hours, mins;
+
+    if (cleaned.includes(":")) {
+      const [h, m] = cleaned.split(":");
+      hours = parseInt(h) || 0;
+      mins = (m || "00").padStart(2, "0");
+    } else {
+      hours = parseInt(cleaned.substring(0, cleaned.length - 2)) || 0;
+      mins = cleaned.substring(cleaned.length - 2).padStart(2, "0");
+    }
+
     const ampm = hours >= 12 ? "PM" : "AM";
     const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+
     return `${displayHours}:${mins} ${ampm}`;
   };
 
@@ -652,7 +649,7 @@ export default function Home() {
           </div>
 
           {/* ✅ BANNER ABOVE TABS - Show when NO location */}
-          {!userLocation && (
+          {!liveUserLocation && (
             <div className={styles.fallbackBanner}>
               <div className={styles.bannerContent}>
                 <div className={styles.bannerIcon}>📍</div>
@@ -760,10 +757,7 @@ export default function Home() {
             <div className={styles.mapContainer}>
               <SalonMap
                 salons={nearbySalons}
-                userLocation={{
-                  lat: userOnboarding?.location?.latitude,
-                  lng: userOnboarding?.location?.longitude,
-                }}
+                userLocation={liveUserLocation}
                 selectedSalon={selectedSalon}
                 onSalonSelect={setSelectedSalon}
                 onBookNow={handleSalonCardClick}
@@ -792,15 +786,12 @@ export default function Home() {
                     {/* Salon Image */}
                     <div className={styles.salonImageContainer}>
                       <img
-                        src={
-                          typeof salon.salonImages?.[0] === "string"
-                            ? salon.salonImages[0]
-                            : salon.salonImages?.[0]?.url ||
-                              "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&h=200&fit=crop"
-                        }
-                        alt={`${salon.salonName} Salon`}
-                        className={styles.salonImage}
+                        src={salon.profilePicture || PLACEHOLDER_IMAGE}
+                        alt={salon.salonName}
+                        style={{ objectFit: "cover", borderRadius: "8px" }}
+                        unoptimized // 👈 Add this if using external CDN
                       />
+
                       <div className={styles.salonImageOverlay}></div>
 
                       {/* Badges */}

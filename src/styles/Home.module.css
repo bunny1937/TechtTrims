@@ -299,7 +299,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 80px;
+  height: 60px;
 }
 
 .logoContainer {
@@ -1581,7 +1581,7 @@
 
 .salonImageContainer {
   position: relative;
-  height: 240px;
+  height: auto;
   overflow: hidden;
 }
 
@@ -1601,7 +1601,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: auto;
   border-radius: 1rem;
   background: linear-gradient(45deg, rgba(0, 0, 0, 0.1) 0%, transparent 50%);
 }
@@ -2220,7 +2220,7 @@
     font-size: 1.25rem;
   }
   .salonImageContainer {
-    height: 200px;
+    height: auto;
   }
   .salonRating {
     display: block;
@@ -2404,9 +2404,6 @@
   .salonLocation {
     font-size: 0.75rem;
     margin-bottom: var(--space-3);
-  }
-  .salonImageContainer {
-    height: 200px;
   }
   .salonRating {
     display: block;

@@ -81,24 +81,28 @@ export default async function handler(req, res) {
     }
 
     // ✅ CHANGED: Calculate queue position BEFORE inserting
-    let queuePosition = null;
+    // ✅ Calculate queue position ONLY for ORANGE (arrived) customers
+    let queuePosition = 1; // Default to 1 for new bookings
+
     if (barberObjectId) {
-      // Count existing bookings (NOT including current)
-      const existingCount = await db.collection("bookings").countDocuments({
-        barberId: barberObjectId,
-        salonId: new ObjectId(salonId),
-        queueStatus: { $in: ["RED", "ORANGE"] },
-        isExpired: { $ne: true },
-      });
-      queuePosition = existingCount + 1; // This booking's position
+      // Count only ORANGE bookings (customers who have arrived)
+      const existingOrangeCount = await db
+        .collection("bookings")
+        .countDocuments({
+          barberId: barberObjectId,
+          salonId: new ObjectId(salonId),
+          queueStatus: "ORANGE",
+          isExpired: { $ne: true },
+        });
+      queuePosition = existingOrangeCount + 1;
     } else {
-      queuePosition = "Pending Assignment";
+      queuePosition = "Pending";
     }
 
-    console.log("📊 Queue position calculated:", {
+    console.log("✅ Queue position calculated:", {
       barber: barberName,
-      existingInQueue:
-        queuePosition === "Pending Assignment" ? 0 : queuePosition - 1,
+      existingOrangeCustomers:
+        queuePosition === "Pending" ? 0 : queuePosition - 1,
       newPosition: queuePosition,
       bookingCode,
     });

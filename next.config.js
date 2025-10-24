@@ -7,6 +7,12 @@ const nextConfig = {
     swcTraceProfiling: false, // 🚫 disables trace file
   },
   images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**.imagekit.io",
+      },
+    ],
     domains: [
       "localhost",
       "your-domain.com",

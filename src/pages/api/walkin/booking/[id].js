@@ -35,37 +35,36 @@ export default async function handler(req, res) {
       _id: booking.salonId,
     });
 
-    // ✅ CRITICAL FIX: Use STORED position only
-    let queuePosition = booking.queuePosition || null;
+    // ✅ Calculate REAL-TIME queue position
+    let queuePosition = null;
 
-    // Only calculate if missing
-    if (!queuePosition && booking.barberId) {
-      console.warn("⚠️ Position missing:", booking.bookingCode);
-
-      const allBookings = await db
-        .collection("bookings")
-        .find({
-          barberId: booking.barberId,
-          salonId: booking.salonId,
-          queueStatus: { $in: ["RED", "ORANGE"] },
-          isExpired: { $ne: true },
-        })
-        .sort({ createdAt: 1 })
-        .toArray();
-
-      const index = allBookings.findIndex(
-        (b) => b._id.toString() === booking._id.toString()
-      );
-      queuePosition = index >= 0 ? index + 1 : null;
-
-      if (queuePosition) {
-        await db
-          .collection("bookings")
-          .updateOne({ _id: booking._id }, { $set: { queuePosition } });
-      }
-    } else if (!queuePosition) {
-      queuePosition = "Pending Assignment";
+    if (booking.queueStatus === "ORANGE" && booking.barberId) {
+      // Count ONLY ORANGE bookings that checked in BEFORE this one
+      const position = await db.collection("bookings").countDocuments({
+        barberId: booking.barberId,
+        salonId: booking.salonId,
+        queueStatus: "ORANGE",
+        isExpired: { $ne: true },
+        arrivedAt: { $lt: booking.arrivedAt || booking.createdAt },
+      });
+      queuePosition = position + 1;
+    } else if (booking.queueStatus === "RED") {
+      queuePosition = "Not Arrived";
+    } else if (booking.queueStatus === "GREEN") {
+      queuePosition = "In Service";
+    } else if (booking.queueStatus === "COMPLETED") {
+      queuePosition = "Completed";
+    } else {
+      queuePosition = "Pending";
     }
+
+    console.log("📊 Real-time position:", {
+      code: booking.bookingCode,
+      customer: booking.customerName,
+      status: booking.queueStatus,
+      position: queuePosition,
+      barber: barber?.name,
+    });
 
     console.log("📊 Queue:", {
       code: booking.bookingCode,
