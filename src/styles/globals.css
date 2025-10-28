@@ -582,3 +582,141 @@ h6 {
     box-shadow: none !important;
   }
 }
+/* ========================================
+   LEAFLET MAP POPUPS - MOBILE RESPONSIVE
+   ======================================== */
+
+/* Smaller popups on ALL screens */
+/* SUPER SPECIFIC: Only the last child div (buttons container) becomes row */
+.leaflet-popup-content .flex.flex-col > div:last-child {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+/* Keep the main container as column */
+.leaflet-popup-content .flex.flex-col {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Buttons equal width */
+.leaflet-popup-content button {
+  flex: 1 !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .leaflet-popup-content .flex.flex-col {
+    display: flex !important;
+    flex-direction: row !important;
+  }
+  .leaflet-popup-content .flex.flex-col > div:last-child {
+    gap: 4px !important;
+  }
+}
+/* Fix salon marker styling */
+.custom-salon-icon {
+  font-size: 30px;
+  line-height: 30px;
+  text-align: center;
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-popup-content-wrapper {
+  max-width: 200px !important;
+  padding: 6px !important;
+  border-radius: 10px !important;
+}
+
+.leaflet-popup-content {
+  margin: 6px !important;
+  line-height: 1.3 !important;
+}
+
+/* Tablet */
+@media (max-width: 768px) {
+  .leaflet-popup-content-wrapper {
+    max-width: 160px !important;
+    padding: 5px !important;
+  }
+
+  .leaflet-popup-content {
+    margin: 5px !important;
+    font-size: 11px !important;
+  }
+
+  .leaflet-popup-content strong {
+    font-size: 11px !important;
+  }
+
+  .leaflet-popup-content p {
+    font-size: 9px !important;
+    margin: 2px 0 !important;
+  }
+
+  .leaflet-popup-content button {
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+  }
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .leaflet-popup-content-wrapper {
+    max-width: 130px !important;
+    padding: 4px !important;
+  }
+
+  .leaflet-popup-content {
+    margin: 4px !important;
+    font-size: 10px !important;
+  }
+
+  .leaflet-popup-content strong {
+    font-size: 10px !important;
+  }
+
+  .leaflet-popup-content p {
+    font-size: 8px !important;
+    margin: 1px 0 !important;
+  }
+
+  .leaflet-popup-content button {
+    padding: 1px 2px !important;
+    font-size: 6px !important;
+    font-weight: 800;
+  }
+}
+
+/* Extra small */
+@media (max-width: 360px) {
+  .leaflet-popup-content-wrapper {
+    max-width: 110px !important;
+    padding: 3px !important;
+  }
+
+  .leaflet-popup-content {
+    margin: 3px !important;
+    font-size: 9px !important;
+    flex-direction: row !important;
+  }
+
+  .leaflet-popup-content strong {
+    font-size: 9px !important;
+  }
+
+  .leaflet-popup-content p {
+    font-size: 7px !important;
+  }
+
+  .leaflet-popup-content button {
+    width: 50%;
+    padding: 2px 5px !important;
+    font-size: 4px !important;
+  }
+}

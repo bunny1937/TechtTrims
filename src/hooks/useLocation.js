@@ -1,3 +1,4 @@
+// src/hooks/useLocation.js
 import { useState, useEffect, useCallback, useRef } from "react";
 
 export const useLocation = () => {
@@ -5,9 +6,12 @@ export const useLocation = () => {
   const [locationStatus, setLocationStatus] = useState("idle"); // idle, requesting, granted, denied, error
   const [locationError, setLocationError] = useState(null);
   const watchIdRef = useRef(null);
-  const lastUpdateRef = useRef(0); // Track last update time
-  const MIN_UPDATE_INTERVAL = 5000; // 5 seconds between updates
-  const MIN_DISTANCE_DELTA = 0.0001; // Roughly 10m diff
+  const lastUpdateRef = useRef(0);
+
+  // INCREASED THRESHOLDS FOR STABILITY
+  const MIN_UPDATE_INTERVAL = 30000; // 30 seconds between updates (was 5s)
+  const MIN_DISTANCE_DELTA = 0.0005; // ~50m (was 10m - too sensitive)
+  const MAX_ACCURACY = 100; // Only accept positions with <100m accuracy
 
   // ----------------- START WATCHING -----------------
   const startWatchingLocation = useCallback(() => {
@@ -17,32 +21,46 @@ export const useLocation = () => {
       (position) => {
         const now = Date.now();
 
+        // IGNORE UPDATES TOO SOON
         if (now - lastUpdateRef.current < MIN_UPDATE_INTERVAL) {
-          return; // Ignore updates that come too soon
+          console.log("⏱️ Ignoring location update (too soon)");
+          return;
+        }
+
+        // FILTER OUT INACCURATE POSITIONS
+        if (position.coords.accuracy > MAX_ACCURACY) {
+          console.log(
+            `🎯 Ignoring inaccurate position (${position.coords.accuracy}m)`
+          );
+          return;
         }
 
         const newLat = position.coords.latitude;
         const newLng = position.coords.longitude;
 
         setUserLocation((prev) => {
-          if (
-            !prev ||
-            Math.abs(prev.lat - newLat) > MIN_DISTANCE_DELTA ||
-            Math.abs(prev.lng - newLng) > MIN_DISTANCE_DELTA
-          ) {
-            lastUpdateRef.current = now;
+          // ONLY UPDATE IF MOVED SIGNIFICANTLY
+          if (prev) {
+            const latDiff = Math.abs(prev.lat - newLat);
+            const lngDiff = Math.abs(prev.lng - newLng);
 
-            const newLocation = {
-              lat: newLat,
-              lng: newLng,
-              accuracy: position.coords.accuracy,
-              timestamp: position.timestamp,
-            };
-
-            localStorage.setItem("userLocation", JSON.stringify(newLocation));
-            return newLocation;
+            if (latDiff < MIN_DISTANCE_DELTA && lngDiff < MIN_DISTANCE_DELTA) {
+              console.log("📍 Ignoring minor location change");
+              return prev; // No significant movement
+            }
           }
-          return prev;
+
+          // SIGNIFICANT CHANGE - UPDATE
+          lastUpdateRef.current = now;
+          const newLocation = {
+            lat: newLat,
+            lng: newLng,
+            accuracy: position.coords.accuracy,
+            timestamp: position.timestamp,
+          };
+
+          console.log("✅ Location updated:", newLocation);
+          return newLocation;
         });
       },
       (error) => {
@@ -51,8 +69,8 @@ export const useLocation = () => {
       },
       {
         enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 10000, // Cache for 10s
+        timeout: 15000, // Increased timeout
+        maximumAge: 30000, // Cache for 30s - PREVENTS CONSTANT UPDATES
       }
     );
   }, []);
@@ -62,6 +80,7 @@ export const useLocation = () => {
     if (watchIdRef.current) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
+      console.log("🛑 Stopped watching location");
     }
   }, []);
 
@@ -79,8 +98,8 @@ export const useLocation = () => {
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
+          timeout: 15000,
+          maximumAge: 0, // Force fresh position on initial request
         });
       });
 
@@ -93,10 +112,14 @@ export const useLocation = () => {
 
       setUserLocation(newLocation);
       setLocationStatus("granted");
+      lastUpdateRef.current = Date.now();
+
+      // Save to localStorage ONLY ONCE (not on every update)
       localStorage.setItem("userLocation", JSON.stringify(newLocation));
 
       // Start continuous monitoring
       startWatchingLocation();
+
       return true;
     } catch (error) {
       console.error("Location error:", error);
@@ -108,27 +131,31 @@ export const useLocation = () => {
 
   // ----------------- SETUP ON MOUNT -----------------
   useEffect(() => {
+    // Try to load from localStorage ONLY on mount
     const stored = localStorage.getItem("userLocation");
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
         setUserLocation(parsed);
         setLocationStatus("granted");
+        console.log("📍 Loaded cached location");
       } catch (e) {
         console.error("Error parsing stored location", e);
       }
     }
 
+    // Always request fresh location on mount
     if (!stored) {
       requestLocationPermission();
     } else {
+      // If we have cached location, start watching
       startWatchingLocation();
     }
 
     return () => {
       stopWatchingLocation();
     };
-  }, [requestLocationPermission, startWatchingLocation, stopWatchingLocation]);
+  }, [requestLocationPermission, startWatchingLocation, stopWatchingLocation]); // ONLY RUN ONCE ON MOUNT
 
   return {
     userLocation,

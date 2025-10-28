@@ -1,12 +1,17 @@
-//pages/src/components/Maps/SalonMap.js
-import React, { useEffect, useRef, useState, useMemo } from "react";
+// src/components/Maps/SalonMap.js - WITH MANUAL LOCATION SEARCH
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import { useRouter } from "next/router";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import { Navigation } from "lucide-react";
+import { Navigation, Search, MapPin, Crosshair } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import styles from "../../styles/SalonMap.module.css";
-// import SalonCard from "../Salon/SalonCard";
 
 // Fix for default markers in react-leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -28,7 +33,7 @@ const salonIcon = new L.Icon({
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
     </svg>
   `),
-  iconSize: [35, 35], // Fixed size
+  iconSize: [35, 35],
   iconAnchor: [17.5, 35],
   popupAnchor: [0, -35],
   className: "fixed-marker-icon",
@@ -36,9 +41,9 @@ const salonIcon = new L.Icon({
 
 // User location marker
 const userIcon = new L.Icon({
-  iconUrl: "/maps/usericon.png", // Put your icon here
-  iconSize: [25, 25], // Fixed size
-  iconAnchor: [12.5, 12.5],
+  iconUrl: "/maps/usericon.png",
+  iconSize: [50, 50],
+  iconAnchor: [25, 25], // ✅ CORRECT - Center of the 50x50 icon
   className: "fixed-user-icon",
 });
 
@@ -161,68 +166,389 @@ const MapUpdater = ({ selectedSalon, salons }) => {
   return null;
 };
 
-// const AutoOpenPopup = ({ children, position, ...props }) => {
-//   const map = useMap();
+// 🔧 FINAL FIX: Add proper headers + rate limiting
+// 🔧 FIXED: Location Search Component with WORKING click on map
+const LocationSearch = ({
+  onLocationSelect,
+  isSearching,
+  setIsSearching,
+  userLocation,
+  mapRef,
+}) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [clickMode, setClickMode] = useState(false);
+  const searchTimeoutRef = useRef(null);
+  const mapClickHandlerRef = useRef(null);
 
-//   const popupOptions = useMemo(() => props, [props]);
-
-//   useEffect(() => {
-//     const marker = L.marker(position, { icon: salonIcon }).addTo(map);
-//     const popup = L.popup(popupOptions).setContent(children);
-//     marker.bindPopup(popup).openPopup();
-
-//     return () => {
-//       map.removeLayer(marker);
-//     };
-//   }, [map, position, children, popupOptions]);
-
-//   return null;
-// };
-// Live Location Control Component
-const LiveLocationControl = ({ userLocation, map }) => {
-  const [locating, setLocating] = useState(false);
-
-  const centerOnUser = () => {
-    if (userLocation?.lat && userLocation?.lng && map) {
-      setLocating(true);
-      map.flyTo([userLocation.lat, userLocation.lng], 16, {
-        animate: true,
-        duration: 1.5,
-      });
-      setTimeout(() => setLocating(false), 1500);
-    } else {
-      // Request live location
-      if (navigator.geolocation) {
-        setLocating(true);
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const newPos = [
-              position.coords.latitude,
-              position.coords.longitude,
-            ];
-            map.flyTo(newPos, 16, { animate: true, duration: 1.5 });
-            setTimeout(() => setLocating(false), 1500);
-          },
-          (error) => {
-            alert("Unable to get location");
-            setLocating(false);
-          }
-        );
+  // Search function
+  const searchLocation = useCallback(
+    async (query) => {
+      if (!query || query.trim().length < 3) {
+        setSearchResults([]);
+        setLoading(false);
+        return;
       }
+
+      setLoading(true);
+      try {
+        // Use your backend API proxy
+        const response = await fetch(
+          `/api/geocode?query=${encodeURIComponent(
+            query + ", Maharashtra, India"
+          )}`
+        );
+
+        if (!response.ok) throw new Error("Search failed");
+
+        const allResults = await response.json();
+
+        // Filter by distance
+        const userLat = userLocation?.lat || 19.247251;
+        const userLng = userLocation?.lng || 73.154063;
+
+        const nearbyResults = allResults
+          .map((result) => {
+            const lat = parseFloat(result.lat);
+            const lng = parseFloat(result.lon);
+            const R = 6371;
+            const dLat = ((lat - userLat) * Math.PI) / 180;
+            const dLng = ((lng - userLng) * Math.PI) / 180;
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos((userLat * Math.PI) / 180) *
+                Math.cos((lat * Math.PI) / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+            return { ...result, distance: distance.toFixed(1) };
+          })
+          .filter((r) => parseFloat(r.distance) < 20)
+          .sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance))
+          .slice(0, 8);
+
+        setSearchResults(nearbyResults);
+      } catch (error) {
+        console.error("Search error:", error);
+        setSearchResults([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [userLocation]
+  );
+
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (value.trim().length >= 3) {
+      setLoading(true);
+      searchTimeoutRef.current = setTimeout(() => searchLocation(value), 1000);
+    } else {
+      setSearchResults([]);
+      setLoading(false);
     }
   };
 
+  const selectResult = (result) => {
+    onLocationSelect({
+      lat: parseFloat(result.lat),
+      lng: parseFloat(result.lon),
+      accuracy: 10,
+      manual: true,
+      address: result.display_name,
+    });
+    setSearchQuery("");
+    setSearchResults([]);
+    setIsSearching(false);
+  };
+
+  // 🔥 FIXED: Click on map mode
+  const enableClickMode = () => {
+    if (!mapRef) {
+      console.error("❌ mapRef is null!");
+      return;
+    }
+
+    console.log("✅ Enabling click mode");
+    setClickMode(true);
+    setSearchQuery("");
+    setSearchResults([]);
+
+    // Disable all map interactions
+    mapRef.dragging.disable();
+    mapRef.scrollWheelZoom.disable();
+    mapRef.doubleClickZoom.disable();
+    mapRef.touchZoom.disable();
+    mapRef.boxZoom.disable();
+    mapRef.keyboard.disable();
+
+    // Change cursor
+    const container = mapRef.getContainer();
+    container.style.cursor = "crosshair";
+    console.log("🎯 Cursor changed to crosshair");
+
+    // Create click handler
+    const handleMapClick = (e) => {
+      console.log("🖱️ Map clicked!", e.latlng);
+      const { lat, lng } = e.latlng;
+
+      // Set location immediately with coordinates
+      const location = {
+        lat: lat,
+        lng: lng,
+        accuracy: 5,
+        manual: true,
+        address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      };
+
+      console.log("📍 Setting location:", location);
+      onLocationSelect(location);
+
+      // ✅ USE YOUR BACKEND API (not OpenStreetMap directly)
+      fetch(`/api/geocode?reverse=true&lat=${lat}&lon=${lng}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.display_name) {
+            location.address = data.display_name;
+            onLocationSelect(location);
+          }
+        })
+        .catch((err) =>
+          console.log("Reverse geocode failed, using coordinates")
+        );
+
+      // Cleanup
+      disableClickMode();
+      setIsSearching(false);
+    };
+
+    // Store reference and attach
+    mapClickHandlerRef.current = handleMapClick;
+    mapRef.on("click", handleMapClick);
+    console.log("✅ Click handler attached");
+  };
+
+  const disableClickMode = () => {
+    if (!mapRef) return;
+
+    console.log("🔄 Disabling click mode");
+    setClickMode(false);
+
+    // Re-enable all map interactions
+    mapRef.dragging.enable();
+    mapRef.scrollWheelZoom.enable();
+    mapRef.doubleClickZoom.enable();
+    mapRef.touchZoom.enable();
+    mapRef.boxZoom.enable();
+    mapRef.keyboard.enable();
+
+    // Reset cursor
+    mapRef.getContainer().style.cursor = "";
+
+    // Remove click handler
+    if (mapClickHandlerRef.current) {
+      mapRef.off("click", mapClickHandlerRef.current);
+      mapClickHandlerRef.current = null;
+      console.log("✅ Click handler removed");
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      disableClickMode();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <button
-      className={styles.liveLocationBtn}
-      onClick={centerOnUser}
-      disabled={locating}
-      title="Center on my location"
-    >
-      <span className={locating ? styles.spinning : ""}>📍</span>
-      {locating ? "Locating..." : "My Location"}
-    </button>
+    <div className={styles.locationSearchPanel}>
+      <div className={styles.searchHeader}>
+        <h3>{clickMode ? "📍 Click on map" : "🔍 Search Location"}</h3>
+        <button
+          className={styles.closeSearchBtn}
+          onClick={() => {
+            setIsSearching(false);
+            disableClickMode();
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {clickMode ? (
+        <div className={styles.clickModeInfo}>
+          <p>📍 Click anywhere on the map to set your location</p>
+          <p className={styles.clickModeHint}>
+            Map is frozen. Click to select.
+          </p>
+          <button className={styles.backToSearchBtn} onClick={disableClickMode}>
+            ← Back to search
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className={styles.alternativeOption}>
+            <button className={styles.clickMapBtn} onClick={enableClickMode}>
+              📍 Click on map to set location
+            </button>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              searchLocation(searchQuery);
+            }}
+            className={styles.searchForm}
+          >
+            <input
+              type="text"
+              placeholder="Or search building/landmark..."
+              value={searchQuery}
+              onChange={handleInputChange}
+              className={styles.searchInput}
+            />
+            <button
+              type="submit"
+              className={styles.searchBtn}
+              disabled={loading || !searchQuery.trim()}
+            >
+              {loading ? "🔄" : "Search"}
+            </button>
+          </form>
+
+          {loading && (
+            <div className={styles.loadingResults}>
+              <p>Searching...</p>
+            </div>
+          )}
+
+          {searchResults.length > 0 && (
+            <div className={styles.searchResults}>
+              {searchResults.map((result, idx) => (
+                <div
+                  key={idx}
+                  className={styles.searchResultItem}
+                  onClick={() => selectResult(result)}
+                >
+                  <MapPin size={16} className={styles.resultIcon} />
+                  <div className={styles.resultText}>
+                    <strong>
+                      {result.name || result.display_name.split(",")[0]}{" "}
+                      <span className={styles.resultDistance}>
+                        · {result.distance}km
+                      </span>
+                    </strong>
+                    <p>{result.display_name}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
+};
+
+// const LiveLocationControl = ({
+//   userLocation,
+//   map,
+//   isManualLocation,
+//   onRevertToLive,
+//   onOpenSearch,
+// }) => {
+//   const [locating, setLocating] = useState(false);
+
+//   const centerOnUser = () => {
+//     if (userLocation?.lat && userLocation?.lng && map) {
+//       setLocating(true);
+//       map.flyTo([userLocation.lat, userLocation.lng], 16, {
+//         animate: true,
+//         duration: 1.5,
+//       });
+//       setTimeout(() => setLocating(false), 1500);
+//     } else {
+//       // Request live location
+//       if (navigator.geolocation) {
+//         setLocating(true);
+//         navigator.geolocation.getCurrentPosition(
+//           (position) => {
+//             const newPos = [
+//               position.coords.latitude,
+//               position.coords.longitude,
+//             ];
+//             map.flyTo(newPos, 16, { animate: true, duration: 1.5 });
+//             setTimeout(() => setLocating(false), 1500);
+//           },
+//           (error) => {
+//             alert("Unable to get location");
+//             setLocating(false);
+//           }
+//         );
+//       }
+//     }
+//   };
+
+//   return (
+//     <div className={styles.locationControls}>
+//       {/* Manual Location Search Button */}
+//       <button
+//         className={styles.searchLocationBtn}
+//         onClick={onOpenSearch}
+//         title="Search location manually"
+//       >
+//         <Search size={18} />
+//         <span>Search Location</span>
+//       </button>
+
+//       {/* Live Location / Revert Button */}
+//       {isManualLocation ? (
+//         <button
+//           className={styles.revertToLiveBtn}
+//           onClick={onRevertToLive}
+//           title="Revert to live location"
+//         >
+//           <Crosshair size={18} />
+//           <span>Use Live Location</span>
+//         </button>
+//       ) : (
+//         <button
+//           className={styles.liveLocationBtn}
+//           onClick={centerOnUser}
+//           disabled={locating}
+//           title="Center on my location"
+//         >
+//           <span className={locating ? styles.spinning : ""}>
+//             <Crosshair size={18} />
+//           </span>
+//           <span>{locating ? "Locating..." : "My Location"}</span>
+//         </button>
+//       )}
+//     </div>
+//   );
+// };
+// Add this BEFORE the SalonMap component
+const ZoomIndicator = () => {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+
+  useEffect(() => {
+    const updateZoom = () => {
+      setZoom(map.getZoom());
+    };
+
+    map.on("zoomend", updateZoom);
+
+    return () => {
+      map.off("zoomend", updateZoom);
+    };
+  }, [map]);
+
+  return <div className={styles.zoomIndicator}>Zoom: {zoom.toFixed(1)}</div>;
 };
 
 const SalonMap = ({
@@ -232,42 +558,193 @@ const SalonMap = ({
   onSalonSelect,
   onBookNow,
   userGender,
+  onLocationChange,
 }) => {
-  const [mapLoaded, setMapLoaded] = useState(false);
+  const [loadingLocation, setLoadingLocation] = useState(false);
   const selectedSalonData = salons.find((s) => s._id === selectedSalon);
   const router = useRouter();
   const [mapTheme, setMapTheme] = useState("standard");
   const [selectedSalonPopup, setSelectedSalonPopup] = useState(null);
   const [mapInstance, setMapInstance] = useState(null);
   const [mapRef, setMapRef] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const searchTimeoutRef = useRef(null);
+  const [clickMode, setClickMode] = useState(false); // ✅ ADD THIS
+  const mapClickHandlerRef = useRef(null);
+  // 🔧 Track initialization and user marker
+  const hasInitialized = useRef(false);
+  const userMarkerRef = useRef(null);
+
+  // 🔧 NEW: Manual location state
+  const [manualLocation, setManualLocation] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isManualMode, setIsManualMode] = useState(false);
 
   const mapThemes = {
     standard: {
-      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      url: "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
       name: "Standard",
+      maxZoom: 22,
+      maxNativeZoom: 22,
+      attribution: "&copy; Google Maps",
     },
-    dark: {
-      url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      name: "Dark",
+    simple: {
+      url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+      name: "Simple",
+      maxZoom: 22,
+      maxNativeZoom: 22,
+      attribution: "&copy; OpenStreetMap Humanitarian",
+    },
+    detailed: {
+      url: "https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png",
+      name: "Detailed",
+      maxZoom: 22,
+      maxNativeZoom: 22,
+      attribution: "&copy; OpenStreetMap.de",
     },
     light: {
       url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
       name: "Light",
-    },
-    satellite: {
-      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      name: "Satellite",
+      maxZoom: 22,
+      maxNativeZoom: 22,
+      attribution: "&copy; CARTO",
     },
     terrain: {
-      url: "https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}{r}.png",
+      url: "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
       name: "Terrain",
+      maxZoom: 22,
+      maxNativeZoom: 22,
+      attribution: "&copy; Google Maps",
+    },
+    hybrid: {
+      url: "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+      name: "Hybrid",
+      maxZoom: 22,
+      maxNativeZoom: 22,
+      attribution: "&copy; Google Maps",
+    },
+    satellite: {
+      url: "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+      name: "Satellite",
+      maxZoom: 22,
+      maxNativeZoom: 22,
+      attribution: "&copy; Google Maps",
+    },
+    atlas: {
+      url: "https://{s}.tile.thunderforest.com/mobile-atlas/{z}/{x}/{y}.png?apikey=20622b4dbbab4ee68c1024d1fc0ceee9",
+      name: "Atlas",
+      maxZoom: 22,
+      maxNativeZoom: 22,
+      attribution: "&copy; Thunderforest",
     },
   };
 
-  const defaultCenter =
-    userLocation?.lat && userLocation?.lng
-      ? [userLocation.lat, userLocation.lng]
+  // 🔧 Use manual location if set, otherwise use live location
+  const effectiveUserLocation =
+    isManualMode && manualLocation ? manualLocation : userLocation;
+
+  const defaultCenter = useMemo(() => {
+    return effectiveUserLocation?.lat && effectiveUserLocation?.lng
+      ? [effectiveUserLocation.lat, effectiveUserLocation.lng]
       : [19.076, 72.8777]; // Mumbai default
+  }, [effectiveUserLocation?.lat, effectiveUserLocation?.lng]);
+
+  // 🔧 PREVENT continuous re-centering
+  useEffect(() => {
+    if (!mapRef || hasInitialized.current) return;
+
+    // Only center on initial load
+    if (defaultCenter) {
+      mapRef.setView(defaultCenter, 15);
+      hasInitialized.current = true;
+      console.log("🗺️ Map initialized at:", defaultCenter);
+    }
+  }, [mapRef, defaultCenter]); // No dependency on userLocation
+
+  // 🔧 STABILIZE user marker position updates
+  useEffect(() => {
+    if (!mapRef || !effectiveUserLocation || !userMarkerRef.current) return;
+
+    const MIN_UPDATE_DISTANCE = 0.0005; // ~50m threshold
+
+    const currentPos = userMarkerRef.current.getLatLng();
+    const latDiff = Math.abs(currentPos.lat - effectiveUserLocation.lat);
+    const lngDiff = Math.abs(currentPos.lng - effectiveUserLocation.lng);
+
+    // Only update if moved significantly
+    if (latDiff > MIN_UPDATE_DISTANCE || lngDiff > MIN_UPDATE_DISTANCE) {
+      console.log("📍 Updating user marker position");
+      userMarkerRef.current.setLatLng([
+        effectiveUserLocation.lat,
+        effectiveUserLocation.lng,
+      ]);
+    } else {
+      console.log("📍 Skipping minor position update");
+    }
+  }, [effectiveUserLocation, mapRef]);
+
+  // 🔧 NEW: Handle manual location selection
+  const handleLocationSelect = (location) => {
+    console.log("📍 Manual location set:", location);
+
+    setManualLocation(location);
+    setIsManualMode(true);
+    localStorage.setItem("manualLocation", JSON.stringify(location));
+    localStorage.setItem("isManualMode", "true");
+
+    if (mapRef) {
+      mapRef.flyTo([location.lat, location.lng], 16, {
+        animate: true,
+        duration: 1.5,
+      });
+    }
+
+    // Call parent callback
+    if (onLocationChange) {
+      onLocationChange(location);
+    }
+  };
+
+  // 🔧 NEW: Revert to live location
+  const handleRevertToLive = () => {
+    console.log("📍 Reverted to live location");
+    setIsManualMode(false);
+    setManualLocation(null);
+
+    localStorage.removeItem("manualLocation");
+    localStorage.setItem("isManualMode", "false");
+
+    // ✅ IMMEDIATELY RECALCULATE DISTANCES WITH LIVE LOCATION
+    if (userLocation && onLocationChange) {
+      onLocationChange(userLocation);
+    }
+
+    // Center map on live location
+    if (userLocation && mapRef) {
+      mapRef.flyTo([userLocation.lat, userLocation.lng], 16, {
+        animate: true,
+        duration: 1.5,
+      });
+    }
+  };
+
+  // 🔧 Load manual location from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("manualLocation");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setManualLocation(parsed);
+        setIsManualMode(true);
+        console.log("📍 Loaded manual location from storage");
+      } catch (e) {
+        console.error("Error parsing stored manual location", e);
+      }
+    }
+  }, []);
+
   const ThemeSelector = () => (
     <div className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg p-2 text-black">
       <select
@@ -283,7 +760,7 @@ const SalonMap = ({
       </select>
     </div>
   );
-  // Add this component inside the MapContainer, after TileLayer
+
   const PopupOpener = ({ salons }) => {
     const map = useMap();
 
@@ -302,135 +779,451 @@ const SalonMap = ({
     return null;
   };
 
+  const handleLiveLocationClick = async () => {
+    // If in manual mode, just revert to live tracking
+    if (isManualMode) {
+      handleRevertToLive();
+      return;
+    }
+
+    // ✅ USE THE EXISTING liveUserLocation FROM HOOK!
+    if (userLocation) {
+      console.log("📍 Using existing live location:", userLocation);
+
+      // Update distances with existing location
+      if (onLocationChange) {
+        onLocationChange(userLocation);
+      }
+
+      // Center map
+      if (mapRef) {
+        mapRef.flyTo([userLocation.lat, userLocation.lng], 16, {
+          animate: true,
+          duration: 1.5,
+        });
+      }
+      return;
+    }
+
+    // ✅ ONLY IF NO LOCATION, REQUEST NEW ONE
+    setLoadingLocation(true);
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 10000, // ✅ 10 seconds for network location
+          maximumAge: 10000, // Accept 10s old
+        });
+      });
+
+      const newLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      };
+
+      if (onLocationChange) {
+        onLocationChange(newLocation);
+      }
+
+      if (mapRef) {
+        mapRef.flyTo([newLocation.lat, newLocation.lng], 16, {
+          animate: true,
+          duration: 1.5,
+        });
+      }
+
+      setLoadingLocation(false);
+    } catch (error) {
+      console.error("Location error:", error);
+      setLoadingLocation(false);
+    }
+  };
+
+  // Search location function
+  const searchLocation = async (query) => {
+    if (!query || query.trim().length < 3) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/geocode?query=${encodeURIComponent(
+          query + ", Maharashtra, India"
+        )}`
+      );
+      if (!response.ok) throw new Error("Search failed");
+
+      const allResults = await response.json();
+      const userLat = effectiveUserLocation?.lat || 19.247251;
+      const userLng = effectiveUserLocation?.lng || 73.154063;
+
+      const nearbyResults = allResults
+        .map((result) => {
+          const lat = parseFloat(result.lat);
+          const lng = parseFloat(result.lon);
+          const R = 6371;
+          const dLat = ((lat - userLat) * Math.PI) / 180;
+          const dLng = ((lng - userLng) * Math.PI) / 180;
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos((userLat * Math.PI) / 180) *
+              Math.cos((lat * Math.PI) / 180) *
+              Math.sin(dLng / 2) *
+              Math.sin(dLng / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distance = R * c;
+          return { ...result, distance: distance.toFixed(1) };
+        })
+        .filter((r) => parseFloat(r.distance) < 20)
+        .sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance))
+        .slice(0, 8);
+
+      setSearchResults(nearbyResults);
+    } catch (error) {
+      console.error("Search error:", error);
+      setSearchResults([]);
+    }
+  };
+
   return (
-    <div className={styles.mapContainer}>
-      <ThemeSelector />
-      <MapContainer
-        center={defaultCenter}
-        zoom={15}
-        maxZoom={20}
-        className={styles.map}
-        ref={setMapRef}
-        whenReady={(map) => setMapRef(map.target)}
-        whenCreated={setMapInstance}
-      >
-        <TileLayer
-          url={mapThemes[mapTheme].url}
-          attribution="&copy; Map Data"
+    <div className={styles.mapWrapper}>
+      {/* Controls above map */}
+      <div className={styles.mapControlsTop}>
+        {/* Search input - takes most space */}
+        <input
+          type="text"
+          placeholder="Search building, landmark..."
+          value={searchQuery}
+          onChange={(e) => {
+            const value = e.target.value;
+            setSearchQuery(value);
+            if (searchTimeoutRef.current)
+              clearTimeout(searchTimeoutRef.current);
+            if (value.trim().length >= 3) {
+              setSearching(true);
+              searchTimeoutRef.current = setTimeout(
+                () => searchLocation(value),
+                1000
+              );
+            } else {
+              setSearchResults([]);
+              setSearching(false);
+            }
+          }}
+          className={styles.searchInput}
         />
-        <PopupOpener salons={salons} />
-        <MapUpdater selectedSalon={selectedSalon} salons={salons} />
 
-        {/* User location marker */}
-        {userLocation?.lat && userLocation?.lng && (
-          <Marker
-            position={[userLocation.lat, userLocation.lng]}
-            icon={userIcon}
-          >
-            <Popup>
-              <div className={styles.userPopup}>
-                <strong>Your Location</strong>
-              </div>
-            </Popup>
-          </Marker>
-        )}
+        {/* Click on map button */}
+        {/* Click on map button */}
+        <button
+          className={styles.clickMapBtn}
+          onClick={() => {
+            if (!mapRef) {
+              console.error("Map not ready");
+              return;
+            }
 
-        {/* Salon markers with always-open popups */}
-        {salons.map((salon) => (
-          <Marker
-            key={salon._id}
-            position={[
-              salon.location.coordinates[1],
-              salon.location.coordinates[0],
-            ]}
-            icon={salonIcon}
-            eventHandlers={{
-              click: () => onSalonSelect(salon),
-            }}
-          >
-            <Popup
-              autoClose={false}
-              closeButton={false}
-              closeOnClick={false}
-              closeOnEscapeKey={false}
-              autoPan={false}
-              className="custom-popup"
-            >
-              <div className="text-center p-2 min-w-[20px]">
-                <h3 className="font-bold text-sm mb-1">{salon.salonName}</h3>
-                <p className="text-xs font-medium text-blue-600 ">
-                  {salon.distance?.toFixed(1)}km away
-                </p>
-                <div className="flex flex-col gap-1">
-                  <button
-                    className="text-xs bg-orange-500 text-white rounded px-4 py-1 font-medium hover:bg-orange-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedSalonPopup(salon);
-                    }}
-                  >
-                    View Details
-                  </button>
-                  <button
-                    className="text-xs bg-blue-500 text-white rounded px-2 py-1 font-medium hover:bg-blue-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.open(
-                        `https://maps.google.com/maps?daddr=${salon.location.coordinates[1]},${salon.location.coordinates[0]}`
-                      );
-                    }}
-                  >
-                    Get Directions
-                  </button>
+            // Set crosshair cursor
+            mapRef.getContainer().style.cursor = "crosshair";
+            setClickMode(true);
+
+            // Attach click handler
+            const handleMapClick = (e) => {
+              const { lat, lng } = e.latlng;
+
+              handleLocationSelect({
+                lat,
+                lng,
+                accuracy: 5,
+                manual: true,
+                address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+              });
+
+              // Try reverse geocode
+              fetch(`/api/geocode?reverse=true&lat=${lat}&lon=${lng}`)
+                .then((res) => res.json())
+                .then((data) => {
+                  if (data.display_name) {
+                    handleLocationSelect({
+                      lat,
+                      lng,
+                      accuracy: 5,
+                      manual: true,
+                      address: data.display_name,
+                    });
+                  }
+                })
+                .catch(() => console.log("Using coordinates"));
+
+              // Reset
+              mapRef.getContainer().style.cursor = "";
+              setClickMode(false);
+              mapRef.off("click", handleMapClick);
+            };
+
+            mapRef.on("click", handleMapClick);
+          }}
+          title="Click on map to set location"
+        >
+          <MapPin size={16} />
+          <span>Pin</span>
+        </button>
+
+        {/* My Location button */}
+        <button
+          className={styles.liveLocationTopBtn}
+          onClick={handleLiveLocationClick}
+          disabled={loadingLocation}
+          title="Get my current location"
+        >
+          {loadingLocation ? (
+            <Navigation size={16} className={styles.spinning} />
+          ) : (
+            <Navigation size={16} />
+          )}
+          <span>{loadingLocation ? "..." : "Live"}</span>
+        </button>
+      </div>
+
+      {/* Search results dropdown */}
+      {/* Search results dropdown */}
+      {searching && searchQuery.trim().length >= 3 && (
+        <div className={styles.searchResultsDropdown}>
+          {searchResults.length > 0 ? (
+            // Show results
+            searchResults.map((result, idx) => (
+              <div
+                key={idx}
+                className={styles.searchResultItem}
+                onClick={() => {
+                  handleLocationSelect({
+                    lat: parseFloat(result.lat),
+                    lng: parseFloat(result.lon),
+                    accuracy: 10,
+                    manual: true,
+                    address: result.display_name,
+                  });
+                  setSearchQuery("");
+                  setSearchResults([]);
+                  setSearching(false);
+                }}
+              >
+                <MapPin size={14} className={styles.resultIcon} />
+                <div className={styles.resultText}>
+                  <strong>
+                    {result.name || result.display_name.split(",")[0]}
+                    <span className={styles.resultDistance}>
+                      {" "}
+                      · {result.distance}km
+                    </span>
+                  </strong>
+                  <p>{result.display_name}</p>
                 </div>
               </div>
-            </Popup>
-          </Marker>
-        ))}
-
-        {salons.map((salon) => (
-          <Marker
-            key={`marker-${salon._id}`}
-            position={[
-              salon.location.coordinates[1],
-              salon.location.coordinates[0],
-            ]}
-            icon={salonIcon}
-            eventHandlers={{
-              click: () => onSalonSelect(salon),
-            }}
-          />
-        ))}
-      </MapContainer>
-      {userLocation && mapRef && (
-        <LiveLocationControl userLocation={userLocation} map={mapRef} />
-      )}
-      {/* Salon Details Card */}
-      {selectedSalonPopup && (
-        <div
-          className={styles.salonPopupOverlay}
-          onClick={() => setSelectedSalonPopup(null)}
-        >
-          <div
-            className={styles.salonPopupCard}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className={styles.popupClose}
-              onClick={() => setSelectedSalonPopup(null)}
-            >
-              ×
-            </button>
-            <SalonCard
-              salon={selectedSalonPopup}
-              userLocation={userLocation}
-              onSalonSelect={onSalonSelect}
-              onBookNow={onBookNow}
-              userGender={userGender}
-            />
-          </div>
+            ))
+          ) : (
+            // No results fallback
+            <div className={styles.noResults}>
+              <p>🔍 No locations found</p>
+              <p className={styles.noResultsHint}>
+                Try searching for a nearby landmark or use the &quot;Pin&quot;
+                button to click on the map
+              </p>
+            </div>
+          )}
         </div>
       )}
+
+      <div className={styles.mapContainer}>
+        <ThemeSelector />
+
+        {/* 🔧 NEW: Location Search Panel */}
+        {isSearching && (
+          <LocationSearch
+            onLocationSelect={handleLocationSelect}
+            isSearching={isSearching}
+            setIsSearching={setIsSearching}
+            userLocation={effectiveUserLocation}
+            mapRef={mapRef}
+          />
+        )}
+
+        {/* 🔧 Manual Location Indicator */}
+        {isManualMode && manualLocation?.address && (
+          <div className={styles.manualLocationIndicator}>
+            <MapPin size={16} />
+            <span>Manual: {manualLocation.address.substring(0, 50)}...</span>
+          </div>
+        )}
+
+        <MapContainer
+          center={defaultCenter}
+          zoom={15}
+          minZoom={10}
+          maxZoom={22}
+          className={styles.map}
+          ref={setMapRef}
+          whenReady={(map) => setMapRef(map.target)}
+          whenCreated={setMapInstance}
+        >
+          <TileLayer
+            url={mapThemes[mapTheme].url}
+            attribution="&copy; Map Data"
+            maxZoom={22}
+            maxNativeZoom={22}
+          />
+          <ZoomIndicator />
+          {/* Add traffic overlay when traffic theme is selected */}
+          {mapTheme === "traffic" && (
+            <TileLayer
+              url="https://mt1.google.com/vt/lyrs=h,traffic&x={x}&y={y}&z={z}"
+              attribution="Traffic"
+              opacity={1}
+              zIndex={1000}
+            />
+          )}
+          <PopupOpener salons={salons} />
+          <MapUpdater selectedSalon={selectedSalon} salons={salons} />
+
+          {/* User location marker - 🔧 WITH REF */}
+          {effectiveUserLocation?.lat && effectiveUserLocation?.lng && (
+            <Marker
+              position={[effectiveUserLocation.lat, effectiveUserLocation.lng]}
+              icon={userIcon}
+              ref={userMarkerRef}
+            >
+              <Popup>
+                <div className={styles.userPopup}>
+                  <strong>
+                    {isManualMode ? "📍 Manual Location" : "📍 Your Location"}
+                  </strong>
+                  <p className="text-xs mt-1">
+                    Lat: {effectiveUserLocation.lat.toFixed(6)}
+                    <br />
+                    Lng: {effectiveUserLocation.lng.toFixed(6)}
+                    <br />
+                    {isManualMode
+                      ? "Set manually"
+                      : `Accuracy: ±${
+                          effectiveUserLocation.accuracy?.toFixed(0) ||
+                          "Unknown"
+                        }m`}
+                  </p>
+                </div>
+              </Popup>
+            </Marker>
+          )}
+
+          {/* Salon markers with always-open popups */}
+          {salons.map((salon) => (
+            <Marker
+              key={salon._id}
+              position={[
+                salon.location.coordinates[1],
+                salon.location.coordinates[0],
+              ]}
+              icon={salonIcon}
+              eventHandlers={{
+                click: () => onSalonSelect(salon),
+              }}
+            >
+              <Popup
+                autoClose={false}
+                closeButton={false}
+                closeOnClick={false}
+                closeOnEscapeKey={false}
+                autoPan={false}
+                className="custom-popup"
+              >
+                <div className="text-center p-2 min-w-[20px]">
+                  <h3 className="font-bold text-sm mb-1">{salon.salonName}</h3>
+                  <p className="text-xs font-medium text-blue-600 ">
+                    {salon.distance?.toFixed(1)}km away
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      className="text-xs bg-orange-500 text-white rounded px-4 py-1 font-medium hover:bg-orange-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSalonPopup(salon);
+                      }}
+                    >
+                      View Details
+                    </button>
+                    <button
+                      className="text-xs bg-purple-500 text-white rounded px-2 py-1 font-medium hover:bg-purple-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const lat = salon.location.coordinates[1];
+                        const lng = salon.location.coordinates[0];
+                        window.open(
+                          `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`,
+                          "_blank"
+                        );
+                      }}
+                    >
+                      🚶 Street View
+                    </button>
+                    <button
+                      className="text-xs bg-blue-500 text-white rounded px-2 py-1 font-medium hover:bg-blue-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(
+                          `https://maps.google.com/maps?daddr=${salon.location.coordinates[1]},${salon.location.coordinates[0]}`
+                        );
+                      }}
+                    >
+                      Get Directions
+                    </button>
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+
+        {/* 🔧 UPDATED: Location Controls */}
+        {/* {mapRef && (
+          <LiveLocationControl
+            userLocation={effectiveUserLocation}
+            map={mapRef}
+            isManualLocation={isManualMode}
+            onRevertToLive={handleRevertToLive}
+            onOpenSearch={() => setIsSearching(true)}
+          />
+        )} */}
+
+        {/* Salon Details Card */}
+        {selectedSalonPopup && (
+          <div
+            className={styles.salonPopupOverlay}
+            onClick={() => setSelectedSalonPopup(null)}
+          >
+            <div
+              className={styles.salonPopupCard}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className={styles.popupClose}
+                onClick={() => setSelectedSalonPopup(null)}
+              >
+                ×
+              </button>
+              <SalonCard
+                salon={selectedSalonPopup}
+                userLocation={effectiveUserLocation}
+                onSalonSelect={onSalonSelect}
+                onBookNow={onBookNow}
+                userGender={userGender}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
