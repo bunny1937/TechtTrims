@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../../styles/Auth/UserAuth.module.css";
 import { UserDataManager } from "@/lib/userData";
+import { setAuthToken, setUserData } from "@/lib/cookieAuth";
 
 export default function UserLoginPage() {
   const router = useRouter();
@@ -72,11 +73,8 @@ export default function UserLoginPage() {
 
       if (response.ok) {
         const result = await response.json();
-        localStorage.setItem("userToken", result.token);
-        localStorage.setItem(
-          "authenticatedUserData",
-          JSON.stringify(result.user)
-        );
+        setAuthToken(result.token, true); // true = remember me
+        setUserData(result.user); // Store non-sensitive data in sessionStorage
 
         await UserDataManager.fetchAndStoreUserData();
 

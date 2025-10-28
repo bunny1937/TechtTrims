@@ -5,9 +5,12 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import styles from "../styles/Home.module.css";
 import { useLocation } from "@/hooks/useLocation";
+import { UserDataManager } from "@/lib/userData";
+import { getAuthToken, getUserData } from "@/lib/cookieAuth";
 
 export default function Home() {
   const router = useRouter();
+  const [salons, setSalons] = useState([]);
   const [userOnboarding, setUserOnboarding] = useState(null);
   const [nearbySalons, setNearbySalons] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,19 +40,16 @@ export default function Home() {
     const initializeUser = async () => {
       if (typeof window === "undefined") return;
 
-      const userToken = localStorage.getItem("userToken");
-      const authenticatedUserData = localStorage.getItem(
-        "authenticatedUserData"
-      );
+      // ✅ USE COOKIE INSTEAD OF LOCALSTORAGE
+      const userToken = getAuthToken();
 
-      if (userToken && authenticatedUserData) {
+      if (userToken) {
         try {
-          const response = await fetch("/api/user/profile", {
-            headers: { Authorization: `Bearer ${userToken}` },
-          });
-          if (response.ok) {
-            const apiUserData = await response.json();
-            setUserOnboarding(apiUserData);
+          // Fetch fresh user data from API
+          const userData = await UserDataManager.fetchAndStoreUserData();
+
+          if (userData) {
+            setUserOnboarding(userData);
 
             // Load salons ONLY ONCE with initial location
             if (liveUserLocation && !salonsLoadedRef.current) {
@@ -57,7 +57,7 @@ export default function Home() {
               await loadNearbySalons(
                 liveUserLocation.lat,
                 liveUserLocation.lng,
-                apiUserData.gender
+                userData.gender
               );
               salonsLoadedRef.current = true;
             }
@@ -66,7 +66,7 @@ export default function Home() {
           console.error("Error loading user data:", error);
         }
       } else {
-        // Check onboarding data
+        // Check onboarding data for guest users
         const onboardingData = localStorage.getItem("userOnboardingData");
         if (onboardingData) {
           try {
@@ -88,6 +88,7 @@ export default function Home() {
           }
         }
       }
+
       setIsLoading(false);
     };
 
@@ -97,35 +98,57 @@ export default function Home() {
     }
   }, [liveUserLocation]); // Dependency on location only for initial load
 
-  // MODIFIED: Load nearby salons WITHOUT triggering on every update
-  const loadNearbySalons = async (latitude, longitude, gender) => {
-    setIsLoadingSalons(true);
+  const loadNearbySalons = async (lat, lng, gender = "all") => {
     try {
-      console.log("ðŸ” Loading salons for coordinates:", latitude, longitude);
-      const response = await fetch(
-        `/api/salons/nearby?latitude=${latitude}&longitude=${longitude}&radius=100&gender=${gender}`
-      );
+      console.log("🔍 Loading salons for coordinates:", lat, lng);
+
+      const url = `/api/salons/nearby?latitude=${lat}&longitude=${lng}&radius=100&gender=${gender}`;
+      console.log("📡 Fetching from:", url);
+
+      const response = await fetch(url);
+
+      console.log("📦 Response status:", response.status);
+      console.log("📦 Response ok:", response.ok);
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
       const data = await response.json();
 
-      if (response.ok) {
-        setNearbySalons(data.salons);
-        console.log("âœ… Loaded salons:", data.salons?.length || 0);
-      } else {
-        console.error("Error loading salons:", data.message);
-        setNearbySalons([]);
-      }
+      // ✅ ADD DETAILED LOGGING
+      console.log("📦 Raw API response:", data);
+      console.log("📦 Data type:", typeof data);
+      console.log("📦 Is array:", Array.isArray(data));
+      console.log("📦 Data length:", data?.length);
+
+      // Ensure data is array
+      const salonsArray = Array.isArray(data.salons) ? data.salons : []; // <-- FIX
+
+      console.log("✅ Loaded salons:", salonsArray.length);
+      console.log("🏢 First salon:", salonsArray[0]);
+
+      // ✅ SET STATE
+      // ✅ SET STATE - USE BOTH salons AND nearbySalons
+      setSalons(salonsArray);
+      setNearbySalons(salonsArray); // ✅ ADD THIS LINE
+      setFilteredSalons(salonsArray);
+
+      // ✅ VERIFY STATE WAS SET
+      console.log("✅ State updated - salons count:", salonsArray.length);
     } catch (error) {
-      console.error("Error loading salons:", error);
-      setNearbySalons([]);
-    } finally {
-      setIsLoadingSalons(false);
+      console.error("❌ Error loading salons:", error.message);
+      console.error("❌ Full error:", error);
+      setSalons([]);
+      setFilteredSalons([]);
     }
   };
 
   const handleLocationChange = (newLocation) => {
     console.log("📍 Location changed to", newLocation);
 
-    const updatedSalons = nearbySalons.map((salon) => {
+    const updatedSalons = salons.map((salon) => {
+      // ✅ CHANGE nearbySalons to salons
       const salonLat = salon.location.coordinates[1];
       const salonLng = salon.location.coordinates[0];
 
@@ -147,7 +170,7 @@ export default function Home() {
       };
     });
 
-    setNearbySalons([...updatedSalons]);
+    setSalons([...updatedSalons]);
     setMapKey((prev) => prev + 1); // ✅ Force map re-render
 
     console.log(
@@ -195,12 +218,12 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!nearbySalons.length) {
+    if (!salons.length) {
       setFilteredSalons([]);
       return;
     }
 
-    let filtered = nearbySalons;
+    let filtered = salons;
 
     // Filter by selected service
     if (selectedService) {
@@ -225,7 +248,7 @@ export default function Home() {
     }
 
     setFilteredSalons(filtered);
-  }, [nearbySalons, searchTerm, selectedService]);
+  }, [nearbySalons, searchTerm, selectedService, salons]);
 
   // const toggleDarkMode = () => {
   //   const newMode = !isDarkMode;
@@ -445,9 +468,7 @@ export default function Home() {
                   <div className={styles.heroStat}>
                     <div className={styles.statIcon}>
                       🏪{" "}
-                      <span className={styles.statNumber}>
-                        {nearbySalons.length}
-                      </span>
+                      <span className={styles.statNumber}>{salons.length}</span>
                     </div>
                     <div className={styles.statContent}>
                       <span className={styles.statLabel}>Premium Salons</span>
@@ -457,7 +478,7 @@ export default function Home() {
                     <div className={styles.statIcon}>
                       💆{" "}
                       <span className={styles.statNumber}>
-                        {nearbySalons.reduce(
+                        {salons.reduce(
                           (total, salon) =>
                             total + (salon.topServices?.length || 0),
                           0
@@ -472,7 +493,7 @@ export default function Home() {
                     <div className={styles.statIcon}>
                       ⭐
                       <span className={styles.statNumber}>
-                        {nearbySalons.reduce(
+                        {salons.reduce(
                           (total, salon) =>
                             total + (salon.stats?.totalBookings || 0),
                           0
@@ -784,7 +805,7 @@ export default function Home() {
           )} */}
 
           {/* View toggle (only show for pre-book with location) */}
-          {nearbySalons.length > 0 && (
+          {salons.length > 0 && (
             <div className={styles.SalonControls}>
               <div className={styles.viewOptions}>
                 <motion.button
@@ -831,18 +852,17 @@ export default function Home() {
               </div>
               <p>Discovering premium salons near you...</p>
             </div>
-          ) : nearbySalons.length === 0 ? (
+          ) : salons.length === 0 ? ( // ✅ CHANGE nearbySalons to salons
             <div className={styles.noSalons}>
               <p>
-                Select a salon below to see real-time chair availability and
-                queue status
-              </p>{" "}
+                No salons found in your area. Try adjusting your search filters.
+              </p>
             </div>
           ) : showMapView ? (
             <div className={styles.mapViewWrapper}>
               <SalonMap
                 key={mapKey}
-                salons={nearbySalons}
+                salons={salons}
                 userLocation={liveUserLocation}
                 onLocationChange={handleLocationChange}
                 onRefreshSalons={(lat, lng) => {
@@ -857,7 +877,8 @@ export default function Home() {
             </div>
           ) : (
             <div className={styles.salonsGrid}>
-              {(filteredSalons.length > 0 ? filteredSalons : nearbySalons).map(
+              {(filteredSalons.length > 0 ? filteredSalons : salons).map(
+                // ✅ CHANGE nearbySalons to salons
                 (salon, index) => (
                   <motion.div
                     key={salon._id?.oid || salon._id?.toString() || index}
@@ -934,7 +955,12 @@ export default function Home() {
                         <div className={styles.metric}>
                           <span className={styles.metricIcon}>📍</span>
                           <span className={styles.metricValue}>
-                            {salon.distance || 0} km away
+                            📍{" "}
+                            {salon.distance
+                              ? salon.distance < 1
+                                ? `${Math.round(salon.distance * 1000)}m away`
+                                : `${salon.distance}km away`
+                              : "N/A"}
                           </span>
                         </div>
                         <div className={styles.metric}>
