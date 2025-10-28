@@ -9,8 +9,8 @@ import { UserDataManager } from "../../lib/userData";
 import RetryButton from "@/components/RetryButton";
 import ReviewsSection from "@/components/Salon/ReviewSection";
 import ImageCarousel from "@/components/ImageCarousel";
-import LocationMap from "@/components/Maps/LocationMap";
-import { useLocation } from "@/hooks/useLocation";
+import LocationMap from "../../components/Maps/LocationMap";
+import { useLocation } from "../../hooks/useLocation";
 
 // Dynamic map import to avoid SSR issues
 const MapContainer = dynamic(

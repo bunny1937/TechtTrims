@@ -4,9 +4,9 @@ import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import styles from "../styles/Home.module.css";
-import { useLocation } from "@/hooks/useLocation";
-import { UserDataManager } from "@/lib/userData";
-import { getAuthToken, getUserData } from "@/lib/cookieAuth";
+import { useLocation } from "../hooks/useLocation";
+import { UserDataManager } from "../lib/userData";
+import { getAuthToken, getUserData } from "../lib/cookieAuth";
 
 export default function Home() {
   const router = useRouter();

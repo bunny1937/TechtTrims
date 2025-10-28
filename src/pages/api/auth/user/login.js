@@ -1,8 +1,11 @@
 import clientPromise from "../../../../lib/mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { sanitizeInput, validateEmail } from "@/lib/middleware/sanitize";
-import { checkRateLimit } from "@/lib/rateLimit";
+import {
+  sanitizeInput,
+  validateEmail,
+} from "../../../..//lib/middleware/sanitize";
+import { checkRateLimit } from "../../../../lib/rateLimit";
 import crypto from "crypto";
 
 export default async function handler(req, res) {

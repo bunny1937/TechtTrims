@@ -5,8 +5,8 @@ import { useRouter } from "next/router";
 import styles from "../../styles/User.module.css";
 import Link from "next/link";
 import { UserDataManager } from "../../lib/userData";
-import { removeAuthToken } from "@/lib/cookieAuth";
-import { getAuthToken } from "@/lib/cookieAuth";
+import { removeAuthToken } from "../../lib/cookieAuth";
+import { getAuthToken } from "../../lib/cookieAuth";
 
 export default function UserDashboard() {
   const router = useRouter();
