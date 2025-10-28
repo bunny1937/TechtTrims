@@ -1,5 +1,5 @@
 // pages/index.js
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -19,11 +19,12 @@ export default function Home() {
   const [filteredSalons, setFilteredSalons] = useState([]);
   const [isPrebook, setIsPrebook] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
-  const {
-    userLocation: liveUserLocation,
-    locationStatus,
-    requestLocationPermission,
-  } = useLocation();
+  const { userLocation: liveUserLocation, locationStatus } = useLocation();
+  const [mapKey, setMapKey] = useState(0);
+
+  // ADD: Track if salons were loaded
+  const salonsLoadedRef = useRef(false);
+  const initialLocationRef = useRef(null);
   const PLACEHOLDER_IMAGE = process.env.NEXT_PUBLIC_PLACEHOLDER_SALON_IMAGE;
 
   // Dynamic import for map component
@@ -41,56 +42,157 @@ export default function Home() {
         "authenticatedUserData"
       );
 
-      // If user is logged in, get API data
-      if (userToken || authenticatedUserData) {
+      if (userToken && authenticatedUserData) {
         try {
           const response = await fetch("/api/user/profile", {
             headers: { Authorization: `Bearer ${userToken}` },
           });
-
           if (response.ok) {
             const apiUserData = await response.json();
             setUserOnboarding(apiUserData);
 
-            // Use live location from hook
-            if (liveUserLocation) {
-              loadNearbySalons(
+            // Load salons ONLY ONCE with initial location
+            if (liveUserLocation && !salonsLoadedRef.current) {
+              initialLocationRef.current = liveUserLocation;
+              await loadNearbySalons(
                 liveUserLocation.lat,
                 liveUserLocation.lng,
                 apiUserData.gender
               );
+              salonsLoadedRef.current = true;
             }
           }
         } catch (error) {
           console.error("Error loading user data:", error);
         }
       } else {
-        // User not logged in - check onboarding data
+        // Check onboarding data
         const onboardingData = localStorage.getItem("userOnboardingData");
         if (onboardingData) {
           try {
             const userData = JSON.parse(onboardingData);
             setUserOnboarding(userData);
 
-            // Use live location from hook
-            if (liveUserLocation) {
-              loadNearbySalons(
+            // Load salons ONLY ONCE
+            if (liveUserLocation && !salonsLoadedRef.current) {
+              initialLocationRef.current = liveUserLocation;
+              await loadNearbySalons(
                 liveUserLocation.lat,
                 liveUserLocation.lng,
                 userData.gender
               );
+              salonsLoadedRef.current = true;
             }
           } catch (error) {
             console.error("Error parsing onboarding data:", error);
           }
         }
       }
-
       setIsLoading(false);
     };
 
-    initializeUser();
-  }, [router, liveUserLocation]);
+    // ONLY run when location is first available
+    if (liveUserLocation && !salonsLoadedRef.current) {
+      initializeUser();
+    }
+  }, [liveUserLocation]); // Dependency on location only for initial load
+
+  // MODIFIED: Load nearby salons WITHOUT triggering on every update
+  const loadNearbySalons = async (latitude, longitude, gender) => {
+    setIsLoadingSalons(true);
+    try {
+      console.log("ðŸ” Loading salons for coordinates:", latitude, longitude);
+      const response = await fetch(
+        `/api/salons/nearby?latitude=${latitude}&longitude=${longitude}&radius=100&gender=${gender}`
+      );
+      const data = await response.json();
+
+      if (response.ok) {
+        setNearbySalons(data.salons);
+        console.log("âœ… Loaded salons:", data.salons?.length || 0);
+      } else {
+        console.error("Error loading salons:", data.message);
+        setNearbySalons([]);
+      }
+    } catch (error) {
+      console.error("Error loading salons:", error);
+      setNearbySalons([]);
+    } finally {
+      setIsLoadingSalons(false);
+    }
+  };
+
+  const handleLocationChange = (newLocation) => {
+    console.log("📍 Location changed to", newLocation);
+
+    const updatedSalons = nearbySalons.map((salon) => {
+      const salonLat = salon.location.coordinates[1];
+      const salonLng = salon.location.coordinates[0];
+
+      const R = 6371;
+      const dLat = (salonLat - newLocation.lat) * (Math.PI / 180);
+      const dLng = (salonLng - newLocation.lng) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(newLocation.lat * (Math.PI / 180)) *
+          Math.cos(salonLat * (Math.PI / 180)) *
+          Math.sin(dLng / 2) *
+          Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+
+      return {
+        ...salon,
+        distance: distance,
+      };
+    });
+
+    setNearbySalons([...updatedSalons]);
+    setMapKey((prev) => prev + 1); // ✅ Force map re-render
+
+    console.log(
+      "✅ Updated distances:",
+      updatedSalons.map((s) => s.distance)
+    );
+  };
+
+  const handleRefreshLocation = async () => {
+    if (locationStatus === "denied") {
+      // Request permission from useLocation hook
+      const granted = await requestLocationPermission();
+
+      // Wait a bit for location to update
+      setTimeout(() => {
+        if (liveUserLocation) {
+          loadNearbySalons(
+            liveUserLocation.lat,
+            liveUserLocation.lng,
+            userOnboarding?.gender
+          );
+        }
+      }, 1000);
+    } else if (liveUserLocation) {
+      // Just reload with current location
+      loadNearbySalons(
+        liveUserLocation.lat,
+        liveUserLocation.lng,
+        userOnboarding?.gender
+      );
+    }
+  };
+
+  // ADD: Manual refresh function
+  const handleRefreshSalons = () => {
+    if (liveUserLocation && userOnboarding) {
+      salonsLoadedRef.current = false; // Allow reload
+      loadNearbySalons(
+        liveUserLocation.lat,
+        liveUserLocation.lng,
+        userOnboarding.gender
+      );
+      salonsLoadedRef.current = true;
+    }
+  };
 
   useEffect(() => {
     if (!nearbySalons.length) {
@@ -124,33 +226,6 @@ export default function Home() {
 
     setFilteredSalons(filtered);
   }, [nearbySalons, searchTerm, selectedService]);
-
-  const loadNearbySalons = async (latitude, longitude, gender) => {
-    setIsLoadingSalons(true);
-    try {
-      console.log("Loading salons for coordinates:", latitude, longitude);
-
-      const response = await fetch(
-        `/api/salons/nearby?latitude=${latitude}&longitude=${longitude}&radius=100&gender=${gender}`
-      );
-
-      const data = await response.json();
-      console.log("Salon API response:", data);
-
-      if (response.ok) {
-        setNearbySalons(data.salons || []);
-        console.log("Set nearby salons:", data.salons?.length || 0);
-      } else {
-        console.error("Error loading salons:", data.message);
-        setNearbySalons([]);
-      }
-    } catch (error) {
-      console.error("Error loading salons:", error);
-      setNearbySalons([]);
-    } finally {
-      setIsLoadingSalons(false);
-    }
-  };
 
   // const toggleDarkMode = () => {
   //   const newMode = !isDarkMode;
@@ -710,30 +785,40 @@ export default function Home() {
 
           {/* View toggle (only show for pre-book with location) */}
           {nearbySalons.length > 0 && (
-            <div className={styles.viewOptions}>
-              <motion.button
-                className={`${styles.viewToggle} ${
-                  !showMapView ? styles.active : ""
-                }`}
-                onClick={() => setShowMapView(false)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <span className={styles.viewIcon}>⊞</span>
-                Grid View
-              </motion.button>
+            <div className={styles.SalonControls}>
+              <div className={styles.viewOptions}>
+                <motion.button
+                  className={`${styles.viewToggle} ${
+                    !showMapView ? styles.active : ""
+                  }`}
+                  onClick={() => setShowMapView(false)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className={styles.viewIcon}>⊞</span>
+                  Grid View
+                </motion.button>
 
-              <motion.button
-                className={`${styles.viewToggle} ${
-                  showMapView ? styles.active : ""
-                }`}
-                onClick={() => setShowMapView(true)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
+                <motion.button
+                  className={`${styles.viewToggle} ${
+                    showMapView ? styles.active : ""
+                  }`}
+                  onClick={() => setShowMapView(true)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className={styles.viewIcon}>🗺</span>
+                  Map View
+                </motion.button>
+              </div>
+
+              <button
+                onClick={handleRefreshSalons}
+                className={styles.refreshButton}
+                disabled={isLoadingSalons}
               >
-                <span className={styles.viewIcon}>🗺</span>
-                Map View
-              </motion.button>
+                🔄 Refresh Salons
+              </button>
             </div>
           )}
 
@@ -754,10 +839,16 @@ export default function Home() {
               </p>{" "}
             </div>
           ) : showMapView ? (
-            <div className={styles.mapContainer}>
+            <div className={styles.mapViewWrapper}>
               <SalonMap
+                key={mapKey}
                 salons={nearbySalons}
                 userLocation={liveUserLocation}
+                onLocationChange={handleLocationChange}
+                onRefreshSalons={(lat, lng) => {
+                  // This loads fresh salons from API
+                  loadNearbySalons(lat, lng, userOnboarding?.gender);
+                }}
                 selectedSalon={selectedSalon}
                 onSalonSelect={setSelectedSalon}
                 onBookNow={handleSalonCardClick}
@@ -789,7 +880,7 @@ export default function Home() {
                         src={salon.profilePicture || PLACEHOLDER_IMAGE}
                         alt={salon.salonName}
                         style={{ objectFit: "cover", borderRadius: "8px" }}
-                        unoptimized // 👈 Add this if using external CDN
+                        unoptimized // ðŸ‘ˆ Add this if using external CDN
                       />
 
                       <div className={styles.salonImageOverlay}></div>

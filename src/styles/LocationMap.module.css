@@ -4,6 +4,86 @@
   overflow: hidden;
   border-bottom: 2px solid #c9a02c;
 }
+.mapControlsTop {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 12px;
+}
+
+.searchInput {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.clickMapBtn,
+.liveLocationTopBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #d4af37;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.themeSelector {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  padding: 6px 10px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.searchResultsDropdown {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1001;
+}
+
+.searchResultItem {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+.searchResultItem:hover {
+  background: #f9f9f9;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .mapHeader {
   padding: 20px;
@@ -92,7 +172,6 @@
 
 .liveLocationBtn:hover {
   background: #d4af37;
-  color: #fff;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
 }
@@ -112,5 +191,14 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 480px) {
+  .mapWrapper {
+    width: 96%;
+    margin: 0 auto;
+    height: 300px !important;
+    min-height: 300px !important;
   }
 }

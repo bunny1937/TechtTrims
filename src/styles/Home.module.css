@@ -9,6 +9,48 @@
   position: relative;
   overflow-x: hidden;
 }
+.locationRequired {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.locationModal {
+  background: white;
+  padding: 2rem;
+  border-radius: 16px;
+  max-width: 400px;
+  text-align: center;
+}
+
+.locationIcon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.enableLocationBtn {
+  background: #f59e0b;
+  color: white;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  margin: 1rem 0;
+}
+
+.locationNote {
+  font-size: 0.875rem;
+  color: #666;
+  margin-top: 1rem;
+}
 
 /* Enhanced Loading */
 .loadingContainer {
@@ -1465,7 +1507,10 @@
 
   margin-top: var(--space-16);
 }
-
+.SalonControls {
+  display: flex;
+  justify-content: space-between;
+}
 .viewOptions {
   display: flex;
   gap: var(--space-2);
@@ -1513,12 +1558,23 @@
   font-size: 1rem;
 }
 
-.mapContainer {
-  margin-top: var(--space-8);
-  border-radius: var(--radius-3xl);
-  overflow: hidden;
-  box-shadow: var(--shadow-xl);
-  height: 600px;
+.mapViewWrapper {
+  width: 100%;
+  height: auto;
+  min-height: 600px;
+  margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+  .mapViewWrapper {
+    min-height: 500px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mapViewWrapper {
+    min-height: 400px;
+  }
 }
 
 .loadingSalons {
