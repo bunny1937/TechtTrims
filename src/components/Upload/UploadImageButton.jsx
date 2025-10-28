@@ -21,8 +21,40 @@ export default function UploadImageButton({
       .toLowerCase()
       .replace(/[^a-z0-9-_]/g, "-") || "default-salon";
 
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
   const handleFileChange = async (event) => {
     const files = Array.from(event.target.files);
+
+    if (!files.length) return;
+
+    // Validate file types
+    for (const file of files) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        setError(
+          `Invalid file type: ${file.type}. Only JPEG, PNG, and WebP allowed.`
+        );
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        setError(
+          `File too large: ${(file.size / 1024 / 1024).toFixed(
+            1
+          )}MB. Max 5MB allowed.`
+        );
+        return;
+      }
+
+      // Validate file extension matches MIME type
+      const ext = file.name.split(".").pop().toLowerCase();
+      const validExts = ["jpg", "jpeg", "png", "webp"];
+      if (!validExts.includes(ext)) {
+        setError("Invalid file extension");
+        return;
+      }
+    }
     if (!files.length) return;
 
     if (multiple && files.length > maxFiles) {

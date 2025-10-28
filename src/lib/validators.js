@@ -9,7 +9,23 @@ export const validateMobile = (mobile) => {
 };
 
 export const validatePassword = (password) => {
-  return password && password.length >= 6;
+  if (!password || password.length < 8) {
+    return { valid: false, message: "Password must be at least 8 characters" };
+  }
+
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+  if (!hasUpper || !hasLower || !hasNumber) {
+    return {
+      valid: false,
+      message: "Password must contain uppercase, lowercase, and numbers",
+    };
+  }
+
+  return { valid: true };
 };
 
 export const validateSalonRegistration = (data) => {

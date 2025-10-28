@@ -1,15 +1,23 @@
 // lib/userData.js
+import {
+  getAuthToken,
+  setAuthToken,
+  removeAuthToken,
+  getUserData,
+  setUserData,
+} from "./cookieAuth";
+
 export class UserDataManager {
   static getStoredUserData() {
     if (typeof window === "undefined") return null;
 
     try {
       // First try to get authenticated user data
-      const userToken = localStorage.getItem("userToken");
+      const userToken = getAuthToken(); // ✅ CHANGE 1
       if (userToken) {
-        const storedUserData = localStorage.getItem("authenticatedUserData");
+        const storedUserData = getUserData(); // ✅ Use sessionStorage instead
         if (storedUserData) {
-          const userData = JSON.parse(storedUserData);
+          const userData = storedUserData;
           // Always preserve onboarding location data for authenticated users
           const onboardingData = localStorage.getItem("userOnboardingData");
           if (onboardingData) {
@@ -45,7 +53,7 @@ export class UserDataManager {
   static async fetchAndStoreUserData() {
     if (typeof window === "undefined") return null;
 
-    const userToken = localStorage.getItem("userToken");
+    const userToken = getAuthToken(); // ✅ CHANGE 2
     if (!userToken) return this.getStoredUserData();
 
     try {
@@ -94,11 +102,8 @@ export class UserDataManager {
           }
         }
 
-        // Store the merged data
-        localStorage.setItem(
-          "authenticatedUserData",
-          JSON.stringify(mergedData)
-        );
+        // Store the merged data in sessionStorage
+        setUserData(mergedData); // ✅ Use secure storage
 
         // Update booking history after login
         await this.syncBookingHistory();
@@ -115,7 +120,7 @@ export class UserDataManager {
   }
 
   static async syncBookingHistory() {
-    const userToken = localStorage.getItem("userToken");
+    const userToken = getAuthToken(); // ✅ CHANGE 3
     if (!userToken) return;
 
     try {
@@ -131,8 +136,8 @@ export class UserDataManager {
   static clearUserData() {
     if (typeof window === "undefined") return;
     // Clear user-specific data
-    localStorage.removeItem("userToken");
-    localStorage.removeItem("authenticatedUserData");
+    removeAuthToken(); // ✅ Clear cookie
+    sessionStorage.removeItem("userData"); // Clear session data
     localStorage.removeItem("userPrefillData");
     localStorage.removeItem("userData");
 
@@ -158,8 +163,8 @@ export class UserDataManager {
   static clearAllData() {
     if (typeof window === "undefined") return;
     // Nuclear option - clear everything except hasOnboarded
-    localStorage.removeItem("userToken");
-    localStorage.removeItem("authenticatedUserData");
+    removeAuthToken(); // ✅ Clear cookie
+    sessionStorage.clear();
     localStorage.removeItem("salonToken");
     localStorage.removeItem("salonSession");
     localStorage.removeItem("ownerToken");
@@ -180,8 +185,8 @@ export class UserDataManager {
 
   static isUserLoggedIn() {
     if (typeof window === "undefined") return false;
-    const userToken = localStorage.getItem("userToken");
-    const authenticatedUserData = localStorage.getItem("authenticatedUserData");
+    const userToken = getAuthToken(); // ✅ CHANGE 4
+    const authenticatedUserData = getUserData();
     const salonToken = localStorage.getItem("salonToken");
     const salonSession = localStorage.getItem("salonSession");
     // User is logged in if ANY auth token exists
@@ -210,8 +215,8 @@ export class UserDataManager {
 
   static isLoggedIn() {
     if (typeof window === "undefined") return false;
-    const userToken = localStorage.getItem("userToken");
-    const authenticatedUserData = localStorage.getItem("authenticatedUserData");
+    const userToken = getAuthToken(); // ✅ CHANGE 5
+    const authenticatedUserData = getUserData();
     const salonToken = localStorage.getItem("salonToken");
     const salonSession = localStorage.getItem("salonSession");
     // Check ANY authentication

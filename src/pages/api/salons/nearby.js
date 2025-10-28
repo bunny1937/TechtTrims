@@ -22,20 +22,12 @@ export default async function handler(req, res) {
     try {
       const { db } = await connectToDatabase();
 
-      console.log("=== DEBUGGING SALON SEARCH ===");
-      console.log("Search coordinates:", { lat, lng });
-      console.log("Search radius:", radiusKm, "km");
-
-      // Get all salons with timeout
       const allSalons = await db
         .collection("salons")
         .find({})
         .maxTimeMS(30000)
         .toArray();
 
-      console.log(`Found ${allSalons.length} total salons in database`);
-
-      // Filter salons by distance
       const nearbySalons = [];
 
       for (const salon of allSalons) {
@@ -46,12 +38,14 @@ export default async function handler(req, res) {
           continue;
         }
 
+        // [lng, lat] from MongoDB, but you want [lat, lng] for calc
         const [salonLng, salonLat] = salon.location.coordinates;
 
         if (isNaN(salonLat) || isNaN(salonLng)) {
           continue;
         }
 
+        // Calculate distance correctly!
         const distance = calculateDistance(lat, lng, salonLat, salonLng);
 
         if (distance <= radiusKm) {
@@ -62,7 +56,6 @@ export default async function handler(req, res) {
         }
       }
 
-      // Process salon data
       const processedSalons = nearbySalons.map((salon) => ({
         ...salon,
         id: salon._id.toString(),
@@ -91,18 +84,13 @@ export default async function handler(req, res) {
         salons: processedSalons,
       });
     } catch (err) {
-      console.error(`Attempt ${retryCount + 1} failed:`, err.message);
       retryCount++;
-
       if (retryCount >= maxRetries) {
-        console.error("Max retries reached. Final error:", err);
         return res.status(500).json({
           message: "Database connection failed after retries",
           error: err.message,
         });
       }
-
-      // Wait before retrying
       await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount));
     }
   }

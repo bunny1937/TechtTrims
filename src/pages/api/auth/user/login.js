@@ -1,6 +1,9 @@
 import clientPromise from "../../../../lib/mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { sanitizeInput, validateEmail } from "@/lib/middleware/sanitize";
+import { checkRateLimit } from "@/lib/rateLimit";
+import crypto from "crypto";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -8,7 +11,21 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, password } = req.body;
+    // Rate limiting - 5 attempts per 15 minutes
+    const rateCheck = checkRateLimit(
+      `login:${req.headers["x-forwarded-for"] || "unknown"}`,
+      5,
+      15 * 60 * 1000
+    );
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        message: `Too many login attempts. Try again in ${rateCheck.resetIn} minutes.`,
+        retryAfter: rateCheck.resetIn * 60,
+      });
+    }
+
+    // Sanitize and validate input
+    const { email, password } = sanitizeInput(req.body);
 
     if (!email || !password) {
       return res
@@ -16,6 +33,9 @@ export default async function handler(req, res) {
         .json({ message: "Email and password are required" });
     }
 
+    if (!validateEmail(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
     const client = await clientPromise;
     const db = client.db("techtrims");
 
@@ -54,13 +74,19 @@ export default async function handler(req, res) {
     // Create JWT token
     const token = jwt.sign(
       {
-        userId: user._id,
-        email: user.email,
+        userId: user._id.toString(),
         role: user.role,
+        email: user.email,
         name: user.name,
+        type: "access",
+        jti: crypto.randomBytes(16).toString("hex"),
       },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      {
+        expiresIn: "7d",
+        issuer: "techtrims-api",
+        audience: "techtrims-app",
+      }
     );
 
     // Return user data without sensitive info

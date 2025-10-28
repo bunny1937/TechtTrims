@@ -5,6 +5,8 @@ import { useRouter } from "next/router";
 import styles from "../../styles/User.module.css";
 import Link from "next/link";
 import { UserDataManager } from "../../lib/userData";
+import { removeAuthToken } from "@/lib/cookieAuth";
+import { getAuthToken } from "@/lib/cookieAuth";
 
 export default function UserDashboard() {
   const router = useRouter();
@@ -32,13 +34,11 @@ export default function UserDashboard() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const token = localStorage.getItem("userToken");
-
+        const token = getAuthToken();
         if (!token) {
           router.push("/auth/user/login");
           return;
         }
-
         setIsLoading(true);
 
         // Simple profile load
@@ -116,8 +116,9 @@ export default function UserDashboard() {
 
       // Force clear to ensure clean state
       if (typeof window !== "undefined") {
-        localStorage.removeItem("userToken");
-        localStorage.removeItem("authenticatedUserData");
+        removeAuthToken(); // Clear cookie
+        sessionStorage.clear();
+        UserDataManager.clearUserData(); // Clears cookies + session
         localStorage.removeItem("salonToken");
         localStorage.removeItem("ownerToken");
       }

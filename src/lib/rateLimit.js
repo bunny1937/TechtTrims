@@ -1,13 +1,15 @@
-// In-memory store for rate limiting (use Redis in large-scale production)
+// src/lib/rateLimit.js - COMPLETE REPLACEMENT
+
+// Use Redis in production for distributed rate limiting
 const rateLimit = new Map();
 
 export function checkRateLimit(
   identifier,
-  maxAttempts = 3,
-  windowMs = 60 * 60 * 1000
+  maxAttempts = 5,
+  windowMs = 15 * 60 * 1000
 ) {
   const now = Date.now();
-  const key = `reset_${identifier}`;
+  const key = `limit:${identifier}`;
 
   // Get existing attempts
   const attempts = rateLimit.get(key) || [];
@@ -23,10 +25,12 @@ export function checkRateLimit(
     const timeUntilReset = Math.ceil(
       (windowMs - (now - oldestAttempt)) / 1000 / 60
     );
+
     return {
       allowed: false,
       remaining: 0,
       resetIn: timeUntilReset,
+      retryAfter: Math.ceil((windowMs - (now - oldestAttempt)) / 1000),
     };
   }
 
@@ -58,4 +62,15 @@ function cleanupRateLimit(windowMs) {
       rateLimit.set(key, validAttempts);
     }
   }
+}
+
+// Add IP-based rate limiting for sensitive endpoints
+export function checkIPRateLimit(req, maxAttempts = 10, windowMs = 60 * 1000) {
+  const ip =
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.headers["x-real-ip"] ||
+    req.connection.remoteAddress ||
+    "unknown";
+
+  return checkRateLimit(`ip:${ip}`, maxAttempts, windowMs);
 }
