@@ -1,7 +1,7 @@
 import { connectToDatabase, clientPromise } from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
 import { updateSalonStats } from "../../../lib/statsHelper";
-import { csrfMiddleware } from "@/lib/middleware/csrf";
+import { csrfMiddleware } from "../../../lib/middleware/csrf";
 
 async function handler(req, res) {
   if (req.method !== "POST") {
