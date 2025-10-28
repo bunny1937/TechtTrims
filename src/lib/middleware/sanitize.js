@@ -1,14 +1,21 @@
-// src/lib/middleware/sanitize.js - CREATE NEW FILE
-import DOMPurify from "isomorphic-dompurify";
+// lib/middleware/sanitize.js
 import validator from "validator";
 
 export const sanitizeInput = (data) => {
   if (typeof data === "string") {
-    // Remove script tags and dangerous HTML
-    return DOMPurify.sanitize(data, {
-      ALLOWED_TAGS: [],
-      ALLOWED_ATTR: [],
-    }).trim();
+    // Simple string sanitization without DOM parsing
+    return data
+      .trim()
+      .replace(/[<>]/g, "") // Remove angle brackets
+      .replace(/javascript:/gi, "") // Remove javascript: protocol
+      .replace(/on\w+\s*=/gi, "") // Remove event handlers like onclick=
+      .replace(/&lt;/g, "")
+      .replace(/&gt;/g, "")
+      .substring(0, 10000); // Max length protection
+  }
+
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeInput(item));
   }
 
   if (typeof data === "object" && data !== null) {
@@ -23,16 +30,12 @@ export const sanitizeInput = (data) => {
 };
 
 export const validateAndSanitize = (req, res, next) => {
-  // Sanitize body
   if (req.body) {
     req.body = sanitizeInput(req.body);
   }
-
-  // Sanitize query params
   if (req.query) {
     req.query = sanitizeInput(req.query);
   }
-
   next();
 };
 
