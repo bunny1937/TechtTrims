@@ -116,15 +116,30 @@ export default function UserRegisterPage() {
       if (response.ok) {
         const result = await response.json();
 
-        // Store authentication data
-        localStorage.setItem("userToken", result.token);
-        localStorage.setItem(
-          "authenticatedUserData",
-          JSON.stringify(result.user)
-        );
+        // Store authentication data using cookie helper
+        setAuthToken(result.token, true);
+        setUserData(result.user);
 
-        // Clean up temporary data but keep onboarding for location
+        // Mark as onboarded (registered users don't need onboarding again)
+        sessionStorage.setItem("hasOnboarded", "true");
+
+        // Clean up temporary data
         localStorage.removeItem("userPrefillData");
+
+        // Keep onboarding data in session for preferences
+        const onboardingData = sessionStorage.getItem("userOnboardingData");
+        if (onboardingData) {
+          // Merge onboarding preferences with user data
+          try {
+            const preferences = JSON.parse(onboardingData);
+            sessionStorage.setItem(
+              "userPreferences",
+              JSON.stringify(preferences)
+            );
+          } catch (e) {
+            console.error("Error parsing onboarding data:", e);
+          }
+        }
 
         alert("Registration successful! Welcome to TechTrims!");
         router.push("/user/dashboard");

@@ -15,6 +15,7 @@ export default function UserLoginPage() {
   const [error, setError] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
+  const [rememberMe, setRememberMe] = useState(false); // ✅ Add state
 
   // ✅ FIX: Wait for client-side mount
   useEffect(() => {
@@ -62,31 +63,32 @@ export default function UserLoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setError("");
 
     try {
       const response = await fetch("/api/auth/user/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        credentials: "include", // ✅ IMPORTANT: Include cookies
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          rememberMe: rememberMe, // ✅ Send rememberMe flag
+        }),
       });
 
       if (response.ok) {
         const result = await response.json();
-        setAuthToken(result.token, true); // true = remember me
-        setUserData(result.user); // Store non-sensitive data in sessionStorage
+        // ❌ DON'T call setAuthToken - backend already set HttpOnly cookie
 
-        await UserDataManager.fetchAndStoreUserData();
+        // ✅ Only store non-sensitive data in sessionStorage
+        setUserData(result.user);
+        sessionStorage.setItem("hasOnboarded", "true");
 
         alert(`Welcome back, ${result.user.name}!`);
         router.push("/user/dashboard");
-      } else {
-        const error = await response.json();
-        setError(error.message || "Login failed");
       }
     } catch (error) {
       console.error("Login error:", error);
-      setError("Network error. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -162,7 +164,14 @@ export default function UserLoginPage() {
                   autoComplete="current-password"
                 />
               </div>
-
+              <label>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                Keep me logged in for 30 days
+              </label>
               <button
                 type="submit"
                 className={styles.submitButton}

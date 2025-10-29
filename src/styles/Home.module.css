@@ -324,14 +324,24 @@
 .header {
   position: sticky;
   top: 0;
-  z-index: 10;
-  background: rgba(255, 255, 255, 0.95);
+  z-index: 50;
+  background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
+  color: var(--text-primary);
   backdrop-filter: blur(20px);
-  transition: all var(--transition-normal);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  transition: background-color 0.4s ease, color 0.4s ease, box-shadow 0.4s ease,
+    border-color 0.4s ease;
 }
 
+/* 🌙 Dark Mode Header — rich black luxury feel */
+.dark,
 [data-theme="dark"] .header {
-  background: rgba(23, 23, 23, 0.95);
+  background: linear-gradient(135deg, #000000 0%, #0a0a0a 100%);
+  color: var(--text-primary);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.08); /* subtle gold border */
+  box-shadow: 0 2px 20px rgba(255, 215, 0, 0.05); /* faint golden glow */
 }
 
 .headerContent {
@@ -572,7 +582,6 @@
 .salonCard,
 .serviceCard,
 .noSalons {
-  background: rgba(255, 255, 255, 0.25); /* White with 25% opacity */
   border-radius: 16px;
   box-shadow: 0 4px 32px 0 rgba(34, 34, 80, 0.15),
     0 1.5px 18px 0 rgba(212, 175, 55, 0.05);
@@ -1495,7 +1504,6 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: var(--space-24) var(--space-6);
-  background: rgba(255, 255, 255, 0.25); /* White with 25% opacity */
   border-radius: 16px;
   box-shadow: 0 4px 32px 0 rgba(34, 34, 80, 0.15),
     0 1.5px 18px 0 rgba(212, 175, 55, 0.05);
@@ -1514,7 +1522,6 @@
 .viewOptions {
   display: flex;
   gap: var(--space-2);
-  background: rgba(255, 255, 255, 0.25); /* White with 25% opacity */
   border-radius: 16px;
   box-shadow: 0 4px 32px 0 rgba(34, 34, 80, 0.15),
     0 1.5px 18px 0 rgba(212, 175, 55, 0.05);
@@ -1929,7 +1936,6 @@
 .testimonialsSection {
   max-width: 1400px;
   margin: 0 auto;
-  background: rgba(255, 255, 255, 0.25); /* White with 25% opacity */
   border-radius: 16px;
   box-shadow: 0 4px 32px 0 rgba(34, 34, 80, 0.15),
     0 1.5px 18px 0 rgba(212, 175, 55, 0.05);

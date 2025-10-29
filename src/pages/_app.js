@@ -17,9 +17,43 @@ function MyApp({ Component, pageProps }) {
   const [mounted, setMounted] = useState(false);
 
   // Don't show header on onboarding AND auth pages
+  // Check if user needs onboarding on route change
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Skip check for auth and onboarding pages
+    if (
+      router.pathname.startsWith("/auth") ||
+      router.pathname.startsWith("/onboarding")
+    ) {
+      return;
+    }
+
+    // Check if user is authenticated
+    const userToken = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("authToken="));
+
+    if (userToken) {
+      // Authenticated users - check if they have completed onboarding
+      const hasOnboarded = sessionStorage.getItem("hasOnboarded");
+      if (!hasOnboarded) {
+        // Force onboarding for authenticated users who haven't completed it
+        sessionStorage.setItem("hasOnboarded", "true"); // Auto-mark authenticated users
+      }
+    } else {
+      // Guest users - must complete onboarding
+      const hasOnboarded = sessionStorage.getItem("hasOnboarded");
+      if (!hasOnboarded && router.pathname === "/") {
+        router.push("/onboarding");
+      }
+    }
+  }, [router]);
+
+  // Dont show header on onboarding AND auth pages
   const hideHeader =
     router.pathname.startsWith("/onboarding") ||
-    router.pathname.startsWith("/auth/");
+    router.pathname.startsWith("/auth");
 
   useEffect(() => {
     setMounted(true);
@@ -27,19 +61,62 @@ function MyApp({ Component, pageProps }) {
     setIsDarkMode(darkMode);
     if (darkMode) {
       document.documentElement.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.removeAttribute("data-theme");
     }
   }, []);
 
-  const toggleDarkMode = () => {
+  const toggleDarkMode = async (event) => {
+    if (!document.startViewTransition) {
+      // fallback (instant toggle)
+      const newMode = !isDarkMode;
+      setIsDarkMode(newMode);
+      localStorage.setItem("darkMode", newMode.toString());
+      if (newMode) document.documentElement.setAttribute("data-theme", "dark");
+      else document.documentElement.removeAttribute("data-theme");
+      return;
+    }
+
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
     localStorage.setItem("darkMode", newMode.toString());
 
-    if (newMode) {
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-    }
+    // find button position
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+
+    // start native View Transition
+    const transition = document.startViewTransition(() => {
+      if (newMode) document.documentElement.setAttribute("data-theme", "dark");
+      else document.documentElement.removeAttribute("data-theme");
+    });
+
+    // when ready, animate the clip-path ripple
+    transition.ready.then(() => {
+      const radius = Math.hypot(window.innerWidth, window.innerHeight);
+
+      // Custom easing and duration for a slower, smoother expansion
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0px at ${x}px ${y}px)`,
+            `circle(${radius}px at ${x}px ${y}px)`,
+          ],
+          filter: [
+            newMode
+              ? "drop-shadow(0 0 25px rgba(255, 215, 0, 0.25))"
+              : "drop-shadow(0 0 15px rgba(0, 0, 0, 0.15))",
+            "none",
+          ],
+        },
+        {
+          duration: 1800, // was 900 — now slower & smoother
+          easing: "cubic-bezier(0.4, 0, 0.2, 1)", // smooth ease-in-out curve
+          pseudoElement: "::view-transition-new(root)",
+        }
+      );
+    });
   };
 
   const navigateToAuth = (type, role) => {
@@ -64,7 +141,19 @@ function MyApp({ Component, pageProps }) {
                 <span className={styles.trimText}>Trims</span>
               </h1>
             </motion.div>
-
+            <motion.button
+              className={styles.themeToggle}
+              onClick={toggleDarkMode}
+              whileHover={{ scale: 1.1, rotate: 15 }}
+              whileTap={{ scale: 0.95 }}
+              title={
+                isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
+              }
+            >
+              <span className={styles.themeIcon}>
+                {isDarkMode ? "☀️" : "🌙"}
+              </span>
+            </motion.button>
             {/* Desktop Navigation */}
             <nav className={styles.desktopNav}>
               <div className={styles.navLinks}>
@@ -75,6 +164,7 @@ function MyApp({ Component, pageProps }) {
               </div>
 
               <div className={styles.headerActions}>
+                {/* ✅ NEW THEME TOGGLE BUTTON */}
                 <motion.button
                   className={styles.themeToggle}
                   onClick={toggleDarkMode}

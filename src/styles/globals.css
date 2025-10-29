@@ -55,6 +55,7 @@
   --text-tertiary: var(--gray-400);
   --border-color: var(--gray-200);
   --border-color-hover: var(--primary);
+  transition: background-color 0.4s ease, color 0.4s ease;
 
   /* Typography */
   --font-display: "Playfair Display", serif;
@@ -102,19 +103,28 @@
   --transition-slow: 0.5s ease-out;
   --transition-luxury: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
 
 /* Dark Theme */
 [data-theme="dark"] {
-  --background-primary: var(--gray-900);
-  --background-secondary: var(--gray-800);
-  --background-tertiary: var(--gray-700);
-  --text-primary: var(--white);
-  --text-secondary: var(--gray-300);
-  --text-tertiary: var(--gray-500);
-  --border-color: var(--gray-700);
+  --background-primary: #000000;
+  --background-secondary: #0a0a0a;
+  --background-tertiary: #111111;
+
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-tertiary: #888888;
+
+  --border-color: #222222;
+
   --primary: #ffd700;
   --primary-dark: #e6c200;
   --primary-light: #fff4b3;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
 /* Base Styles */

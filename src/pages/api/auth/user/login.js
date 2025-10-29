@@ -27,8 +27,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // Sanitize and validate input
-    const { email, password } = sanitizeInput(req.body);
+    // ✅ GET rememberMe flag from request body
+    const { email, password, rememberMe } = sanitizeInput(req.body);
 
     if (!email || !password) {
       return res
@@ -39,6 +39,7 @@ export default async function handler(req, res) {
     if (!validateEmail(email)) {
       return res.status(400).json({ message: "Invalid email format" });
     }
+
     const client = await clientPromise;
     const db = client.db("techtrims");
 
@@ -74,7 +75,7 @@ export default async function handler(req, res) {
       }
     );
 
-    // Create JWT token
+    // ✅ Create JWT token with dynamic expiry based on rememberMe
     const token = jwt.sign(
       {
         userId: user._id.toString(),
@@ -86,11 +87,33 @@ export default async function handler(req, res) {
       },
       process.env.JWT_SECRET,
       {
-        expiresIn: "7d",
+        expiresIn: rememberMe ? "30d" : "1d", // ✅ 30 days if remember me, else 1 day
         issuer: "techtrims-api",
         audience: "techtrims-app",
       }
     );
+
+    // ✅ SET HTTPONLY COOKIE (SECURE - JavaScript CANNOT access)
+    const cookieOptions = [
+      `authToken=${token}`,
+      `Path=/`,
+      `HttpOnly`, // ✅ JavaScript cannot read this
+      `SameSite=Strict`, // ✅ CSRF protection
+    ];
+
+    // ✅ Add Secure flag in production
+    if (process.env.NODE_ENV === "production") {
+      cookieOptions.push(`Secure`);
+    }
+
+    // ✅ Add MaxAge if rememberMe is true (30 days in seconds)
+    if (rememberMe) {
+      cookieOptions.push(`Max-Age=${30 * 24 * 60 * 60}`); // 30 days in seconds
+    }
+    // ✅ If rememberMe is false, NO Max-Age = session cookie (expires on browser close)
+
+    // ✅ Set the HttpOnly cookie
+    res.setHeader("Set-Cookie", cookieOptions.join("; "));
 
     // Return user data without sensitive info
     const userResponse = {
@@ -106,9 +129,9 @@ export default async function handler(req, res) {
       lastLogin: new Date(),
     };
 
+    // ❌ DON'T send token in response body (it's already in HttpOnly cookie)
     res.status(200).json({
       message: "Login successful",
-      token,
       user: userResponse,
     });
   } catch (error) {

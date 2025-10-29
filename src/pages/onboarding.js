@@ -23,9 +23,26 @@ export default function Onboarding() {
   const [locationStatus, setLocationStatus] = useState("pending"); // pending, loading, success, error
 
   useEffect(() => {
-    // Check if user has already completed onboarding
-    const hasOnboarded = localStorage.getItem("hasOnboarded");
-    if (hasOnboarded) {
+    // Check if user is logged in (authenticated users skip onboarding)
+    const userToken =
+      typeof window !== "undefined"
+        ? document.cookie
+            .split("; ")
+            .find((row) => row.startsWith("authToken="))
+        : null;
+
+    if (userToken) {
+      // User is authenticated, check if they have hasOnboarded flag
+      const hasOnboarded = sessionStorage.getItem("hasOnboarded");
+      if (hasOnboarded === "true") {
+        router.push("/");
+        return;
+      }
+    }
+
+    // For guest users, check session storage
+    const hasOnboarded = sessionStorage.getItem("hasOnboarded");
+    if (hasOnboarded === "true") {
       router.push("/");
     }
   }, [router]);
@@ -42,15 +59,26 @@ export default function Onboarding() {
 
     if (!navigator.geolocation) {
       setLocationStatus("error");
-      alert("Geolocation is not supported by this browser.");
+      alert(
+        "Geolocation is not supported. You can skip this step and use manual location."
+      );
+      // Allow skipping location
+      setLocationStatus("success");
+      setFormData((prev) => ({
+        ...prev,
+        location: {
+          latitude: null,
+          longitude: null,
+          address: "Location not provided",
+        },
+      }));
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-        console.log("🔍 ACTUAL GPS COORDINATES:", { latitude, longitude });
+        const { latitude, longitude } = position.coords;
+        console.log("📍 ACTUAL GPS COORDINATES:", latitude, longitude);
 
         try {
           // Reverse geocoding to get address
@@ -60,12 +88,9 @@ export default function Onboarding() {
             body: JSON.stringify({ lat: latitude, lng: longitude }),
           });
 
-          if (!response.ok) {
-            throw new Error("Failed to reverse geocode");
-          }
+          if (!response.ok) throw new Error("Failed to reverse geocode");
 
           const data = await response.json();
-
           setFormData((prev) => ({
             ...prev,
             location: {
@@ -74,6 +99,18 @@ export default function Onboarding() {
               address: data.address || `${latitude}, ${longitude}`,
             },
           }));
+
+          // Store location in session storage immediately
+          sessionStorage.setItem(
+            "userLocation",
+            JSON.stringify({
+              lat: latitude,
+              lng: longitude,
+              address: data.address || `${latitude}, ${longitude}`,
+              timestamp: Date.now(),
+            })
+          );
+
           setLocationStatus("success");
         } catch (error) {
           console.error("Error getting address:", error);
@@ -85,15 +122,43 @@ export default function Onboarding() {
               address: `${latitude}, ${longitude}`,
             },
           }));
+
+          // Store location even if geocoding fails
+          sessionStorage.setItem(
+            "userLocation",
+            JSON.stringify({
+              lat: latitude,
+              lng: longitude,
+              timestamp: Date.now(),
+            })
+          );
+
           setLocationStatus("success");
         }
       },
       (error) => {
         console.error("Error getting location:", error);
         setLocationStatus("error");
+
+        // Don't block user - allow them to continue without location
         alert(
-          "Unable to get your location. Please enter manually or try again."
+          "Unable to get your location. You can update it later from settings or skip for now."
         );
+
+        // Mark location as skipped
+        setFormData((prev) => ({
+          ...prev,
+          location: {
+            latitude: null,
+            longitude: null,
+            address: "Location not provided",
+          },
+        }));
+
+        // Allow continuing without location
+        setTimeout(() => {
+          setLocationStatus("success");
+        }, 2000);
       },
       {
         enableHighAccuracy: true,
@@ -157,22 +222,33 @@ export default function Onboarding() {
       alert("Please enter a valid name");
       return;
     }
+
     if (currentStep === 2 && !formData.gender) {
       alert("Please select your gender");
       return;
     }
+
     if (currentStep === 3 && (!formData.age || formData.age < 13)) {
       alert("You must be at least 13 years old");
       return;
     }
+
     if (currentStep === 4 && !formData.isPhoneVerified) {
       alert("Please verify your phone number");
       return;
     }
-    if (currentStep === 5 && locationStatus !== "success") {
-      alert("Please set your location");
-      return;
+
+    // Step 5 - Location is optional now, don't block
+    if (currentStep === 5) {
+      // Allow continuing even if location is not provided
+      if (locationStatus === "pending") {
+        const proceed = confirm(
+          "You haven't provided your location yet. Continue anyway? You can update it later."
+        );
+        if (!proceed) return;
+      }
     }
+
     if (currentStep < 5) {
       setCurrentStep((prev) => prev + 1);
     } else {
@@ -189,9 +265,26 @@ export default function Onboarding() {
   const completeOnboarding = () => {
     setIsLoading(true);
 
-    // Store onboarding data in localStorage
-    localStorage.setItem("userOnboardingData", JSON.stringify(formData));
-    localStorage.setItem("hasOnboarded", "true");
+    // Store onboarding data in SESSION STORAGE (not localStorage)
+    sessionStorage.setItem("userOnboardingData", JSON.stringify(formData));
+    sessionStorage.setItem("hasOnboarded", "true");
+
+    // Store location separately in session storage (will persist even after logout)
+    if (
+      formData.location &&
+      formData.location.latitude &&
+      formData.location.longitude
+    ) {
+      sessionStorage.setItem(
+        "userLocation",
+        JSON.stringify({
+          lat: formData.location.latitude,
+          lng: formData.location.longitude,
+          address: formData.location.address,
+          timestamp: Date.now(),
+        })
+      );
+    }
 
     setTimeout(() => {
       setIsLoading(false);
