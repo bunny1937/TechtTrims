@@ -411,27 +411,150 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location?.coordinates?.[0], location?.coordinates?.[1], salonName]);
 
-  const handleLiveLocation = () => {
+  const handleLiveLocation = async () => {
     if (!map) return;
 
+    // If in manual mode, revert to live
     if (isManualMode) {
       setIsManualMode(false);
       setManualLocation(null);
+
+      // Check session storage
+      const storedLocation = sessionStorage.getItem("userLocation");
+      if (storedLocation) {
+        try {
+          const locationData = JSON.parse(storedLocation);
+          map.flyTo([locationData.lat, locationData.lng], 16, {
+            animate: true,
+            duration: 1.5,
+          });
+          return;
+        } catch (e) {
+          console.error("Error with stored location", e);
+        }
+      }
+
       if (userLocation) {
         map.flyTo([userLocation.lat, userLocation.lng], 16, {
           animate: true,
           duration: 1.5,
         });
       }
-    } else {
-      setLocating(true);
-      if (effectiveUserLocation) {
-        map.flyTo([effectiveUserLocation.lat, effectiveUserLocation.lng], 16, {
+      return;
+    }
+
+    // Check session storage first
+    const storedLocation = sessionStorage.getItem("userLocation");
+    if (storedLocation) {
+      try {
+        const locationData = JSON.parse(storedLocation);
+        setLocating(true);
+        map.flyTo([locationData.lat, locationData.lng], 16, {
           animate: true,
           duration: 1.5,
         });
+        setTimeout(() => setLocating(false), 1500);
+        return;
+      } catch (e) {
+        console.error("Error parsing location", e);
       }
+    }
+
+    // Use live location from hook
+    if (effectiveUserLocation) {
+      setLocating(true);
+      map.flyTo([effectiveUserLocation.lat, effectiveUserLocation.lng], 16, {
+        animate: true,
+        duration: 1.5,
+      });
       setTimeout(() => setLocating(false), 1500);
+      return;
+    }
+
+    // NO LOCATION - FORCE REQUEST
+    if (!navigator.geolocation) {
+      alert(
+        "⚠️ Geolocation not supported.\n\nPlease use the 'Pin' button to set your location manually."
+      );
+      return;
+    }
+
+    setLocating(true);
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        });
+      });
+
+      const newLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: Date.now(),
+      };
+
+      // Store in session
+      sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
+
+      // Calculate new distance
+      if (location?.coordinates) {
+        const [lng, lat] = location.coordinates;
+        const R = 6371;
+        const dLat = ((lat - newLocation.lat) * Math.PI) / 180;
+        const dLon = ((lng - newLocation.lng) * Math.PI) / 180;
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos((newLocation.lat * Math.PI) / 180) *
+            Math.cos((lat * Math.PI) / 180) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const dist = R * c;
+
+        setDistance(dist.toFixed(1));
+        alert(
+          `✅ Live Location Set!\n\nYou are ${dist.toFixed(
+            1
+          )} km away from this salon.`
+        );
+      }
+
+      map.flyTo([newLocation.lat, newLocation.lng], 16, {
+        animate: true,
+        duration: 1.5,
+      });
+
+      setLocating(false);
+    } catch (error) {
+      console.error("Location error:", error);
+      setLocating(false);
+
+      if (error.code === 1) {
+        alert(
+          "🔒 Location Permission Denied\n\n" +
+            "To see your distance:\n" +
+            "1. Click the lock icon in address bar\n" +
+            "2. Allow location access\n" +
+            "3. Try again\n\n" +
+            "Or use the 'Pin' button to set manually."
+        );
+      } else if (error.code === 2) {
+        alert(
+          "📍 Location unavailable. Please check your device settings or use the 'Pin' button."
+        );
+      } else if (error.code === 3) {
+        alert(
+          "⏱️ Location request timed out. Please try again or use the 'Pin' button."
+        );
+      } else {
+        alert(
+          "❌ Unable to get location. Please use the 'Pin' button to set manually."
+        );
+      }
     }
   };
 

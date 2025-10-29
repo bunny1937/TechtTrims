@@ -454,84 +454,6 @@ const LocationSearch = ({
   );
 };
 
-// const LiveLocationControl = ({
-//   userLocation,
-//   map,
-//   isManualLocation,
-//   onRevertToLive,
-//   onOpenSearch,
-// }) => {
-//   const [locating, setLocating] = useState(false);
-
-//   const centerOnUser = () => {
-//     if (userLocation?.lat && userLocation?.lng && map) {
-//       setLocating(true);
-//       map.flyTo([userLocation.lat, userLocation.lng], 16, {
-//         animate: true,
-//         duration: 1.5,
-//       });
-//       setTimeout(() => setLocating(false), 1500);
-//     } else {
-//       // Request live location
-//       if (navigator.geolocation) {
-//         setLocating(true);
-//         navigator.geolocation.getCurrentPosition(
-//           (position) => {
-//             const newPos = [
-//               position.coords.latitude,
-//               position.coords.longitude,
-//             ];
-//             map.flyTo(newPos, 16, { animate: true, duration: 1.5 });
-//             setTimeout(() => setLocating(false), 1500);
-//           },
-//           (error) => {
-//             alert("Unable to get location");
-//             setLocating(false);
-//           }
-//         );
-//       }
-//     }
-//   };
-
-//   return (
-//     <div className={styles.locationControls}>
-//       {/* Manual Location Search Button */}
-//       <button
-//         className={styles.searchLocationBtn}
-//         onClick={onOpenSearch}
-//         title="Search location manually"
-//       >
-//         <Search size={18} />
-//         <span>Search Location</span>
-//       </button>
-
-//       {/* Live Location / Revert Button */}
-//       {isManualLocation ? (
-//         <button
-//           className={styles.revertToLiveBtn}
-//           onClick={onRevertToLive}
-//           title="Revert to live location"
-//         >
-//           <Crosshair size={18} />
-//           <span>Use Live Location</span>
-//         </button>
-//       ) : (
-//         <button
-//           className={styles.liveLocationBtn}
-//           onClick={centerOnUser}
-//           disabled={locating}
-//           title="Center on my location"
-//         >
-//           <span className={locating ? styles.spinning : ""}>
-//             <Crosshair size={18} />
-//           </span>
-//           <span>{locating ? "Locating..." : "My Location"}</span>
-//         </button>
-//       )}
-//     </div>
-//   );
-// };
-// Add this BEFORE the SalonMap component
 const ZoomIndicator = () => {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
@@ -685,14 +607,30 @@ const SalonMap = ({
     }
   }, [effectiveUserLocation, mapRef]);
 
+  // 🔧 Load manual location from sessionStorage on mount
+  useEffect(() => {
+    const stored = sessionStorage.getItem("manualLocation");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setManualLocation(parsed);
+        setIsManualMode(true);
+        console.log("📍 Loaded manual location from session storage");
+      } catch (e) {
+        console.error("Error parsing stored manual location", e);
+      }
+    }
+  }, []);
+
   // 🔧 NEW: Handle manual location selection
   const handleLocationSelect = (location) => {
-    console.log("📍 Manual location set:", location);
-
+    console.log("📍 Manual location set", location);
     setManualLocation(location);
     setIsManualMode(true);
-    localStorage.setItem("manualLocation", JSON.stringify(location));
-    localStorage.setItem("isManualMode", "true");
+
+    // Store in sessionStorage instead of localStorage
+    sessionStorage.setItem("manualLocation", JSON.stringify(location));
+    sessionStorage.setItem("isManualMode", "true");
 
     if (mapRef) {
       mapRef.flyTo([location.lat, location.lng], 16, {
@@ -713,10 +651,31 @@ const SalonMap = ({
     setIsManualMode(false);
     setManualLocation(null);
 
-    localStorage.removeItem("manualLocation");
-    localStorage.setItem("isManualMode", "false");
+    // Use sessionStorage instead of localStorage
+    sessionStorage.removeItem("manualLocation");
+    sessionStorage.setItem("isManualMode", "false");
 
-    // ✅ IMMEDIATELY RECALCULATE DISTANCES WITH LIVE LOCATION
+    // Check for stored live location in sessionStorage first
+    const storedLocation = sessionStorage.getItem("userLocation");
+    if (storedLocation) {
+      try {
+        const locationData = JSON.parse(storedLocation);
+        if (onLocationChange) {
+          onLocationChange(locationData);
+        }
+        if (mapRef) {
+          mapRef.flyTo([locationData.lat, locationData.lng], 16, {
+            animate: true,
+            duration: 1.5,
+          });
+        }
+        return;
+      } catch (e) {
+        console.error("Error with stored location", e);
+      }
+    }
+
+    // IMMEDIATELY RECALCULATE DISTANCES WITH LIVE LOCATION from hook
     if (userLocation && onLocationChange) {
       onLocationChange(userLocation);
     }
@@ -729,21 +688,6 @@ const SalonMap = ({
       });
     }
   };
-
-  // 🔧 Load manual location from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem("manualLocation");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setManualLocation(parsed);
-        setIsManualMode(true);
-        console.log("📍 Loaded manual location from storage");
-      } catch (e) {
-        console.error("Error parsing stored manual location", e);
-      }
-    }
-  }, []);
 
   const ThemeSelector = () => (
     <div className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg p-2 text-black">
@@ -786,16 +730,51 @@ const SalonMap = ({
       return;
     }
 
-    // ✅ USE THE EXISTING liveUserLocation FROM HOOK!
-    if (userLocation) {
-      console.log("📍 Using existing live location:", userLocation);
+    // Check session storage first
+    const storedLocation = sessionStorage.getItem("userLocation");
 
-      // Update distances with existing location
+    if (storedLocation) {
+      try {
+        const locationData = JSON.parse(storedLocation);
+        console.log("✅ Using stored location from session", locationData);
+
+        // Use stored location
+        if (onLocationChange) {
+          onLocationChange(locationData);
+        }
+
+        // Center map
+        if (mapRef) {
+          mapRef.flyTo([locationData.lat, locationData.lng], 16, {
+            animate: true,
+            duration: 1.5,
+          });
+        }
+        return;
+      } catch (e) {
+        console.error("Error parsing stored location", e);
+      }
+    }
+
+    // USE THE EXISTING liveUserLocation FROM HOOK!
+    if (userLocation) {
+      console.log("✅ Using live location from hook", userLocation);
+
+      // Store in session
+      sessionStorage.setItem(
+        "userLocation",
+        JSON.stringify({
+          lat: userLocation.lat,
+          lng: userLocation.lng,
+          accuracy: userLocation.accuracy,
+          timestamp: Date.now(),
+        })
+      );
+
       if (onLocationChange) {
         onLocationChange(userLocation);
       }
 
-      // Center map
       if (mapRef) {
         mapRef.flyTo([userLocation.lat, userLocation.lng], 16, {
           animate: true,
@@ -805,15 +784,24 @@ const SalonMap = ({
       return;
     }
 
-    // ✅ ONLY IF NO LOCATION, REQUEST NEW ONE
+    // NO LOCATION FOUND - FORCE REQUEST
+    console.log("❌ No location found - requesting from browser");
+
+    if (!navigator.geolocation) {
+      alert(
+        "⚠️ Geolocation Not Supported\n\nYour browser doesn't support location services. Please use the 'Search Location' button to set your location manually."
+      );
+      return;
+    }
+
     setLoadingLocation(true);
 
     try {
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: false,
-          timeout: 10000, // ✅ 10 seconds for network location
-          maximumAge: 10000, // Accept 10s old
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
         });
       });
 
@@ -821,7 +809,13 @@ const SalonMap = ({
         lat: position.coords.latitude,
         lng: position.coords.longitude,
         accuracy: position.coords.accuracy,
+        timestamp: Date.now(),
       };
+
+      console.log("✅ Location obtained:", newLocation);
+
+      // Store in session immediately
+      sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
 
       if (onLocationChange) {
         onLocationChange(newLocation);
@@ -836,8 +830,44 @@ const SalonMap = ({
 
       setLoadingLocation(false);
     } catch (error) {
-      console.error("Location error:", error);
+      console.error("❌ Location error:", error);
       setLoadingLocation(false);
+
+      // Show user-friendly alerts based on error type
+      if (error.code === 1) {
+        // PERMISSION_DENIED
+        alert(
+          "🔒 Location Permission Denied\n\n" +
+            "To see live nearby salons:\n\n" +
+            "1. Click the lock icon (🔒) in your browser's address bar\n" +
+            "2. Allow location access for this site\n" +
+            "3. Refresh the page\n\n" +
+            "Or use the 'Search Location' button to set manually."
+        );
+      } else if (error.code === 2) {
+        // POSITION_UNAVAILABLE
+        alert(
+          "📍 Location Unavailable\n\n" +
+            "Unable to determine your location.\n\n" +
+            "Please check:\n" +
+            "• Location services are enabled on your device\n" +
+            "• You have a stable internet connection\n\n" +
+            "Or use the 'Search Location' button."
+        );
+      } else if (error.code === 3) {
+        // TIMEOUT
+        alert(
+          "⏱️ Location Request Timeout\n\n" +
+            "Taking too long to get your location.\n\n" +
+            "Please try again or use the 'Search Location' button."
+        );
+      } else {
+        alert(
+          "❌ Unable to Get Location\n\n" +
+            "Something went wrong while getting your location.\n\n" +
+            "Please use the 'Search Location' button to set manually."
+        );
+      }
     }
   };
 

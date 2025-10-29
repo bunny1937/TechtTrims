@@ -114,8 +114,8 @@ export const useLocation = () => {
       setLocationStatus("granted");
       lastUpdateRef.current = Date.now();
 
-      // Save to localStorage ONLY ONCE (not on every update)
-      localStorage.setItem("userLocation", JSON.stringify(newLocation));
+      // Save to SESSION STORAGE (persists across page refreshes but not logout)
+      sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
 
       // Start continuous monitoring
       startWatchingLocation();
@@ -131,8 +131,9 @@ export const useLocation = () => {
 
   // ----------------- SETUP ON MOUNT -----------------
   useEffect(() => {
-    // Try to load from localStorage ONLY on mount
-    const stored = localStorage.getItem("userLocation");
+    // Try to load from SESSION STORAGE on mount
+    const stored = sessionStorage.getItem("userLocation");
+
     if (stored) {
       try {
         const parsed = JSON.parse(stored);

@@ -40,53 +40,66 @@ export default function Home() {
     const initializeUser = async () => {
       if (typeof window === "undefined") return;
 
-      // ✅ USE COOKIE INSTEAD OF LOCALSTORAGE
+      // Check if user has completed onboarding
+      const hasOnboarded = sessionStorage.getItem("hasOnboarded");
+
+      // If not onboarded, redirect to onboarding
+      if (!hasOnboarded) {
+        router.push("/onboarding");
+        return;
+      }
+
+      // USE COOKIE INSTEAD OF LOCALSTORAGE for auth
       const userToken = getAuthToken();
 
       if (userToken) {
         try {
           // Fetch fresh user data from API
           const userData = await UserDataManager.fetchAndStoreUserData();
-
           if (userData) {
             setUserOnboarding(userData);
-
-            // Load salons ONLY ONCE with initial location
-            if (liveUserLocation && !salonsLoadedRef.current) {
-              initialLocationRef.current = liveUserLocation;
-              await loadNearbySalons(
-                liveUserLocation.lat,
-                liveUserLocation.lng,
-                userData.gender
-              );
-              salonsLoadedRef.current = true;
-            }
           }
         } catch (error) {
           console.error("Error loading user data:", error);
         }
       } else {
-        // Check onboarding data for guest users
-        const onboardingData = localStorage.getItem("userOnboardingData");
+        // Check session onboarding data for guest users
+        const onboardingData = sessionStorage.getItem("userOnboardingData");
         if (onboardingData) {
           try {
             const userData = JSON.parse(onboardingData);
             setUserOnboarding(userData);
-
-            // Load salons ONLY ONCE
-            if (liveUserLocation && !salonsLoadedRef.current) {
-              initialLocationRef.current = liveUserLocation;
-              await loadNearbySalons(
-                liveUserLocation.lat,
-                liveUserLocation.lng,
-                userData.gender
-              );
-              salonsLoadedRef.current = true;
-            }
           } catch (error) {
             console.error("Error parsing onboarding data:", error);
           }
         }
+      }
+
+      // Get location from session storage (persistent location)
+      const storedLocation = sessionStorage.getItem("userLocation");
+      if (storedLocation) {
+        try {
+          const locationData = JSON.parse(storedLocation);
+          // Use stored location to load salons
+          if (!salonsLoadedRef.current) {
+            await loadNearbySalons(
+              locationData.lat,
+              locationData.lng,
+              userOnboarding?.gender || "all"
+            );
+            salonsLoadedRef.current = true;
+          }
+        } catch (error) {
+          console.error("Error parsing stored location:", error);
+        }
+      } else if (liveUserLocation && !salonsLoadedRef.current) {
+        // If no stored location, use live location
+        await loadNearbySalons(
+          liveUserLocation.lat,
+          liveUserLocation.lng,
+          userOnboarding?.gender || "all"
+        );
+        salonsLoadedRef.current = true;
       }
 
       setIsLoading(false);
@@ -96,8 +109,20 @@ export default function Home() {
     if (liveUserLocation && !salonsLoadedRef.current) {
       initializeUser();
     }
-  }, [liveUserLocation]); // Dependency on location only for initial load
-
+  }, [liveUserLocation, router]); // Dependency on location only for initial load
+  // Update location in session storage whenever it changes
+  useEffect(() => {
+    if (liveUserLocation) {
+      sessionStorage.setItem(
+        "userLocation",
+        JSON.stringify({
+          lat: liveUserLocation.lat,
+          lng: liveUserLocation.lng,
+          timestamp: Date.now(),
+        })
+      );
+    }
+  }, [liveUserLocation]);
   const loadNearbySalons = async (lat, lng, gender = "all") => {
     try {
       console.log("🔍 Loading salons for coordinates:", lat, lng);
