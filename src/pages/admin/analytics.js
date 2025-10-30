@@ -9,8 +9,8 @@ export default function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("adminToken");
-    if (!token) {
+    const admin = sessionStorage.getItem("adminData");
+    if (!admin) {
       router.push("/admin/login");
       return;
     }
@@ -19,9 +19,8 @@ export default function AdminAnalytics() {
 
   const fetchAnalytics = async () => {
     try {
-      const token = localStorage.getItem("adminToken");
       const response = await fetch("/api/admin/analytics", {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       const data = await response.json();
       setAnalytics(data);

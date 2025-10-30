@@ -1,22 +1,15 @@
 import clientPromise from "../../../lib/mongodb";
-import { verifyToken } from "../../../lib/auth";
 import { ObjectId } from "mongodb";
+import { withAuth } from "../../../lib/middleware/withAuth";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const token = req.headers.authorization?.replace("Bearer ", "");
-    if (!token) {
-      return res.status(401).json({ message: "No token provided" });
-    }
-
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.userId) {
-      return res.status(401).json({ message: "Invalid token" });
-    }
+    // req.user is already set by withAuth middleware
+    const { userId } = req.user;
 
     const client = await clientPromise;
     const db = client.db("techtrims");
@@ -24,7 +17,7 @@ export default async function handler(req, res) {
     const user = await db
       .collection("users")
       .findOne(
-        { _id: new ObjectId(decoded.userId) },
+        { _id: new ObjectId(userId) },
         { projection: { hashedPassword: 0 } }
       );
 
@@ -32,7 +25,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Return complete user profile with all new fields
+    // Return complete user profile
     const userProfile = {
       _id: user._id,
       id: user._id,
@@ -51,7 +44,6 @@ export default async function handler(req, res) {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       isActive: user.isActive,
-      // Keep backward compatibility
       isPhoneVerified: user.isPhoneVerified || true,
     };
 
@@ -61,3 +53,6 @@ export default async function handler(req, res) {
     res.status(500).json({ message: "Internal server error" });
   }
 }
+
+// ✅ Wrap with authentication middleware
+export default withAuth(handler);

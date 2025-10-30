@@ -11,23 +11,21 @@ export default function AdminDashboard() {
   const [adminData, setAdminData] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("adminToken");
-    const admin = localStorage.getItem("adminData");
+    const admin = sessionStorage.getItem("adminData");
 
-    if (!token) {
-      router.push("/admin/login");
+    if (!admin) {
+      router.push("admin/login");
       return;
     }
 
     setAdminData(JSON.parse(admin));
     fetchDashboardStats();
-  }, []);
+  }, [router]);
 
   const fetchDashboardStats = async () => {
     try {
-      const token = localStorage.getItem("adminToken");
-      const response = await fetch("/api/admin/dashboard/stats", {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await fetch("api/admin/dashboard/stats", {
+        credentials: "include", // ✅ Include HttpOnly cookies
       });
 
       const data = await response.json();

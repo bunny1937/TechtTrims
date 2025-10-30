@@ -15,8 +15,8 @@ export default function UserRegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Check for prefill data from feedback or onboarding
-    const onboardingData = localStorage.getItem("userOnboardingData");
+    // ✅ Check for prefill data from feedback or onboarding
+    const onboardingData = sessionStorage.getItem("userOnboardingData");
     const savedPrefillData = localStorage.getItem("userPrefillData");
 
     console.log("Checking localStorage data:");

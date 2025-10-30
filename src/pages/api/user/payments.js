@@ -1,22 +1,16 @@
 import clientPromise from "../../../lib/mongodb";
 import { verifyToken } from "../../../lib/auth";
 import { ObjectId } from "mongodb";
+import { withAuth } from "../../../lib/middleware/withAuth";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const token = req.headers.authorization?.replace("Bearer ", "");
-    if (!token) {
-      return res.status(401).json({ message: "No token provided" });
-    }
-
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.userId) {
-      return res.status(401).json({ message: "Invalid token" });
-    }
+    // ✅ req.user is already set by withAuth middleware
+    const { userId } = req.user;
 
     const client = await clientPromise;
     const db = client.db("techtrims");
@@ -24,7 +18,7 @@ export default async function handler(req, res) {
     // Get user's bookings first
     const user = await db
       .collection("users")
-      .findOne({ _id: new ObjectId(decoded.userId) });
+      .findOne({ _id: new ObjectId(userId) });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -33,10 +27,7 @@ export default async function handler(req, res) {
     const bookings = await db
       .collection("bookings")
       .find({
-        $or: [
-          { userId: new ObjectId(decoded.userId) },
-          { customerPhone: user.phone },
-        ],
+        $or: [{ userId: new ObjectId(userId) }, { customerPhone: user.phone }],
         price: { $gt: 0 }, // Only bookings with payment
       })
       .sort({ createdAt: -1 })
@@ -59,3 +50,4 @@ export default async function handler(req, res) {
     res.status(500).json({ message: "Internal server error" });
   }
 }
+export default withAuth(handler);

@@ -10,8 +10,8 @@ export default function AdminReports() {
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
 
   useEffect(() => {
-    const token = localStorage.getItem("adminToken");
-    if (!token) {
+    const admin = sessionStorage.getItem("adminData");
+    if (!admin) {
       router.push("/admin/login");
       return;
     }
@@ -20,13 +20,12 @@ export default function AdminReports() {
   const generateReport = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("adminToken");
       const response = await fetch("/api/admin/reports/generate", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        credentials: "include", // ✅ Include HttpOnly cookies
         body: JSON.stringify({ reportType, dateRange }),
       });
 
