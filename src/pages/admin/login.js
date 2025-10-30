@@ -17,18 +17,19 @@ export default function AdminLoginPage() {
     setError("");
 
     try {
-      const response = await fetch("/api/auth/admin/login", {
+      const response = await fetch("api/auth/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // ✅ Include HttpOnly cookies
         body: JSON.stringify(credentials),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem("adminToken", data.token);
-        localStorage.setItem("adminData", JSON.stringify(data.admin));
-        router.push("/admin/dashboard");
+        // ✅ DON'T store token in localStorage - backend sets HttpOnly cookie
+        sessionStorage.setItem("adminData", JSON.stringify(data.admin));
+        router.push("admin/dashboard");
       } else {
         setError(data.message || "Login failed");
       }

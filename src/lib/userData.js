@@ -19,20 +19,20 @@ export class UserDataManager {
         if (storedUserData) {
           const userData = storedUserData;
           // Always preserve onboarding location data for authenticated users
-          const onboardingData = localStorage.getItem("userOnboardingData");
+          const onboardingData = sessionStorage.getItem("userOnboardingData");
           if (onboardingData) {
             try {
               const onboarding = JSON.parse(onboardingData);
               return {
-                ...userData,
-                location: onboarding.location || userData.location,
+                ...storedUserData,
+                location: onboarding.location || storedUserData.location,
                 preferences: {
-                  ...userData.preferences,
+                  ...storedUserData.preferences,
                   ...onboarding.preferences,
                 },
               };
             } catch (e) {
-              return userData;
+              return storedUserData;
             }
           }
           return userData;
@@ -40,8 +40,11 @@ export class UserDataManager {
       }
 
       // Fallback to onboarding data
-      const onboardingData = localStorage.getItem("userOnboardingData");
-      if (onboardingData) return JSON.parse(onboardingData);
+      // ✅ Fallback to onboarding data from sessionStorage
+      const onboardingData = sessionStorage.getItem("userOnboardingData");
+      if (onboardingData) {
+        return JSON.parse(onboardingData);
+      }
 
       return null;
     } catch (error) {
@@ -53,20 +56,22 @@ export class UserDataManager {
   static async fetchAndStoreUserData() {
     if (typeof window === "undefined") return null;
 
-    const userToken = getAuthToken(); // ✅ CHANGE 2
+    const userToken = getAuthToken();
     if (!userToken) return this.getStoredUserData();
 
     try {
-      const response = await fetch("/api/user/profile", {
-        headers: { Authorization: `Bearer ${userToken}` },
+      const response = await fetch("api/user/profile", {
+        credentials: "include", // ✅ Include HttpOnly cookies
       });
 
       if (response.ok) {
         const userData = await response.json();
+
         console.log("API user data:", userData);
 
-        // Always merge with onboarding data to preserve location and other fields
-        const onboardingData = localStorage.getItem("userOnboardingData");
+        // ✅ Always merge with onboarding data to preserve location and other fields
+        const onboardingData = sessionStorage.getItem("userOnboardingData");
+
         console.log("Raw onboarding data:", onboardingData);
 
         let mergedData = userData;
@@ -132,21 +137,24 @@ export class UserDataManager {
       console.error("Error syncing booking history:", error);
     }
   }
-
   static clearUserData() {
     if (typeof window === "undefined") return;
-    // Clear user-specific data
-    removeAuthToken(); // ✅ Clear cookie
-    sessionStorage.removeItem("userData"); // Clear session data
+
+    // ✅ Clear user-specific data
+    removeAuthToken(); // Clears HttpOnly cookie via API
     localStorage.removeItem("userPrefillData");
-    localStorage.removeItem("userData");
 
-    // Clear society/member data if exists
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("authUser");
-    localStorage.removeItem("selectedSocietyId");
+    // ✅ Clear session storage EXCEPT location
+    const storedLocation = sessionStorage.getItem("userLocation");
+    sessionStorage.removeItem("userOnboardingData");
+    sessionStorage.removeItem("hasOnboarded");
+    sessionStorage.removeItem("userData");
 
-    // Keep onboarding data for future use
+    // ✅ Restore location after clearing
+    if (storedLocation) {
+      sessionStorage.setItem("userLocation", storedLocation);
+    }
+
     console.log("User data cleared successfully");
   }
 

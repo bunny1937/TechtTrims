@@ -13,8 +13,8 @@ export default function AdminUsers() {
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("adminToken");
-    if (!token) {
+    const admin = sessionStorage.getItem("adminData");
+    if (!admin) {
       router.push("/admin/login");
       return;
     }
@@ -27,9 +27,8 @@ export default function AdminUsers() {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem("adminToken");
       const response = await fetch("/api/admin/users", {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       const data = await response.json();
       setUsers(data.users || []);

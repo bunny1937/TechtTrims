@@ -63,32 +63,36 @@ export default function UserLoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setError("");
 
     try {
-      const response = await fetch("/api/auth/user/login", {
+      const response = await fetch("api/auth/user/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // ✅ IMPORTANT: Include cookies
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          rememberMe: rememberMe, // ✅ Send rememberMe flag
-        }),
+        credentials: "include", // ✅ Include cookies
+        body: JSON.stringify(formData),
       });
 
       if (response.ok) {
         const result = await response.json();
-        // ❌ DON'T call setAuthToken - backend already set HttpOnly cookie
-
-        // ✅ Only store non-sensitive data in sessionStorage
+        // ✅ Don't call setAuthToken - backend sets HttpOnly cookie
         setUserData(result.user);
+
+        // ✅ Mark as onboarded
         sessionStorage.setItem("hasOnboarded", "true");
 
+        // Store non-sensitive data in sessionStorage
+        await UserDataManager.fetchAndStoreUserData();
+
         alert(`Welcome back, ${result.user.name}!`);
-        router.push("/user/dashboard");
+        router.push("user/dashboard");
+      } else {
+        const error = await response.json();
+        setError(error.message || "Login failed");
       }
     } catch (error) {
       console.error("Login error:", error);
+      setError("Network error. Please try again.");
     } finally {
       setIsLoading(false);
     }

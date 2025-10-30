@@ -1,17 +1,16 @@
 import clientPromise from "../../../../lib/mongodb";
 import { verifyAdminToken } from "../../../../lib/adminAuth";
 import { ObjectId } from "mongodb";
+import { withAdminAuth } from "@/lib/middleware/withAdminAuth";
+import { logAdminAction, AuditActions } from "../../../../lib/auditLogger";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const admin = verifyAdminToken(req);
-    if (!admin) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    const { adminId, username } = req.admin;
 
     const client = await clientPromise;
     const db = client.db("techtrims");
@@ -66,6 +65,22 @@ export default async function handler(req, res) {
       collected: 0,
       pending: salonsWithRevenue.reduce((sum, s) => sum + s.balance, 0),
     };
+    // ✅ Log revenue data access
+    await logAdminAction({
+      adminId: adminId,
+      adminUsername: username,
+      action: AuditActions.VIEW_REVENUE,
+      resource: "Revenue",
+      resourceId: null,
+      details: {
+        totalRevenue: revenueData.totalRevenue,
+        dateRange: req.query.dateRange || "all",
+        accessedAt: new Date(),
+      },
+      ipAddress: req.admin.getClientIP(),
+      userAgent: req.admin.getUserAgent(),
+      status: "SUCCESS",
+    });
 
     res.status(200).json({ summary, salons: salonsWithRevenue });
   } catch (error) {
@@ -75,3 +90,4 @@ export default async function handler(req, res) {
       .json({ message: "Internal server error", error: error.message });
   }
 }
+export default withAdminAuth(handler);

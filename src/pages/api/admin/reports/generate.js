@@ -2,18 +2,14 @@ import clientPromise from "../../../../lib/mongodb";
 import { verifyAdminToken } from "../../../../lib/adminAuth";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { withAdminAuth } from "@/lib/middleware/withAdminAuth";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const admin = verifyAdminToken(req);
-    if (!admin) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const { reportType } = req.body;
 
     const client = await clientPromise;
@@ -107,3 +103,4 @@ export default async function handler(req, res) {
       .json({ message: "Internal server error", error: error.message });
   }
 }
+export default withAdminAuth(handler);

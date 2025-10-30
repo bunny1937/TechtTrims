@@ -1,33 +1,23 @@
 import clientPromise from "../../../lib/mongodb";
 import { verifyToken } from "../../../lib/auth";
 import { ObjectId } from "mongodb";
+import { withAuth } from "../../../lib/middleware/withAuth";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const token = req.headers.authorization?.replace("Bearer ", "");
-    console.log("User bookings API - Token received:", token ? "YES" : "NO");
-
-    if (!token) {
-      return res.status(401).json({ message: "No token provided" });
-    }
-
-    const decoded = verifyToken(token);
-    console.log("User bookings API - Decoded token:", decoded);
-
-    if (!decoded || !decoded.userId) {
-      return res.status(401).json({ message: "Invalid token" });
-    }
+    // ✅ Read token from HttpOnly cookie
+    const { userId } = req.user;
 
     const client = await clientPromise;
     const db = client.db("techtrims");
 
     const user = await db
       .collection("users")
-      .findOne({ _id: new ObjectId(decoded.userId) });
+      .findOne({ _id: new ObjectId(userId) });
     console.log("User bookings API - Found user:", user ? "YES" : "NO");
     console.log("User phone:", user?.phone);
     console.log("User name:", user?.name);
@@ -43,7 +33,7 @@ export default async function handler(req, res) {
 
     // Try multiple search strategies
     const searchQueries = [
-      { userId: new ObjectId(decoded.userId) },
+      { userId: new ObjectId(userId) },
       { customerPhone: user.phone },
       { customerName: user.name },
     ];
@@ -169,3 +159,4 @@ export default async function handler(req, res) {
     res.status(500).json({ message: "Internal server error" });
   }
 }
+export default withAuth(handler);

@@ -14,8 +14,8 @@ export default function AdminSalons() {
   const [filterStatus, setFilterStatus] = useState("all");
 
   useEffect(() => {
-    const token = localStorage.getItem("adminToken");
-    if (!token) {
+    const admin = sessionStorage.getItem("adminData");
+    if (!admin) {
       router.push("/admin/login");
       return;
     }
@@ -49,9 +49,8 @@ export default function AdminSalons() {
 
   const fetchSalons = async () => {
     try {
-      const token = localStorage.getItem("adminToken");
       const response = await fetch("/api/admin/salons", {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       const data = await response.json();
       setSalons(data.salons || []);
@@ -64,16 +63,13 @@ export default function AdminSalons() {
 
   const toggleSalonStatus = async (salonId, currentStatus) => {
     try {
-      const token = localStorage.getItem("adminToken");
       const response = await fetch(
         `/api/admin/salons/${salonId}/toggle-status`,
         {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ isActive: !currentStatus }),
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ isActive: !isActive }),
         }
       );
 

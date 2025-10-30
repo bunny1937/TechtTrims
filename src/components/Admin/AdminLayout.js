@@ -17,6 +17,7 @@ export default function AdminLayout({ children }) {
     { name: "Revenue", path: "/admin/revenue", icon: "💰" },
     { name: "Analytics", path: "/admin/analytics", icon: "📈" },
     { name: "Reports", path: "/admin/reports", icon: "📄" },
+    { name: "Audit Logs", path: "/admin/audit-logs", icon: "📝" },
   ];
 
   return (

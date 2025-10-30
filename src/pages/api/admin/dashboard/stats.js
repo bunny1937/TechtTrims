@@ -1,16 +1,16 @@
 import clientPromise from "../../../../lib/mongodb";
-import { verifyAdminToken } from "../../../../lib/adminAuth";
+import { ObjectId } from "mongodb";
+import { withAdminAuth } from "../../../../lib/middleware/withAdminAuth";
+import { logAdminAction, AuditActions } from "../../../../lib/auditLogger";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const admin = verifyAdminToken(req);
-    if (!admin) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    // ✅ req.admin already set by middleware
+    const { adminId, username } = req.admin;
 
     const client = await clientPromise;
     const db = client.db("techtrims");
@@ -63,6 +63,23 @@ export default async function handler(req, res) {
       .toArray();
 
     const avgRating = ratings[0]?.avgRating || 5.0;
+    // ✅ Log dashboard access
+    await logAdminAction({
+      adminId: adminId,
+      adminUsername: username,
+      action: AuditActions.VIEW_ANALYTICS,
+      resource: "Dashboard",
+      resourceId: null,
+      details: {
+        totalSalons,
+        totalUsers,
+        totalBookings,
+        totalRevenue,
+      },
+      ipAddress: req.admin.getClientIP(),
+      userAgent: req.admin.getUserAgent(),
+      status: "SUCCESS",
+    });
 
     res.status(200).json({
       totalSalons,
@@ -79,3 +96,4 @@ export default async function handler(req, res) {
     res.status(500).json({ message: "Internal server error" });
   }
 }
+export default withAdminAuth(handler);

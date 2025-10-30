@@ -11,8 +11,8 @@ export default function AdminRevenue() {
   const [filterMonth, setFilterMonth] = useState("all");
 
   useEffect(() => {
-    const token = localStorage.getItem("adminToken");
-    if (!token) {
+    const admin = sessionStorage.getItem("adminData");
+    if (!admin) {
       router.push("/admin/login");
       return;
     }
@@ -21,9 +21,8 @@ export default function AdminRevenue() {
 
   const fetchRevenueData = async () => {
     try {
-      const token = localStorage.getItem("adminToken");
       const response = await fetch(`/api/admin/revenue?month=${filterMonth}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       const data = await response.json();
       setRevenueData(data.summary);

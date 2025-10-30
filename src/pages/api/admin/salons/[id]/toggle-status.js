@@ -1,17 +1,16 @@
 import clientPromise from "../../../../../lib/mongodb";
 import { verifyAdminToken } from "../../../../../lib/adminAuth";
 import { ObjectId } from "mongodb";
+import { withAdminAuth } from "@/lib/middleware/withAdminAuth";
+import { logAdminAction, AuditActions } from "../../../../../lib/auditLogger";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "PUT") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const admin = verifyAdminToken(req);
-    if (!admin) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    const { adminId, username } = req.admin;
 
     const { id } = req.query;
     const { isActive } = req.body;
@@ -25,6 +24,23 @@ export default async function handler(req, res) {
         { _id: new ObjectId(id) },
         { $set: { isActive, updatedAt: new Date() } }
       );
+    // ✅ Log salon status change
+    await logAdminAction({
+      adminId: adminId,
+      adminUsername: username,
+      action: AuditActions.TOGGLE_SALON_STATUS,
+      resource: "Salon",
+      resourceId: id,
+      details: {
+        salonName: salon.name,
+        previousStatus: salon.isActive,
+        newStatus: !salon.isActive,
+        reason: req.body.reason || "No reason provided",
+      },
+      ipAddress: req.admin.getClientIP(),
+      userAgent: req.admin.getUserAgent(),
+      status: "SUCCESS",
+    });
 
     if (result.matchedCount === 0) {
       return res.status(404).json({ message: "Salon not found" });
@@ -36,3 +52,4 @@ export default async function handler(req, res) {
     res.status(500).json({ message: "Internal server error" });
   }
 }
+export default withAdminAuth(handler);
