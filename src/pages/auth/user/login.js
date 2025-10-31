@@ -66,11 +66,11 @@ export default function UserLoginPage() {
     setError("");
 
     try {
-      const response = await fetch("api/auth/user/login", {
+      const response = await fetch("/api/auth/user/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include", // ✅ Include cookies
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, rememberMe }),
       });
 
       if (response.ok) {
@@ -85,7 +85,7 @@ export default function UserLoginPage() {
         await UserDataManager.fetchAndStoreUserData();
 
         alert(`Welcome back, ${result.user.name}!`);
-        router.push("user/dashboard");
+        router.push("/user/dashboard");
       } else {
         const error = await response.json();
         setError(error.message || "Login failed");

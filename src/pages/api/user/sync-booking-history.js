@@ -27,7 +27,7 @@ async function handler(req, res) {
       .collection("bookings")
       .find({
         $or: [
-          { userId: new ObjectId(decoded.userId) },
+          { userId: new ObjectId(userId) },
           { customerPhone: user.phone },
           { customerName: { $regex: user.name, $options: "i" } },
         ],
@@ -41,14 +41,14 @@ async function handler(req, res) {
         .collection("bookings")
         .updateMany(
           { _id: { $in: bookingsToUpdate.map((b) => b._id) } },
-          { $set: { userId: new ObjectId(decoded.userId) } }
+          { $set: { userId: new ObjectId(userId) } }
         );
     }
 
     // Update user's booking history
     const bookingIds = allBookings.map((b) => b._id);
     await db.collection("users").updateOne(
-      { _id: new ObjectId(decoded.userId) },
+      { _id: new ObjectId(userId) },
       {
         $set: {
           bookingHistory: bookingIds,

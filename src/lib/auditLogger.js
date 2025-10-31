@@ -1,11 +1,13 @@
 // lib/auditLogger.js
 import clientPromise from "./mongodb";
+import { MongoClient } from "mongodb";
 
 /**
  * Logs admin actions for compliance and security tracking
  * @param {Object} params - Audit log parameters
  */
-export async function logAdminAction({
+
+export async function logAdminAction(
   adminId,
   adminUsername,
   action,
@@ -15,13 +17,24 @@ export async function logAdminAction({
   ipAddress = null,
   userAgent = null,
   status = "SUCCESS",
-  errorMessage = null,
-}) {
-  try {
-    const client = await clientPromise;
-    const db = client.db("techtrims");
+  errorMessage = null
+) {
+  if (!action || typeof action !== "string" || action.trim() === "") {
+    action = "UNKNOWN_ACTION";
 
-    const auditLog = {
+    console.error("logAdminAction: invalid or empty action", {
+      adminId,
+      adminUsername,
+    });
+    return;
+  }
+
+  const client = new MongoClient(process.env.MONGODB_URI);
+
+  try {
+    await client.connect();
+    const db = client.db("techtrims");
+    await db.collection("auditlogs").insertOne({
       adminId,
       adminUsername,
       action,
@@ -33,14 +46,13 @@ export async function logAdminAction({
       timestamp: new Date(),
       status,
       errorMessage,
-    };
+    });
 
-    await db.collection("audit_logs").insertOne(auditLog);
-
-    console.log(`✅ Audit: ${action} by ${adminUsername} - ${status}`);
+    console.log("Audit log saved:", { adminId, action, timestamp: new Date() });
   } catch (error) {
-    // ⚠️ Never fail the main operation if logging fails
-    console.error("❌ Audit logging failed:", error.message);
+    console.error("Failed to write audit log:", error);
+  } finally {
+    await client.close();
   }
 }
 

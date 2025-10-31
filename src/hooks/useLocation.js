@@ -17,60 +17,96 @@ export const useLocation = () => {
   const startWatchingLocation = useCallback(() => {
     if (watchIdRef.current) return; // already active
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const now = Date.now();
+    const handleSuccess = (position) => {
+      const now = Date.now();
 
-        // IGNORE UPDATES TOO SOON
-        if (now - lastUpdateRef.current < MIN_UPDATE_INTERVAL) {
-          console.log("⏱️ Ignoring location update (too soon)");
+      // IGNORE UPDATES TOO SOON
+      if (now - lastUpdateRef.current < MIN_UPDATE_INTERVAL) {
+        console.log("⏱️ Ignoring location update (too soon)");
+        return;
+      }
+
+      // Only accept high-accuracy positions
+      if (position.coords.accuracy > MAX_ACCURACY) {
+        console.log(
+          `⚠️ Position accuracy too low: ${position.coords.accuracy}m`
+        );
+        return;
+      }
+
+      const { latitude, longitude, accuracy } = position.coords;
+      const newLocation = { latitude, longitude, accuracy };
+
+      // Check if location has actually changed enough to warrant an update
+      if (userLocation) {
+        const latDiff = Math.abs(userLocation.latitude - latitude);
+        const lngDiff = Math.abs(userLocation.longitude - longitude);
+
+        if (latDiff < MIN_DISTANCE_DELTA && lngDiff < MIN_DISTANCE_DELTA) {
+          console.log("📍 Location unchanged (within threshold)");
           return;
         }
+      }
 
-        // FILTER OUT INACCURATE POSITIONS
-        if (position.coords.accuracy > MAX_ACCURACY) {
-          console.log(
-            `🎯 Ignoring inaccurate position (${position.coords.accuracy}m)`
-          );
-          return;
-        }
+      // UPDATE STATE
+      console.log(
+        `✅ Location updated: ${latitude.toFixed(6)}, ${longitude.toFixed(
+          6
+        )} (±${accuracy.toFixed(0)}m)`
+      );
+      setUserLocation(newLocation);
+      setLocationStatus("granted");
+      setLocationError(null);
+      lastUpdateRef.current = now;
 
-        const newLat = position.coords.latitude;
-        const newLng = position.coords.longitude;
+      // SAVE TO STORAGE - both session and local for persistence
+      sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
+      localStorage.setItem("cachedUserLocation", JSON.stringify(newLocation));
+    };
 
-        setUserLocation((prev) => {
-          // ONLY UPDATE IF MOVED SIGNIFICANTLY
-          if (prev) {
-            const latDiff = Math.abs(prev.lat - newLat);
-            const lngDiff = Math.abs(prev.lng - newLng);
+    const handleError = (error) => {
+      console.error("Watch position error:", error);
 
-            if (latDiff < MIN_DISTANCE_DELTA && lngDiff < MIN_DISTANCE_DELTA) {
-              console.log("📍 Ignoring minor location change");
-              return prev; // No significant movement
-            }
+      if (error.code === 3) {
+        // TIMEOUT - Retry after 5 seconds
+        setLocationError(
+          "Location request timed out. Retrying in 5 seconds..."
+        );
+        setLocationStatus("error");
+
+        setTimeout(() => {
+          console.log("🔄 Retrying location fetch...");
+          if (watchIdRef.current) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
           }
+          startWatchingLocation(); // Retry
+        }, 5000);
+      } else if (error.code === 1) {
+        // PERMISSION DENIED
+        setLocationError(
+          "Please allow location access in your browser settings to find nearby salons."
+        );
+        setLocationStatus("denied");
+      } else if (error.code === 2) {
+        // POSITION UNAVAILABLE
+        setLocationError(
+          "Location unavailable. Please check your device settings."
+        );
+        setLocationStatus("error");
+      } else {
+        // UNKNOWN ERROR
+        setLocationError("Unable to get your location. Please try again.");
+        setLocationStatus("error");
+      }
+    };
 
-          // SIGNIFICANT CHANGE - UPDATE
-          lastUpdateRef.current = now;
-          const newLocation = {
-            lat: newLat,
-            lng: newLng,
-            accuracy: position.coords.accuracy,
-            timestamp: position.timestamp,
-          };
-
-          console.log("✅ Location updated:", newLocation);
-          return newLocation;
-        });
-      },
-      (error) => {
-        console.error("Watch position error:", error);
-        setLocationError(error.message);
-      },
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handleSuccess,
+      handleError,
       {
         enableHighAccuracy: true,
-        timeout: 15000, // Increased timeout
-        maximumAge: 30000, // Cache for 30s - PREVENTS CONSTANT UPDATES
+        timeout: 30000, // INCREASED to 30 seconds
+        maximumAge: 60000, // INCREASED to 60 seconds cache
       }
     );
   }, []);
@@ -116,6 +152,7 @@ export const useLocation = () => {
 
       // Save to SESSION STORAGE (persists across page refreshes but not logout)
       sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
+      localStorage.setItem("cachedUserLocation", JSON.stringify(newLocation)); // ADD THIS LINE
 
       // Start continuous monitoring
       startWatchingLocation();

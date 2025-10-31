@@ -10,45 +10,37 @@ import {
 export class UserDataManager {
   static getStoredUserData() {
     if (typeof window === "undefined") return null;
-
     try {
-      // First try to get authenticated user data
-      const userToken = getAuthToken(); // ✅ CHANGE 1
+      const userToken = getAuthToken();
       if (userToken) {
-        const storedUserData = getUserData(); // ✅ Use sessionStorage instead
-        if (storedUserData) {
-          const userData = storedUserData;
-          // Always preserve onboarding location data for authenticated users
-          const onboardingData = sessionStorage.getItem("userOnboardingData");
-          if (onboardingData) {
-            try {
-              const onboarding = JSON.parse(onboardingData);
-              return {
-                ...storedUserData,
-                location: onboarding.location || storedUserData.location,
-                preferences: {
-                  ...storedUserData.preferences,
-                  ...onboarding.preferences,
-                },
-              };
-            } catch (e) {
-              return storedUserData;
-            }
-          }
-          return userData;
+        const storedUserData = getUserData();
+
+        // Use sessionStorage to keep onboarding data and location with fallback
+        const onboardingDataStr = sessionStorage.getItem("userOnboardingData");
+        let onboarding = null;
+        if (onboardingDataStr) {
+          onboarding = JSON.parse(onboardingDataStr);
         }
-      }
 
-      // Fallback to onboarding data
-      // ✅ Fallback to onboarding data from sessionStorage
-      const onboardingData = sessionStorage.getItem("userOnboardingData");
-      if (onboardingData) {
-        return JSON.parse(onboardingData);
-      }
+        // Fallback: check localStorage cached location too (persist across reloads)
+        let cachedLocation = null;
+        try {
+          cachedLocation = JSON.parse(
+            localStorage.getItem("cachedUserLocation")
+          );
+        } catch {}
 
-      return null;
-    } catch (error) {
-      console.error("Error getting stored user data:", error);
+        return {
+          ...storedUserData,
+          location:
+            onboarding?.location || cachedLocation || storedUserData.location,
+          preferences: {
+            ...storedUserData.preferences,
+            ...(onboarding?.preferences || {}),
+          },
+        };
+      }
+    } catch (e) {
       return null;
     }
   }
@@ -60,7 +52,7 @@ export class UserDataManager {
     if (!userToken) return this.getStoredUserData();
 
     try {
-      const response = await fetch("api/user/profile", {
+      const response = await fetch("/api/user/profile", {
         credentials: "include", // ✅ Include HttpOnly cookies
       });
 
