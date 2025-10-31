@@ -22,6 +22,11 @@ export const removeAuthToken = async () => {
     console.error("Logout error:", error);
   }
 };
+export const isAuthenticated = () => {
+  if (typeof window === "undefined") return false;
+  const matches = document.cookie.match(/(?:^|; )userAuth=([^;]*)/);
+  return matches ? matches[1] === "true" : false;
+};
 
 // ❌ REMOVE setAuthToken - Backend sets HttpOnly cookie
 // export const setAuthToken = ... DELETE THIS

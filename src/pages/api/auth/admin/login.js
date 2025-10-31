@@ -1,5 +1,5 @@
 import clientPromise from "../../../../lib/mongodb";
-import bcrypt from "bcryptjs";
+import bcryptjs from "bcryptjs"; // ✅ Change this
 import jwt from "jsonwebtoken";
 import {
   logAdminAction,
@@ -7,13 +7,23 @@ import {
   getClientIP,
 } from "../../../../lib/auditLogger";
 
+const bcrypt = bcryptjs; // ✅ Add this
+
 export default async function handler(req, res) {
+  console.log("🔵 [ADMIN LOGIN] Request received");
+
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
     const { username, password } = req.body;
+    console.log(
+      "🔵 [ADMIN LOGIN] Username:",
+      username,
+      "Password length:",
+      password?.length
+    );
 
     if (!username || !password) {
       return res
@@ -24,86 +34,88 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db("techtrims");
 
-    // Find admin
     const admin = await db.collection("admins").findOne({ username });
+    console.log("🔵 [ADMIN LOGIN] Admin found:", !!admin);
 
-    if (!admin || !(await bcrypt.compare(password, admin.hashedPassword))) {
-      // ✅ Log failed login attempt
-      await logAdminAction({
-        adminId: "unknown",
-        adminUsername: username || "unknown",
-        action: AuditActions.LOGIN,
-        resource: "Admin",
-        resourceId: admin?._id?.toString() || "unknown",
-        details: {
-          reason: !admin ? "Admin not found" : "Invalid password",
-          attemptedUsername: username,
-        },
-        ipAddress: getClientIP(req),
-        userAgent: req.headers["user-agent"],
-        status: "FAILURE",
-        errorMessage: "Invalid credentials",
-      });
-
+    if (!admin) {
+      console.log("❌ [ADMIN LOGIN] Admin not found");
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Verify password
-    const isValid = await bcrypt.compare(password, admin.hashedPassword);
-
-    if (!isValid) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    // ✅ Generate token
-    const token = jwt.sign(
-      { adminId: admin._id, username: admin.username, role: admin.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" } // ✅ 30 days token
+    console.log(
+      "🔵 [ADMIN LOGIN] Comparing password. Hash exists:",
+      !!admin.hashedPassword
     );
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      admin.hashedPassword
+    );
+    console.log("🔵 [ADMIN LOGIN] Password valid:", isPasswordValid);
 
-    // ✅ SET HTTPONLY COOKIE
-    const cookieOptions = [
-      `adminToken=${token}`,
-      `Path=/`,
-      `HttpOnly`,
-      `SameSite=Strict`,
-    ];
-
-    if (process.env.NODE_ENV === "production") {
-      cookieOptions.push(`Secure`);
+    if (!isPasswordValid) {
+      console.log("❌ [ADMIN LOGIN] Password invalid");
+      await logAdminAction(
+        "unknown",
+        username,
+        AuditActions.LOGIN,
+        "Admin",
+        admin._id.toString(),
+        { reason: "Invalid password" },
+        getClientIP(req),
+        req.headers["user-agent"],
+        "FAILURE",
+        "Invalid password"
+      );
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // ✅ 30 days persistent cookie
-    cookieOptions.push(`Max-Age=${30 * 24 * 60 * 60}`);
+    console.log("✅ [ADMIN LOGIN] Password verified successfully");
 
-    res.setHeader("Set-Cookie", cookieOptions.join("; "));
-
-    // Remove password from response
-    const { hashedPassword, ...adminData } = admin;
-    // ✅ Log successful login
-    await logAdminAction({
-      adminId: admin._id.toString(),
-      adminUsername: admin.username,
-      action: AuditActions.LOGIN,
-      resource: "Admin",
-      resourceId: admin._id.toString(),
-      details: {
+    const token = jwt.sign(
+      {
+        adminId: admin._id,
+        username: admin.username,
         role: admin.role,
-        loginTime: new Date(),
       },
-      ipAddress: getClientIP(req),
-      userAgent: req.headers["user-agent"],
-      status: "SUCCESS",
-    });
+      process.env.JWT_SECRET,
+      { expiresIn: "30d" }
+    );
+    console.log("🔵 [ADMIN LOGIN] JWT generated:", !!token);
 
-    // ❌ DON'T send token in response
-    res.status(200).json({
+    res.setHeader("Set-Cookie", [
+      `adminToken=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${
+        30 * 24 * 60 * 60
+      }`,
+      ...(process.env.NODE_ENV === "production" ? ["Secure"] : []),
+    ]);
+    console.log("🔵 [ADMIN LOGIN] Cookie set");
+
+    const { hashedPassword, ...adminData } = admin;
+
+    console.log("🔵 [ADMIN LOGIN] Logging success...");
+    await logAdminAction(
+      admin._id.toString(),
+      admin.username,
+      AuditActions.LOGIN,
+      "Admin",
+      admin._id.toString(),
+      { role: admin.role, loginTime: new Date() },
+      getClientIP(req),
+      req.headers["user-agent"],
+      "SUCCESS"
+    );
+    console.log("🔵 [ADMIN LOGIN] Success logged");
+
+    console.log("✅ [ADMIN LOGIN] Returning 200 response");
+    return res.status(200).json({
       message: "Login successful",
       admin: adminData,
     });
   } catch (error) {
-    console.error("Admin login error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("❌ [ADMIN LOGIN] ERROR:", error);
+    console.error("Stack:", error.stack);
+    return res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 }

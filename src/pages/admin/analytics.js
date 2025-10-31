@@ -52,8 +52,8 @@ export default function AdminAnalytics() {
               <h3>Peak Booking Hours</h3>
               <ul>
                 {analytics?.peakHours?.map((hour) => (
-                  <li key={hour.hour}>
-                    <strong>{hour.hour}</strong> - {hour.count} bookings
+                  <li key={hour.hourOriginal}>
+                    <strong>{hour.label}</strong> - {hour.count} bookings
                   </li>
                 ))}
               </ul>

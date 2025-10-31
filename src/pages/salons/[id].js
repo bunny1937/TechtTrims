@@ -774,6 +774,36 @@ export default function SalonDetail({ initialSalon }) {
           <RetryButton onRetry={makeBookingRequest} />
         </div>
       )}
+      {/* Location Status Feedback */}
+      {locationStatus === "requesting" && (
+        <div className={styles.locationBanner}>
+          <span>📍</span>
+          <p>Fetching your location for accurate distance...</p>
+        </div>
+      )}
+
+      {locationError && locationStatus === "denied" && (
+        <div className={styles.locationBannerError}>
+          <span>⚠️</span>
+          <div>
+            <p>
+              <strong>Location Permission Required</strong>
+            </p>
+            <p>{locationError}</p>
+            <button onClick={() => window.location.reload()}>
+              Allow Location Access
+            </button>
+          </div>
+        </div>
+      )}
+
+      {locationError && locationStatus === "error" && (
+        <div className={styles.locationBannerWarning}>
+          <span>⏱️</span>
+          <p>{locationError}</p>
+        </div>
+      )}
+
       {/* Header */}
       <header className={styles.header}>
         <button onClick={() => router.back()} className={styles.backButton}>

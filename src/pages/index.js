@@ -22,7 +22,12 @@ export default function Home() {
   const [filteredSalons, setFilteredSalons] = useState([]);
   const [isPrebook, setIsPrebook] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
-  const { userLocation: liveUserLocation, locationStatus } = useLocation();
+  const {
+    userLocation: liveUserLocation,
+    locationStatus,
+    locationError,
+    requestLocationPermission,
+  } = useLocation();
   const [mapKey, setMapKey] = useState(0);
 
   // ADD: Track if salons were loaded
@@ -83,23 +88,40 @@ export default function Home() {
           // Use stored location to load salons
           if (!salonsLoadedRef.current) {
             await loadNearbySalons(
-              locationData.lat,
-              locationData.lng,
+              locationData.lat, // Uses 'lat' not 'latitude'
+              locationData.lng, // Uses 'lng' not 'longitude'
               userOnboarding?.gender || "all"
             );
+
             salonsLoadedRef.current = true;
           }
         } catch (error) {
           console.error("Error parsing stored location:", error);
         }
       } else if (liveUserLocation && !salonsLoadedRef.current) {
-        // If no stored location, use live location
+        // PRIORITY: Use live location if available
         await loadNearbySalons(
-          liveUserLocation.lat,
-          liveUserLocation.lng,
+          liveUserLocation.latitude,
+          liveUserLocation.longitude,
           userOnboarding?.gender || "all"
         );
         salonsLoadedRef.current = true;
+      } else if (!liveUserLocation && !salonsLoadedRef.current) {
+        // FALLBACK: Use cached location from localStorage if live location not available
+        const cachedLocation = localStorage.getItem("cachedUserLocation");
+        if (cachedLocation) {
+          try {
+            const locationData = JSON.parse(cachedLocation);
+            await loadNearbySalons(
+              locationData.latitude,
+              locationData.longitude,
+              userOnboarding?.gender || "all"
+            );
+            salonsLoadedRef.current = true;
+          } catch (error) {
+            console.error("Error using cached location:", error);
+          }
+        }
       }
 
       setIsLoading(false);
@@ -116,8 +138,8 @@ export default function Home() {
       sessionStorage.setItem(
         "userLocation",
         JSON.stringify({
-          lat: liveUserLocation.lat,
-          lng: liveUserLocation.lng,
+          lat: liveUserLocation.latitude,
+          lng: liveUserLocation.longitude,
           timestamp: Date.now(),
         })
       );
@@ -213,8 +235,8 @@ export default function Home() {
       setTimeout(() => {
         if (liveUserLocation) {
           loadNearbySalons(
-            liveUserLocation.lat,
-            liveUserLocation.lng,
+            liveUserLocation.latitude,
+            liveUserLocation.longitude,
             userOnboarding?.gender
           );
         }
@@ -222,8 +244,8 @@ export default function Home() {
     } else if (liveUserLocation) {
       // Just reload with current location
       loadNearbySalons(
-        liveUserLocation.lat,
-        liveUserLocation.lng,
+        liveUserLocation.latitude,
+        liveUserLocation.longitude,
         userOnboarding?.gender
       );
     }
@@ -234,10 +256,11 @@ export default function Home() {
     if (liveUserLocation && userOnboarding) {
       salonsLoadedRef.current = false; // Allow reload
       loadNearbySalons(
-        liveUserLocation.lat,
-        liveUserLocation.lng,
-        userOnboarding.gender
+        liveUserLocation.latitude,
+        liveUserLocation.longitude,
+        userOnboarding?.gender
       );
+
       salonsLoadedRef.current = true;
     }
   };
@@ -754,6 +777,70 @@ export default function Home() {
       ; */}
         {/* Salons Section with Booking Type Tabs */}
         {/* Salons Section with Booking Type Tabs */}
+        {/* Location Status Feedback */}
+        {locationStatus === "requesting" && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={styles.locationAlert}
+          >
+            <div className={styles.locationAlertContent}>
+              <span className={styles.locationIcon}>📍</span>
+              <p>Getting your location to find nearby salons...</p>
+            </div>
+          </motion.div>
+        )}
+
+        {locationError && locationStatus === "denied" && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={styles.locationAlertError}
+          >
+            <div className={styles.locationAlertContent}>
+              <span className={styles.locationIcon}>⚠️</span>
+              <div>
+                <p>
+                  <strong>Location Access Needed</strong>
+                </p>
+                <p>{locationError}</p>
+                <button
+                  className={styles.retryButton}
+                  onClick={() => window.location.reload()}
+                >
+                  Refresh to Allow Location
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {locationError && locationStatus === "error" && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={styles.locationAlertWarning}
+          >
+            <div className={styles.locationAlertContent}>
+              <span className={styles.locationIcon}>⏱️</span>
+              <p>{locationError}</p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* {liveUserLocation && locationStatus === "granted" && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={styles.locationAlertSuccess}
+          >
+            <div className={styles.locationAlertContent}>
+              <span className={styles.locationIcon}>✅</span>
+              <p>Location detected! Showing salons near you</p>
+            </div>
+          </motion.div>
+        )} */}
+
         <motion.section
           className={styles.salonsSection}
           initial={{ opacity: 0, y: 50 }}

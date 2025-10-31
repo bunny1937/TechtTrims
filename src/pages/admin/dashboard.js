@@ -24,7 +24,7 @@ export default function AdminDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await fetch("api/admin/dashboard/stats", {
+      const response = await fetch("/api/admin/dashboard/stats", {
         credentials: "include", // ✅ Include HttpOnly cookies
       });
 

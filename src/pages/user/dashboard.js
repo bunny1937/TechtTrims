@@ -36,7 +36,7 @@ export default function UserDashboard() {
       try {
         const token = getAuthToken();
         if (!token) {
-          router.push("auth/user/login");
+          router.push("/auth/user/login");
           return;
         }
 
@@ -44,7 +44,7 @@ export default function UserDashboard() {
 
         // ✅ Simple profile load with credentials
         try {
-          const userRes = await fetch("api/user/profile", {
+          const userRes = await fetch("/api/user/profile", {
             credentials: "include", // ✅ Include HttpOnly cookies
           });
 
@@ -68,7 +68,7 @@ export default function UserDashboard() {
         // Simple bookings load
         // ✅ Simple bookings load with credentials
         try {
-          const bookingsRes = await fetch("api/user/bookings", {
+          const bookingsRes = await fetch("/api/user/bookings", {
             credentials: "include", // ✅ Include HttpOnly cookies
           });
 
@@ -84,7 +84,7 @@ export default function UserDashboard() {
         // Simple payments load
         // ✅ Simple payments load with credentials
         try {
-          const paymentsRes = await fetch("api/user/payments", {
+          const paymentsRes = await fetch("/api/user/payments", {
             credentials: "include", // ✅ Include HttpOnly cookies
           });
 

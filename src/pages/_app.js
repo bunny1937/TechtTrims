@@ -29,17 +29,21 @@ function MyApp({ Component, pageProps }) {
       return;
     }
 
-    // Check if user is authenticated
-    const userToken = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("authToken="));
+    // Check for userAuth cookie (readable by JavaScript)
+    const getCookie = (name) => {
+      const matches = document.cookie.match(
+        new RegExp("(?:^|; )" + name + "=([^;]*)")
+      );
+      return matches ? decodeURIComponent(matches[1]) : null;
+    };
 
-    if (userToken) {
+    const userAuth = getCookie("userAuth");
+    if (userAuth === "true") {
       // Authenticated users - check if they have completed onboarding
       const hasOnboarded = sessionStorage.getItem("hasOnboarded");
       if (!hasOnboarded) {
         // Force onboarding for authenticated users who haven't completed it
-        sessionStorage.setItem("hasOnboarded", "true"); // Auto-mark authenticated users
+        sessionStorage.setItem("hasOnboarded", "true");
       }
     } else {
       // Guest users - must complete onboarding
@@ -191,7 +195,7 @@ function MyApp({ Component, pageProps }) {
                   </motion.button>
                 )}
 
-                {/* ✅ SHOW LOGOUT ONLY IF LOGGED IN */}
+                {/* SHOW LOGOUT ONLY IF LOGGED IN */}
                 {UserDataManager.isLoggedIn() && (
                   <motion.button
                     className={`${styles.actionButton} ${styles.logoutButton}`}
@@ -199,13 +203,18 @@ function MyApp({ Component, pageProps }) {
                     whileTap={{ scale: 0.98 }}
                     onClick={() => {
                       if (window.confirm("Are you sure you want to logout?")) {
-                        localStorage.removeItem("userToken");
-                        localStorage.removeItem("authenticatedUserData");
-                        localStorage.removeItem("salonToken");
-                        localStorage.removeItem("salonSession");
-                        localStorage.removeItem("ownerToken");
+                        // Call UserDataManager logout (synchronous, no await needed)
+                        UserDataManager.clearUserData();
+
+                        // Clear other storage items
+                        if (typeof window !== "undefined") {
+                          localStorage.removeItem("salonToken");
+                          localStorage.removeItem("ownerToken");
+                        }
 
                         alert("Logged out successfully!");
+
+                        // Force redirect to home page
                         window.location.href = "/";
                       }
                     }}
@@ -360,11 +369,14 @@ function MyApp({ Component, pageProps }) {
                         if (
                           window.confirm("Are you sure you want to logout?")
                         ) {
-                          localStorage.removeItem("userToken");
-                          localStorage.removeItem("authenticatedUserData");
-                          localStorage.removeItem("salonToken");
-                          localStorage.removeItem("salonSession");
-                          localStorage.removeItem("ownerToken");
+                          // Call UserDataManager logout (synchronous)
+                          UserDataManager.clearUserData();
+
+                          // Clear other storage
+                          if (typeof window !== "undefined") {
+                            localStorage.removeItem("salonToken");
+                            localStorage.removeItem("ownerToken");
+                          }
 
                           alert("Logged out successfully!");
                           window.location.href = "/";

@@ -93,27 +93,33 @@ export default async function handler(req, res) {
       }
     );
 
-    // ✅ SET HTTPONLY COOKIE (SECURE - JavaScript CANNOT access)
+    // SET HTTPONLY COOKIE SECURE - JavaScript CANNOT access
+    // Set BOTH HttpOnly cookie (for API requests) AND readable cookie (for client-side checks)
     const cookieOptions = [
       `authToken=${token}`,
-      `Path=/`,
-      `HttpOnly`, // ✅ JavaScript cannot read this
-      `SameSite=Strict`, // ✅ CSRF protection
+      "Path=/",
+      "HttpOnly",
+      "SameSite=Strict",
     ];
 
-    // ✅ Add Secure flag in production
+    // Non-HttpOnly cookie for client-side auth check
+    const clientCookieOptions = [`userAuth=true`, "Path=/", "SameSite=Strict"];
+
     if (process.env.NODE_ENV === "production") {
-      cookieOptions.push(`Secure`);
+      cookieOptions.push("Secure");
+      clientCookieOptions.push("Secure");
     }
 
-    // ✅ Add MaxAge if rememberMe is true (30 days in seconds)
-    if (rememberMe) {
-      cookieOptions.push(`Max-Age=${30 * 24 * 60 * 60}`); // 30 days in seconds
-    }
-    // ✅ If rememberMe is false, NO Max-Age = session cookie (expires on browser close)
+    // Always set 30-day expiration
+    const maxAge = `Max-Age=${30 * 24 * 60 * 60}`;
+    cookieOptions.push(maxAge);
+    clientCookieOptions.push(maxAge);
 
-    // ✅ Set the HttpOnly cookie
-    res.setHeader("Set-Cookie", cookieOptions.join("; "));
+    // Set BOTH cookies
+    res.setHeader("Set-Cookie", [
+      cookieOptions.join("; "),
+      clientCookieOptions.join("; "),
+    ]);
 
     // Return user data without sensitive info
     const userResponse = {

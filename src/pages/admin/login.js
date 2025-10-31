@@ -17,23 +17,24 @@ export default function AdminLoginPage() {
     setError("");
 
     try {
-      const response = await fetch("api/auth/admin/login", {
+      // Use absolute path with leading slash
+      const response = await fetch("/api/auth/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // ✅ Include HttpOnly cookies
-        body: JSON.stringify(credentials),
+        credentials: "include", // Include HttpOnly cookies
+        body: JSON.stringify(credentials), // Sends { username, password }
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // ✅ DON'T store token in localStorage - backend sets HttpOnly cookie
         sessionStorage.setItem("adminData", JSON.stringify(data.admin));
-        router.push("admin/dashboard");
+        router.push("/admin/dashboard");
       } else {
         setError(data.message || "Login failed");
       }
     } catch (error) {
+      console.error("Admin login error:", error);
       setError("Network error. Please try again.");
     } finally {
       setIsLoading(false);
@@ -44,7 +45,7 @@ export default function AdminLoginPage() {
     <div className={styles.container}>
       <div className={styles.loginCard}>
         <div className={styles.header}>
-          <h1 className={styles.title}>🔐 Admin Portal</h1>
+          <h1 className={styles.title}>Admin Portal</h1>
           <p className={styles.subtitle}>TechTrims Management Dashboard</p>
         </div>
 
@@ -62,6 +63,8 @@ export default function AdminLoginPage() {
                 setCredentials({ ...credentials, username: e.target.value })
               }
               required
+              disabled={isLoading}
+              autoComplete="username"
             />
           </div>
 
@@ -76,6 +79,8 @@ export default function AdminLoginPage() {
                 setCredentials({ ...credentials, password: e.target.value })
               }
               required
+              disabled={isLoading}
+              autoComplete="current-password"
             />
           </div>
 
