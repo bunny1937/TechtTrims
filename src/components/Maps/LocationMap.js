@@ -89,6 +89,41 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
 
   const effectiveUserLocation =
     isManualMode && manualLocation ? manualLocation : userLocation;
+  // ✅ Reset locating state if in manual mode on mount
+  useEffect(() => {
+    if (isManualMode) {
+      setLocating(false);
+    }
+  }, [isManualMode]);
+
+  // ✅ Load manual location from sessionStorage on mount
+  useEffect(() => {
+    const stored = sessionStorage.getItem("manualLocation");
+    const isManual = sessionStorage.getItem("isManualMode") === "true";
+
+    if (stored && isManual) {
+      try {
+        const parsed = JSON.parse(stored);
+        // Ensure both lat/lng and latitude/longitude exist
+        const normalized = {
+          lat: parsed.lat || parsed.latitude,
+          lng: parsed.lng || parsed.longitude,
+          latitude: parsed.latitude || parsed.lat,
+          longitude: parsed.longitude || parsed.lng,
+          address: parsed.address,
+        };
+        setManualLocation(normalized);
+        setIsManualMode(true);
+        console.log(
+          "📍 LocationMap loaded manual location from storage:",
+          normalized
+        );
+      } catch (e) {
+        console.error("Error loading manual location:", e);
+      }
+    }
+  }, []);
+
   // Add this right after const effectiveUserLocation line
   useEffect(() => {
     console.log("👤 User location changed:", {
@@ -105,14 +140,15 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
 
     const [lng, lat] = location.coordinates;
     const R = 6371;
-    const dLat = ((lat - effectiveUserLocation.lat) * Math.PI) / 180;
-    const dLon = ((lng - effectiveUserLocation.lng) * Math.PI) / 180;
+    const dLat = ((lat - effectiveUserLocation.latitude) * Math.PI) / 180; // Changed
+    const dLon = ((lng - effectiveUserLocation.longitude) * Math.PI) / 180; // Changed
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((effectiveUserLocation.lat * Math.PI) / 180) *
+      Math.cos((effectiveUserLocation.latitude * Math.PI) / 180) *
         Math.cos((lat * Math.PI) / 180) *
         Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+        Math.sin(dLon / 2); // Changed
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const dist = R * c;
 
@@ -124,6 +160,20 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
   useEffect(() => {
     if (!map || !effectiveUserLocation || !location?.coordinates) return;
 
+    // CRITICAL GUARD: Ensure VALID coordinates
+    if (
+      !effectiveUserLocation.latitude ||
+      !effectiveUserLocation.longitude ||
+      isNaN(effectiveUserLocation.latitude) ||
+      isNaN(effectiveUserLocation.longitude)
+    ) {
+      console.warn(
+        "⚠️ effectiveUserLocation has invalid coordinates:",
+        effectiveUserLocation
+      );
+      return;
+    }
+
     const L = window.L;
     if (!L) return;
 
@@ -133,24 +183,24 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
     if (userMarkerRef.current && map.hasLayer(userMarkerRef.current)) {
       console.log("📍 Updating existing user marker position");
       userMarkerRef.current.setLatLng([
-        effectiveUserLocation.lat,
-        effectiveUserLocation.lng,
+        effectiveUserLocation.latitude,
+        effectiveUserLocation.longitude,
       ]);
 
       // Update route line
       if (routeLineRef.current && map.hasLayer(routeLineRef.current)) {
         console.log("🔄 Updating route line");
         routeLineRef.current.setLatLngs([
-          [effectiveUserLocation.lat, effectiveUserLocation.lng],
+          [effectiveUserLocation.latitude, effectiveUserLocation.longitude],
           [lat, lng],
         ]);
       }
-      return; // ✅ EXIT EARLY - Don't create new markers
+      return; // ✅ EXIT EARLY
     }
 
     // 🔥 CREATE user marker ONLY if it doesn't exist
     if (!userMarkerRef.current) {
-      console.log("🆕 Creating user marker for the first time");
+      console.log("🆕 Creating user marker");
 
       const userIcon = L.divIcon({
         html: `
@@ -179,8 +229,9 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
         popupAnchor: [0, -20],
       });
 
+      // ✅ SAFE: Create marker with validated coordinates
       const userMarker = L.marker(
-        [effectiveUserLocation.lat, effectiveUserLocation.lng],
+        [effectiveUserLocation.latitude, effectiveUserLocation.longitude],
         { icon: userIcon }
       )
         .addTo(map)
@@ -196,7 +247,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
 
       const routeLine = L.polyline(
         [
-          [effectiveUserLocation.lat, effectiveUserLocation.lng],
+          [effectiveUserLocation.latitude, effectiveUserLocation.longitude],
           [lat, lng],
         ],
         {
@@ -250,12 +301,12 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
       if (!response.ok) throw new Error("Search failed");
 
       const allResults = await response.json();
-      const userLat = effectiveUserLocation?.lat || 19.247251;
-      const userLng = effectiveUserLocation?.lng || 73.154063;
+      const userLat = effectiveUserLocation?.latitude || 19.247251;
+      const userLng = effectiveUserLocation?.longitude || 73.154063;
 
       const nearbyResults = allResults
         .map((result) => {
-          const lat = parseFloat(result.lat);
+          const lat = parseFloat(result.latitude);
           const lng = parseFloat(result.lon);
           const R = 6371;
           const dLat = ((lat - userLat) * Math.PI) / 180;
@@ -281,59 +332,138 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
     }
   };
 
-  const handleLocationSelect = (loc) => {
-    setManualLocation(loc);
-    setIsManualMode(true);
-    if (map) {
-      map.flyTo([loc.lat, loc.lng], 16, { animate: true, duration: 1.5 });
+  const handleLocationSelect = (location) => {
+    try {
+      if (!location) {
+        console.error("❌ No location provided");
+        return;
+      }
+
+      // ✅ Extract lat/lng - handle BOTH formats
+      let lat = location.lat || location.latitude;
+      let lng = location.lng || location.longitude;
+
+      console.log("🔍 handleLocationSelect received:", { location, lat, lng });
+
+      // ✅ Validate before using isNaN
+      if (
+        lat === undefined ||
+        lat === null ||
+        lng === undefined ||
+        lng === null
+      ) {
+        console.error("❌ Coordinates are undefined/null:", {
+          lat,
+          lng,
+          location,
+        });
+        return;
+      }
+
+      // ✅ NOW check for NaN
+      if (isNaN(lat) || isNaN(lng)) {
+        console.error("❌ NaN coordinates:", { lat, lng });
+        return;
+      }
+
+      // ✅ Validate numbers
+      if (typeof lat !== "number" || typeof lng !== "number") {
+        console.error("❌ Invalid coordinate types:", { lat, lng, location });
+        return;
+      }
+
+      console.log("✅ Selecting location:", {
+        lat,
+        lng,
+        address: location.address,
+      });
+
+      // ✅ Store location
+      setManualLocation(location);
+
+      // ✅ Store to sessionStorage
+      sessionStorage.setItem(
+        "manualLocation",
+        JSON.stringify({
+          lat,
+          lng,
+          latitude: lat,
+          longitude: lng,
+          address: location.address || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        })
+      );
+      sessionStorage.setItem("isManualMode", "true");
+
+      console.log("💾 Manual location saved to sessionStorage");
+    } catch (error) {
+      console.error("❌ ERROR in handleLocationSelect:", error, error.stack);
     }
-    setSearchQuery("");
-    setSearchResults([]);
-    setSearching(false);
   };
 
   const enableClickMode = () => {
     if (!map) return;
 
     setClickMode(true);
-
-    // ✅ DON'T DISABLE MAP INTERACTIONS - Keep it scrollable!
-    // Just change cursor to indicate pin mode is active
     map.getContainer().style.cursor = "crosshair";
 
+    // ✅ Create handler with proper validation
     const handleMapClick = (e) => {
+      if (!e || !e.latlng) {
+        console.error("❌ Invalid click event");
+        return;
+      }
+
       const { lat, lng } = e.latlng;
 
+      // ✅ Validate coordinates
+      if (typeof lat !== "number" || typeof lng !== "number") {
+        console.error("❌ Invalid coordinates:", { lat, lng });
+        return;
+      }
+
+      console.log("📍 Map clicked at:", { lat, lng });
+
+      // ✅ First: Set pin with coordinates
       handleLocationSelect({
-        lat,
-        lng,
+        lat: parseFloat(lat.toFixed(6)),
+        lng: parseFloat(lng.toFixed(6)),
+        latitude: lat,
+        longitude: lng,
         accuracy: 5,
         manual: true,
         address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
       });
 
-      // Try reverse geocode
+      // ✅ Then: Try reverse geocode for better address
       fetch(`/api/geocode?reverse=true&lat=${lat}&lon=${lng}`)
         .then((res) => res.json())
         .then((data) => {
-          if (data.display_name) {
+          if (data && data.display_name) {
+            console.log("✅ Geocoded address:", data.display_name);
+
+            // ✅ Update with better address
             handleLocationSelect({
-              lat,
-              lng,
+              lat: parseFloat(lat.toFixed(6)),
+              lng: parseFloat(lng.toFixed(6)),
+              latitude: lat,
+              longitude: lng,
               accuracy: 5,
               manual: true,
               address: data.display_name,
             });
           }
         })
-        .catch(() => console.log("Using coordinates"));
+        .catch((err) => {
+          console.log("⚠️ Reverse geocode failed, using coordinates");
+        });
 
-      // Reset
+      // ✅ Cleanup after pin
       setClickMode(false);
       map.getContainer().style.cursor = "";
       map.off("click", handleMapClick);
     };
 
+    // ✅ Attach listener
     map.on("click", handleMapClick);
   };
 
@@ -411,59 +541,99 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location?.coordinates?.[0], location?.coordinates?.[1], salonName]);
 
+  // ========================================
+  // CHANGE: ADD useEffect - Listen for manual location updates
+  // ========================================
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === "manualLocation") {
+        console.log("🔄 Manual location updated:", e.newValue);
+        if (e.newValue) {
+          try {
+            const newLocation = JSON.parse(e.newValue);
+            setManualLocation(newLocation);
+          } catch (err) {
+            console.error("Error parsing manual location:", err);
+          }
+        }
+      } else if (e.key === "isManualMode") {
+        console.log("🔄 Manual mode changed:", e.newValue);
+        if (e.newValue !== "true") {
+          setManualLocation(null);
+        }
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", handleStorageChange);
+      return () => window.removeEventListener("storage", handleStorageChange);
+    }
+  }, []);
+
   const handleLiveLocation = async () => {
+    setLocating(false);
+
     if (!map) return;
 
-    // If in manual mode, revert to live
+    // ✅ If in manual mode, revert to live
     if (isManualMode) {
       setIsManualMode(false);
       setManualLocation(null);
+      setLocating(false);
+      sessionStorage.removeItem("manualLocation");
+      sessionStorage.removeItem("isManualMode");
 
-      // Check session storage
+      // Try stored location first
       const storedLocation = sessionStorage.getItem("userLocation");
       if (storedLocation) {
         try {
           const locationData = JSON.parse(storedLocation);
-          map.flyTo([locationData.lat, locationData.lng], 16, {
-            animate: true,
-            duration: 1.5,
-          });
-          return;
+          if (locationData.latitude && locationData.longitude) {
+            map.flyTo([locationData.latitude, locationData.longitude], 16, {
+              animate: true,
+              duration: 1.5,
+            });
+            return;
+          }
         } catch (e) {
           console.error("Error with stored location", e);
         }
       }
 
-      if (userLocation) {
-        map.flyTo([userLocation.lat, userLocation.lng], 16, {
+      // Use live location from hook
+      if (userLocation?.latitude && userLocation?.longitude) {
+        map.flyTo([userLocation.latitude, userLocation.longitude], 16, {
           animate: true,
           duration: 1.5,
         });
+        return;
       }
+
       return;
     }
 
-    // Check session storage first
+    // Already in live mode - just recenter
     const storedLocation = sessionStorage.getItem("userLocation");
     if (storedLocation) {
       try {
         const locationData = JSON.parse(storedLocation);
-        setLocating(true);
-        map.flyTo([locationData.lat, locationData.lng], 16, {
-          animate: true,
-          duration: 1.5,
-        });
-        setTimeout(() => setLocating(false), 1500);
-        return;
+        if (locationData.latitude && locationData.longitude) {
+          setLocating(true);
+          map.flyTo([locationData.latitude, locationData.longitude], 16, {
+            animate: true,
+            duration: 1.5,
+          });
+          setTimeout(() => setLocating(false), 1500);
+          return;
+        }
       } catch (e) {
         console.error("Error parsing location", e);
       }
     }
 
-    // Use live location from hook
-    if (effectiveUserLocation) {
+    if (userLocation?.latitude && userLocation?.longitude) {
       setLocating(true);
-      map.flyTo([effectiveUserLocation.lat, effectiveUserLocation.lng], 16, {
+      map.flyTo([userLocation.latitude, userLocation.longitude], 16, {
         animate: true,
         duration: 1.5,
       });
@@ -471,11 +641,9 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
       return;
     }
 
-    // NO LOCATION - FORCE REQUEST
+    // No location - request geolocation
     if (!navigator.geolocation) {
-      alert(
-        "⚠️ Geolocation not supported.\n\nPlease use the 'Pin' button to set your location manually."
-      );
+      alert("⚠️ Geolocation not supported. Use Pin button to set manually.");
       return;
     }
 
@@ -491,39 +659,24 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
       });
 
       const newLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
         accuracy: position.coords.accuracy,
         timestamp: Date.now(),
       };
 
+      // ✅ CRITICAL: Validate before flyTo
+      if (!newLocation.latitude || !newLocation.longitude) {
+        console.error("❌ Invalid position from geolocation");
+        setLocating(false);
+        return;
+      }
+
       // Store in session
       sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
 
-      // Calculate new distance
-      if (location?.coordinates) {
-        const [lng, lat] = location.coordinates;
-        const R = 6371;
-        const dLat = ((lat - newLocation.lat) * Math.PI) / 180;
-        const dLon = ((lng - newLocation.lng) * Math.PI) / 180;
-        const a =
-          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos((newLocation.lat * Math.PI) / 180) *
-            Math.cos((lat * Math.PI) / 180) *
-            Math.sin(dLon / 2) *
-            Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const dist = R * c;
-
-        setDistance(dist.toFixed(1));
-        alert(
-          `✅ Live Location Set!\n\nYou are ${dist.toFixed(
-            1
-          )} km away from this salon.`
-        );
-      }
-
-      map.flyTo([newLocation.lat, newLocation.lng], 16, {
+      // Fly to location
+      map.flyTo([newLocation.latitude, newLocation.longitude], 16, {
         animate: true,
         duration: 1.5,
       });
@@ -534,26 +687,13 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
       setLocating(false);
 
       if (error.code === 1) {
-        alert(
-          "🔒 Location Permission Denied\n\n" +
-            "To see your distance:\n" +
-            "1. Click the lock icon in address bar\n" +
-            "2. Allow location access\n" +
-            "3. Try again\n\n" +
-            "Or use the 'Pin' button to set manually."
-        );
+        alert("🔒 Location Permission Denied");
       } else if (error.code === 2) {
-        alert(
-          "📍 Location unavailable. Please check your device settings or use the 'Pin' button."
-        );
+        alert("📍 Location unavailable");
       } else if (error.code === 3) {
-        alert(
-          "⏱️ Location request timed out. Please try again or use the 'Pin' button."
-        );
+        alert("⏱️ Location request timed out");
       } else {
-        alert(
-          "❌ Unable to get location. Please use the 'Pin' button to set manually."
-        );
+        alert("❌ Unable to get location");
       }
     }
   };
@@ -625,7 +765,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
         <button
           className={styles.liveLocationTopBtn}
           onClick={handleLiveLocation}
-          disabled={locating}
+          disabled={locating && !isManualMode}
         >
           <Navigation size={16} className={locating ? styles.spinning : ""} />
           {isManualMode ? "Live" : "Center"}
@@ -642,7 +782,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
                 className={styles.searchResultItem}
                 onClick={() =>
                   handleLocationSelect({
-                    lat: parseFloat(result.lat),
+                    lat: parseFloat(result.latitude),
                     lng: parseFloat(result.lon),
                     accuracy: 10,
                     manual: true,

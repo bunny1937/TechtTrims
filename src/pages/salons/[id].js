@@ -64,8 +64,12 @@ export default function SalonDetail({ initialSalon }) {
   const [closingCountdown, setClosingCountdown] = useState(null); // seconds remaining
   const [showClosingTimer, setShowClosingTimer] = useState(false);
   const [salonClosed, setSalonClosed] = useState(false);
-  const { userLocation, locationStatus, requestLocationPermission } =
-    useLocation();
+  const {
+    userLocation,
+    locationStatus,
+    locationError,
+    requestLocationPermission,
+  } = useLocation();
 
   useEffect(() => {
     // Only run once when component mounts
@@ -277,6 +281,40 @@ export default function SalonDetail({ initialSalon }) {
       setSelectedBarber(null);
     }
   }, [selectedServices, salon?._id]);
+  // ========================================
+  // CHANGE 1: ADD useEffect - Sync manual location on mount
+  // ========================================
+  useEffect(() => {
+    const isManual = sessionStorage.getItem("isManualMode") === "true";
+    const manualLocation = sessionStorage.getItem("manualLocation");
+
+    if (isManual && manualLocation) {
+      try {
+        const location = JSON.parse(manualLocation);
+        console.log("📍 Manual location loaded in id page:", location);
+      } catch (e) {
+        console.error("Error loading manual location:", e);
+      }
+    }
+  }, []);
+
+  // ========================================
+  // CHANGE 2: ADD useEffect - Listen for storage changes
+  // ========================================
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === "isManualMode" || e.key === "manualLocation") {
+        console.log("🔄 Manual mode changed in id page:", e.key, e.newValue);
+        // Force LocationMap to re-render by updating state
+        // If you have a state for this, update it here
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", handleStorageChange);
+      return () => window.removeEventListener("storage", handleStorageChange);
+    }
+  }, []);
 
   const chosenService =
     salon?.services && selectedServices

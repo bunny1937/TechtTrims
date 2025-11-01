@@ -205,12 +205,12 @@ const LocationSearch = ({
         const allResults = await response.json();
 
         // Filter by distance
-        const userLat = userLocation?.lat || 19.247251;
-        const userLng = userLocation?.lng || 73.154063;
+        const userLat = userLocation?.latitude || 19.247251;
+        const userLng = userLocation?.longitude || 73.154063;
 
         const nearbyResults = allResults
           .map((result) => {
-            const lat = parseFloat(result.lat);
+            const lat = parseFloat(resultlatitude);
             const lng = parseFloat(result.lon);
             const R = 6371;
             const dLat = ((lat - userLat) * Math.PI) / 180;
@@ -257,9 +257,11 @@ const LocationSearch = ({
     onLocationSelect({
       lat: parseFloat(result.lat),
       lng: parseFloat(result.lon),
+      latitude: parseFloat(result.lat), // ADD THIS
+      longitude: parseFloat(result.lon), // ADD THIS
       accuracy: 10,
       manual: true,
-      address: result.display_name,
+      address: result.displayname,
     });
     setSearchQuery("");
     setSearchResults([]);
@@ -300,6 +302,8 @@ const LocationSearch = ({
       const location = {
         lat: lat,
         lng: lng,
+        latitude: lat, // ✅ ADD THIS
+        longitude: lng,
         accuracy: 5,
         manual: true,
         address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
@@ -476,6 +480,7 @@ const ZoomIndicator = () => {
 const SalonMap = ({
   salons,
   userLocation,
+  onRevertToLive,
   selectedSalon,
   onSalonSelect,
   onBookNow,
@@ -568,10 +573,10 @@ const SalonMap = ({
     isManualMode && manualLocation ? manualLocation : userLocation;
 
   const defaultCenter = useMemo(() => {
-    return effectiveUserLocation?.lat && effectiveUserLocation?.lng
-      ? [effectiveUserLocation.lat, effectiveUserLocation.lng]
+    return effectiveUserLocation?.latitude && effectiveUserLocation?.longitude
+      ? [effectiveUserLocation.latitude, effectiveUserLocation.longitude]
       : [19.076, 72.8777]; // Mumbai default
-  }, [effectiveUserLocation?.lat, effectiveUserLocation?.lng]);
+  }, [effectiveUserLocation?.latitude, effectiveUserLocation?.longitude]);
 
   // 🔧 PREVENT continuous re-centering
   useEffect(() => {
@@ -592,27 +597,69 @@ const SalonMap = ({
     const MIN_UPDATE_DISTANCE = 0.0005; // ~50m threshold
 
     const currentPos = userMarkerRef.current.getLatLng();
-    const latDiff = Math.abs(currentPos.lat - effectiveUserLocation.lat);
-    const lngDiff = Math.abs(currentPos.lng - effectiveUserLocation.lng);
+    const latDiff = Math.abs(currentPos.lat - effectiveUserLocation.latitude);
+    const lngDiff = Math.abs(currentPos.lng - effectiveUserLocation.longitude);
 
     // Only update if moved significantly
     if (latDiff > MIN_UPDATE_DISTANCE || lngDiff > MIN_UPDATE_DISTANCE) {
       console.log("📍 Updating user marker position");
       userMarkerRef.current.setLatLng([
-        effectiveUserLocation.lat,
-        effectiveUserLocation.lng,
+        effectiveUserLocation.latitude,
+        effectiveUserLocation.longitude,
       ]);
     } else {
       console.log("📍 Skipping minor position update");
     }
   }, [effectiveUserLocation, mapRef]);
 
+  // ✅ FIX: Recreate user marker when effectiveUserLocation changes
+  useEffect(() => {
+    if (!mapRef) return;
+    if (!effectiveUserLocation) return;
+
+    const lat = effectiveUserLocation.latitude ?? effectiveUserLocation.lat;
+    const lng = effectiveUserLocation.longitude ?? effectiveUserLocation.lng;
+
+    if (!lat || !lng) return;
+
+    if (!userMarkerRef.current) {
+      console.log("📍 Creating user marker at:", [lat, lng]);
+
+      const userIcon = L.icon({
+        iconUrl:
+          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234285F4'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3C/svg%3E",
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
+
+      userMarkerRef.current = L.marker([lat, lng], { icon: userIcon }).addTo(
+        mapRef
+      );
+
+      console.log("✅ User marker created");
+    } else {
+      // Update existing marker position
+      const lat = effectiveUserLocation.latitude ?? effectiveUserLocation.lat;
+      const lng = effectiveUserLocation.longitude ?? effectiveUserLocation.lng;
+      if (lat && lng) {
+        userMarkerRef.current.setLatLng([lat, lng]);
+      }
+      console.log("📍 User marker updated");
+    }
+  }, [effectiveUserLocation, mapRef, isManualMode]);
+
   // 🔧 Load manual location from sessionStorage on mount
   useEffect(() => {
     const stored = sessionStorage.getItem("manualLocation");
-    if (stored) {
+    const isManual = sessionStorage.getItem("isManualMode") === "true";
+
+    if (stored && isManual) {
       try {
         const parsed = JSON.parse(stored);
+        if (!parsed.latitude && parsed.lat) {
+          parsed.latitude = parsed.lat;
+          parsed.longitude = parsed.lng;
+        }
         setManualLocation(parsed);
         setIsManualMode(true);
         console.log("📍 Loaded manual location from session storage");
@@ -622,73 +669,103 @@ const SalonMap = ({
     }
   }, []);
 
-  // 🔧 NEW: Handle manual location selection
+  // ========================================
+  // CHANGE: Replace handleLocationSelect
+  // ========================================
   const handleLocationSelect = (location) => {
-    console.log("📍 Manual location set", location);
-    setManualLocation(location);
+    if (!location?.lat || !location?.lng) {
+      console.error("❌ Invalid location:", location);
+      return;
+    }
+
+    console.log("📍 Pinning location:", location);
+
+    const normalizedLocation = {
+      lat: location.lat,
+      lng: location.lng,
+      latitude: location.lat,
+      longitude: location.lng,
+      address: location.address || "",
+    };
+
+    setManualLocation(normalizedLocation);
     setIsManualMode(true);
 
-    // Store in sessionStorage instead of localStorage
-    sessionStorage.setItem("manualLocation", JSON.stringify(location));
+    // ✅ CLEAR to force recalculation
+    sessionStorage.removeItem("manualLocationDistances");
+
+    sessionStorage.setItem(
+      "manualLocation",
+      JSON.stringify(normalizedLocation)
+    );
     sessionStorage.setItem("isManualMode", "true");
 
-    if (mapRef) {
-      mapRef.flyTo([location.lat, location.lng], 16, {
-        animate: true,
-        duration: 1.5,
-      });
-    }
-
-    // Call parent callback
-    if (onLocationChange) {
-      onLocationChange(location);
-    }
-  };
-
-  // 🔧 NEW: Revert to live location
-  const handleRevertToLive = () => {
-    console.log("📍 Reverted to live location");
-    setIsManualMode(false);
-    setManualLocation(null);
-
-    // Use sessionStorage instead of localStorage
-    sessionStorage.removeItem("manualLocation");
-    sessionStorage.setItem("isManualMode", "false");
-
-    // Check for stored live location in sessionStorage first
-    const storedLocation = sessionStorage.getItem("userLocation");
-    if (storedLocation) {
+    if (
+      mapRef?._container &&
+      normalizedLocation.lat &&
+      normalizedLocation.lng
+    ) {
       try {
-        const locationData = JSON.parse(storedLocation);
-        if (onLocationChange) {
-          onLocationChange(locationData);
-        }
-        if (mapRef) {
-          mapRef.flyTo([locationData.lat, locationData.lng], 16, {
-            animate: true,
-            duration: 1.5,
-          });
-        }
-        return;
+        mapRef.flyTo([normalizedLocation.lat, normalizedLocation.lng], 16, {
+          animate: true,
+          duration: 1.5,
+        });
+        console.log("🗺️ Map flew to:", normalizedLocation);
       } catch (e) {
-        console.error("Error with stored location", e);
+        console.error("❌ Fly error:", e);
       }
     }
 
-    // IMMEDIATELY RECALCULATE DISTANCES WITH LIVE LOCATION from hook
-    if (userLocation && onLocationChange) {
-      onLocationChange(userLocation);
-    }
-
-    // Center map on live location
-    if (userLocation && mapRef) {
-      mapRef.flyTo([userLocation.lat, userLocation.lng], 16, {
-        animate: true,
-        duration: 1.5,
-      });
+    // ✅ CRITICAL: Call parent to calculate distances
+    if (onLocationChange) {
+      console.log("📍 Calling onLocationChange with new pin");
+      onLocationChange(normalizedLocation);
     }
   };
+  const handleRevertToLive = async () => {
+    console.log("📍 Reverted to live location");
 
+    // ✅ Clear manual mode
+    setIsManualMode(false);
+    sessionStorage.removeItem("manualLocation");
+    sessionStorage.removeItem("isManualMode");
+
+    // ✅ Wait for userLocation to be available from hook
+    if (!userLocation?.latitude && !userLocation?.lng) {
+      console.warn("⚠️ Live location not available yet, requesting permission");
+      await requestLocationPermission();
+      return;
+    }
+
+    // ✅ Use correct property names with fallback
+    const lat = userLocation.latitude || userLocation.lat;
+    const lng = userLocation.longitude || userLocation.lng;
+
+    if (!lat || !lng) {
+      console.error(
+        "❌ Cannot flyTo - coordinates still undefined",
+        userLocation
+      );
+      return;
+    }
+
+    if (mapRef) {
+      try {
+        mapRef.flyTo([lat, lng], 16, {
+          animate: true,
+          duration: 1.5,
+        });
+        console.log("✅ Flew to live location:", [lat, lng]);
+      } catch (err) {
+        console.error("❌ flyTo error:", err);
+      }
+    }
+
+    // ✅ Notify parent to update distances with live location
+    if (onLocationChange) {
+      onLocationChange(userLocation);
+    }
+  };
   const ThemeSelector = () => (
     <div className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg p-2 text-black">
       <select
@@ -724,9 +801,33 @@ const SalonMap = ({
   };
 
   const handleLiveLocationClick = async () => {
+    console.log("🔴 Live location button clicked, isManualMode:", isManualMode);
+
+    // ✅ If in manual mode, switch to live
+    if (isManualMode) {
+      console.log("🔄 Switching from manual to live mode");
+      setIsManualMode(false);
+      setManualLocation(null);
+
+      // ✅ Clear ALL manual data
+      sessionStorage.removeItem("isManualMode");
+      sessionStorage.removeItem("manualLocation");
+      sessionStorage.removeItem("manualLocationDistances");
+
+      console.log("✅ Manual mode cleared, switching to live GPS");
+
+      // ✅ Callback to parent with current userLocation
+      if (onLocationChange && userLocation) {
+        onLocationChange(userLocation);
+      }
+      return;
+    }
+
     // If in manual mode, just revert to live tracking
     if (isManualMode) {
-      handleRevertToLive();
+      if (onRevertToLive) {
+        onRevertToLive();
+      }
       return;
     }
 
@@ -745,7 +846,7 @@ const SalonMap = ({
 
         // Center map
         if (mapRef) {
-          mapRef.flyTo([locationData.lat, locationData.lng], 16, {
+          mapRef.flyTo([locationData.latitude, locationData.longitude], 16, {
             animate: true,
             duration: 1.5,
           });
@@ -764,8 +865,8 @@ const SalonMap = ({
       sessionStorage.setItem(
         "userLocation",
         JSON.stringify({
-          lat: userLocation.lat,
-          lng: userLocation.lng,
+          lat: userLocation.latitude,
+          lng: userLocation.longitude,
           accuracy: userLocation.accuracy,
           timestamp: Date.now(),
         })
@@ -775,12 +876,25 @@ const SalonMap = ({
         onLocationChange(userLocation);
       }
 
-      if (mapRef) {
+      // ✅ Guard against undefined coordinates
+      if (mapRef && userLocation?.latitude && userLocation?.longitude) {
+        mapRef.flyTo([userLocation.latitude, userLocation.longitude], 16, {
+          animate: true,
+          duration: 1.5,
+        });
+      } else if (mapRef && userLocation?.lat && userLocation?.lng) {
+        // Fallback for lat/lng format
         mapRef.flyTo([userLocation.lat, userLocation.lng], 16, {
           animate: true,
           duration: 1.5,
         });
+      } else {
+        console.warn(
+          "⚠️ Cannot flyTo - userLocation coordinates invalid:",
+          userLocation
+        );
       }
+
       return;
     }
 
@@ -823,6 +937,8 @@ const SalonMap = ({
 
       if (mapRef) {
         mapRef.flyTo([newLocation.lat, newLocation.lng], 16, {
+          // ✅ CORRECT
+
           animate: true,
           duration: 1.5,
         });
@@ -888,13 +1004,26 @@ const SalonMap = ({
       if (!response.ok) throw new Error("Search failed");
 
       const allResults = await response.json();
-      const userLat = effectiveUserLocation?.lat || 19.247251;
-      const userLng = effectiveUserLocation?.lng || 73.154063;
+      const userLat = effectiveUserLocation?.latitude || 19.247251;
+      const userLng = effectiveUserLocation?.longitude || 73.154063;
 
       const nearbyResults = allResults
         .map((result) => {
           const lat = parseFloat(result.lat);
           const lng = parseFloat(result.lon);
+
+          // ✅ Return object with BOTH property names
+          const locationObj = {
+            ...result,
+            lat: lat,
+            lng: lng,
+            latitude: lat,
+            longitude: lng,
+            address: result.display_name || result.displayname,
+            manual: true,
+          };
+
+          // Distance calculation using lat/lng
           const R = 6371;
           const dLat = ((lat - userLat) * Math.PI) / 180;
           const dLng = ((lng - userLng) * Math.PI) / 180;
@@ -906,16 +1035,19 @@ const SalonMap = ({
               Math.sin(dLng / 2);
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
           const distance = R * c;
-          return { ...result, distance: distance.toFixed(1) };
+
+          return { ...locationObj, distance: distance.toFixed(1) };
         })
         .filter((r) => parseFloat(r.distance) < 20)
         .sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance))
         .slice(0, 8);
 
       setSearchResults(nearbyResults);
+      setSearching(false);
     } catch (error) {
       console.error("Search error:", error);
       setSearchResults([]);
+      setSearching(false);
     }
   };
 
@@ -968,6 +1100,8 @@ const SalonMap = ({
               handleLocationSelect({
                 lat,
                 lng,
+                latitude: lat, // ✅ ADD THIS
+                longitude: lng,
                 accuracy: 5,
                 manual: true,
                 address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
@@ -1031,8 +1165,10 @@ const SalonMap = ({
                 className={styles.searchResultItem}
                 onClick={() => {
                   handleLocationSelect({
-                    lat: parseFloat(result.lat),
-                    lng: parseFloat(result.lon),
+                    lat: parseFloat(result.lat), // ✅ CORRECT
+                    lng: parseFloat(result.lon), // ✅ CORRECT (not longitude)
+                    latitude: parseFloat(result.lat),
+                    longitude: parseFloat(result.lon),
                     accuracy: 10,
                     manual: true,
                     address: result.display_name,
@@ -1120,33 +1256,48 @@ const SalonMap = ({
           <MapUpdater selectedSalon={selectedSalon} salons={salons} />
 
           {/* User location marker - 🔧 WITH REF */}
-          {effectiveUserLocation?.lat && effectiveUserLocation?.lng && (
-            <Marker
-              position={[effectiveUserLocation.lat, effectiveUserLocation.lng]}
-              icon={userIcon}
-              ref={userMarkerRef}
-            >
-              <Popup>
-                <div className={styles.userPopup}>
-                  <strong>
-                    {isManualMode ? "📍 Manual Location" : "📍 Your Location"}
-                  </strong>
-                  <p className="text-xs mt-1">
-                    Lat: {effectiveUserLocation.lat.toFixed(6)}
-                    <br />
-                    Lng: {effectiveUserLocation.lng.toFixed(6)}
-                    <br />
-                    {isManualMode
-                      ? "Set manually"
-                      : `Accuracy: ±${
-                          effectiveUserLocation.accuracy?.toFixed(0) ||
-                          "Unknown"
-                        }m`}
-                  </p>
-                </div>
-              </Popup>
-            </Marker>
-          )}
+          {(isManualMode ? manualLocation : effectiveUserLocation)?.latitude &&
+            (isManualMode ? manualLocation : effectiveUserLocation)
+              ?.longitude && (
+              <Marker
+                position={[
+                  (isManualMode ? manualLocation : effectiveUserLocation)
+                    .latitude,
+                  (isManualMode ? manualLocation : effectiveUserLocation)
+                    .longitude,
+                ]}
+                icon={userIcon}
+                ref={userMarkerRef}
+              >
+                <Popup>
+                  <div className={styles.userPopup}>
+                    <strong>
+                      {isManualMode ? "📍 Manual Location" : "📍 Your Location"}
+                    </strong>
+                    <p className="text-xs mt-1">
+                      Lat:{" "}
+                      {(isManualMode
+                        ? manualLocation
+                        : effectiveUserLocation
+                      ).latitude.toFixed(6)}
+                      <br />
+                      Lng:{" "}
+                      {(isManualMode
+                        ? manualLocation
+                        : effectiveUserLocation
+                      ).longitude.toFixed(6)}
+                      <br />
+                      {isManualMode
+                        ? "Set manually"
+                        : `Accuracy: ±${
+                            effectiveUserLocation.accuracy?.toFixed(0) ||
+                            "Unknown"
+                          }m`}
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
 
           {/* Salon markers with always-open popups */}
           {salons.map((salon) => (
@@ -1172,8 +1323,12 @@ const SalonMap = ({
                 <div className="text-center p-2 min-w-[20px]">
                   <h3 className="font-bold text-sm mb-1">{salon.salonName}</h3>
                   <p className="text-xs font-medium text-blue-600 ">
-                    {salon.distance?.toFixed(1)}km away
+                    {salon.distance && salon.distance !== "—"
+                      ? parseFloat(salon.distance).toFixed(2)
+                      : "—"}
+                    km away
                   </p>
+
                   <div className="flex flex-col gap-1">
                     <button
                       className="text-xs bg-orange-500 text-white rounded px-4 py-1 font-medium hover:bg-orange-600"

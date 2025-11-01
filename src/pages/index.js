@@ -42,6 +42,31 @@ export default function Home() {
   });
 
   useEffect(() => {
+    if (salons.length === 0) return;
+
+    const isManual = sessionStorage.getItem("isManualMode") === "true";
+
+    const manualDistances = sessionStorage.getItem("manualLocationDistances");
+
+    if (isManual && manualDistances) {
+      try {
+        const distances = JSON.parse(manualDistances);
+        const updatedSalons = salons.map((salon, idx) => ({
+          ...salon,
+          distance:
+            distances[idx] !== undefined ? distances[idx] : salon.distance,
+        }));
+        setSalons(updatedSalons);
+        console.log(
+          "✅ Applied manual distances immediately after salons load"
+        );
+      } catch (e) {
+        console.error("❌ Error applying distances:", e);
+      }
+    }
+  }, [salons.length]);
+
+  useEffect(() => {
     const initializeUser = async () => {
       if (typeof window === "undefined") return;
 
@@ -145,7 +170,36 @@ export default function Home() {
       );
     }
   }, [liveUserLocation]);
+
+  // useEffect(() => {
+  //   const stored = sessionStorage.getItem("manualLocation");
+  //   const isManual = sessionStorage.getItem("isManualMode") === "true";
+
+  //   if (stored && isManual) {
+  //     try {
+  //       const parsed = JSON.parse(stored);
+  //       if (!parsed.latitude && parsed.lat) {
+  //         parsed.latitude = parsed.lat;
+  //         parsed.longitude = parsed.lng;
+  //       }
+  //       console.log("📍 Manual location loaded from storage in parent");
+  //       // ✅ Just log it - SalonMap will handle the recalc
+  //     } catch (e) {
+  //       console.error("Error:", e);
+  //     }
+  //   }
+  // }, []);
+
   const loadNearbySalons = async (lat, lng, gender = "all") => {
+    // ✅ ONLY skip if manual mode AND salons already exist
+    const isManual = sessionStorage.getItem("isManualMode") === "true";
+    if (isManual && salons.length > 0) {
+      console.log(
+        "⏭️ Skipping salon reload - manual mode with existing salons"
+      );
+      return;
+    }
+
     try {
       console.log("🔍 Loading salons for coordinates:", lat, lng);
 
@@ -163,25 +217,20 @@ export default function Home() {
 
       const data = await response.json();
 
-      // ✅ ADD DETAILED LOGGING
       console.log("📦 Raw API response:", data);
       console.log("📦 Data type:", typeof data);
       console.log("📦 Is array:", Array.isArray(data));
       console.log("📦 Data length:", data?.length);
 
-      // Ensure data is array
-      const salonsArray = Array.isArray(data.salons) ? data.salons : []; // <-- FIX
+      const salonsArray = Array.isArray(data.salons) ? data.salons : [];
 
       console.log("✅ Loaded salons:", salonsArray.length);
       console.log("🏢 First salon:", salonsArray[0]);
 
-      // ✅ SET STATE
-      // ✅ SET STATE - USE BOTH salons AND nearbySalons
       setSalons(salonsArray);
-      setNearbySalons(salonsArray); // ✅ ADD THIS LINE
+      setNearbySalons(salonsArray);
       setFilteredSalons(salonsArray);
 
-      // ✅ VERIFY STATE WAS SET
       console.log("✅ State updated - salons count:", salonsArray.length);
     } catch (error) {
       console.error("❌ Error loading salons:", error.message);
@@ -191,20 +240,46 @@ export default function Home() {
     }
   };
 
+  // ========================================
+  // CHANGE 1: Replace handleLocationChange
+  // ========================================
   const handleLocationChange = (newLocation) => {
-    console.log("📍 Location changed to", newLocation);
+    console.log("🔄 handleLocationChange triggered:", newLocation);
+
+    const isManual = sessionStorage.getItem("isManualMode") === "true";
+    const hasManualDistances = sessionStorage.getItem(
+      "manualLocationDistances"
+    );
+
+    // ✅ BLOCK LIVE GPS ONLY if manual mode WITH existing saved distances
+    if (isManual && hasManualDistances) {
+      console.log("📍 BLOCKED: Manual mode active with existing distances");
+      return;
+    }
+
+    console.log("📍 CALCULATING distances for:", {
+      isManual,
+      hasManualDistances: !!hasManualDistances,
+    });
+
+    if (salons.length === 0) {
+      console.log("⚠️ No salons loaded yet");
+      return;
+    }
 
     const updatedSalons = salons.map((salon) => {
-      // ✅ CHANGE nearbySalons to salons
       const salonLat = salon.location.coordinates[1];
       const salonLng = salon.location.coordinates[0];
 
+      const userLat = newLocation.latitude || newLocation.lat;
+      const userLng = newLocation.longitude || newLocation.lng;
+
       const R = 6371;
-      const dLat = (salonLat - newLocation.lat) * (Math.PI / 180);
-      const dLng = (salonLng - newLocation.lng) * (Math.PI / 180);
+      const dLat = (salonLat - userLat) * (Math.PI / 180);
+      const dLng = (salonLng - userLng) * (Math.PI / 180);
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(newLocation.lat * (Math.PI / 180)) *
+        Math.cos(userLat * (Math.PI / 180)) *
           Math.cos(salonLat * (Math.PI / 180)) *
           Math.sin(dLng / 2) *
           Math.sin(dLng / 2);
@@ -213,17 +288,105 @@ export default function Home() {
 
       return {
         ...salon,
-        distance: distance,
+        distance: parseFloat(distance.toFixed(2)),
       };
     });
 
     setSalons([...updatedSalons]);
-    setMapKey((prev) => prev + 1); // ✅ Force map re-render
+    setMapKey((prev) => prev + 1);
+
+    // 👇 ADD THIS 3 LINES
+    const distances = updatedSalons.map((s) => s.distance);
+    sessionStorage.setItem(
+      "manualLocationDistances",
+      JSON.stringify(distances)
+    );
 
     console.log(
       "✅ Updated distances:",
       updatedSalons.map((s) => s.distance)
     );
+  };
+
+  // ========================================
+  // CHANGE 2: ADD useEffect #1 - Load manual mode on mount
+  // ========================================
+  // useEffect(() => {
+  //   const isManual = sessionStorage.getItem("isManualMode") === "true";
+  //   const manualDistances = sessionStorage.getItem("manualLocationDistances");
+
+  //   if (isManual && manualDistances && salons.length > 0) {
+  //     try {
+  //       const distances = JSON.parse(manualDistances);
+  //       const updatedSalons = salons.map((salon, idx) => ({
+  //         ...salon,
+  //         distance:
+  //           distances[idx] !== undefined ? distances[idx] : salon.distance,
+  //       }));
+  //       setSalons(updatedSalons);
+  //       console.log("✅ Restored manual distances from storage:", distances);
+  //     } catch (e) {
+  //       console.error("❌ Error restoring distances:", e);
+  //     }
+  //   }
+  // }, [salons.length]);
+
+  // ========================================
+  // CHANGE 3: ADD useEffect #2 - Listen for storage changes (cross-tab sync)
+  // ========================================
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === "isManualMode") {
+        console.log("🔄 Manual mode changed to:", e.newValue);
+        const isNowManual = e.newValue === "true";
+        if (!isNowManual) {
+          // Switched to live mode from another tab
+          sessionStorage.removeItem("manualLocationDistances");
+        }
+      } else if (e.key === "manualLocationDistances") {
+        console.log("🔄 Distances updated from another tab");
+        if (salons.length > 0) {
+          try {
+            const distances = JSON.parse(e.newValue);
+            const updatedSalons = salons.map((salon, idx) => ({
+              ...salon,
+              distance:
+                distances[idx] !== undefined ? distances[idx] : salon.distance,
+            }));
+            setSalons(updatedSalons);
+          } catch (err) {
+            console.error("Error syncing distances:", err);
+          }
+        }
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", handleStorageChange);
+      return () => window.removeEventListener("storage", handleStorageChange);
+    }
+  }, [salons.length]);
+
+  const handleRevertToLive = () => {
+    console.log("🔄 Reverting to live location");
+
+    setIsManualMode(false);
+    setManualLocation(null);
+
+    // ✅ CLEAR all manual data from storage
+    sessionStorage.removeItem("isManualMode");
+    sessionStorage.removeItem("manualLocation");
+    sessionStorage.removeItem("manualLocationDistances");
+    sessionStorage.removeItem("_pendingDistances");
+
+    // ✅ Force reload salons from live GPS
+    if (liveUserLocation?.latitude && liveUserLocation?.longitude) {
+      loadNearbySalons(
+        liveUserLocation.latitude,
+        liveUserLocation.longitude,
+        selectedGender
+      );
+    }
   };
 
   const handleRefreshLocation = async () => {
@@ -976,6 +1139,7 @@ export default function Home() {
                 key={mapKey}
                 salons={salons}
                 userLocation={liveUserLocation}
+                onRevertToLive={handleRevertToLive}
                 onLocationChange={handleLocationChange}
                 onRefreshSalons={(lat, lng) => {
                   // This loads fresh salons from API

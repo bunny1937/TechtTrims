@@ -21,7 +21,6 @@ export default async function handler(req, res) {
   while (retryCount < maxRetries) {
     try {
       const { db } = await connectToDatabase();
-
       const allSalons = await db
         .collection("salons")
         .find({})
@@ -29,7 +28,6 @@ export default async function handler(req, res) {
         .toArray();
 
       const nearbySalons = [];
-
       for (const salon of allSalons) {
         if (
           !salon.location?.coordinates ||
@@ -37,17 +35,11 @@ export default async function handler(req, res) {
         ) {
           continue;
         }
-
-        // [lng, lat] from MongoDB, but you want [lat, lng] for calc
         const [salonLng, salonLat] = salon.location.coordinates;
-
         if (isNaN(salonLat) || isNaN(salonLng)) {
           continue;
         }
-
-        // Calculate distance correctly!
         const distance = calculateDistance(lat, lng, salonLat, salonLng);
-
         if (distance <= radiusKm) {
           nearbySalons.push({
             ...salon,
@@ -78,7 +70,6 @@ export default async function handler(req, res) {
       }));
 
       processedSalons.sort((a, b) => a.distance - b.distance);
-
       return res.status(200).json({
         success: true,
         salons: processedSalons,
@@ -92,7 +83,27 @@ export default async function handler(req, res) {
         });
       }
       await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount));
+      // Loop continues here with retryCount++
     }
+  }
+
+  // Add this if loop exits without returning (shouldn't happen)
+  return res.status(500).json({
+    message: "Failed to fetch nearby salons after all retries",
+  });
+
+  function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   }
 }
 
