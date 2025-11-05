@@ -145,7 +145,7 @@ function MyApp({ Component, pageProps }) {
                 <span className={styles.trimText}>Trims</span>
               </h1>
             </motion.div>
-            <motion.button
+            {/* <motion.button
               className={styles.themeToggle}
               onClick={toggleDarkMode}
               whileHover={{ scale: 1.1, rotate: 15 }}
@@ -157,7 +157,7 @@ function MyApp({ Component, pageProps }) {
               <span className={styles.themeIcon}>
                 {isDarkMode ? "☀️" : "🌙"}
               </span>
-            </motion.button>
+            </motion.button> */}
             {/* Desktop Navigation */}
             <nav className={styles.desktopNav}>
               <div className={styles.navLinks}>
@@ -277,29 +277,43 @@ function MyApp({ Component, pageProps }) {
                 )}
               </div>
             </nav>
+            <div className={styles.rightControls}>
+              <motion.button
+                className={styles.themeToggle}
+                onClick={toggleDarkMode}
+                whileHover={{ scale: 1.1, rotate: 15 }}
+                whileTap={{ scale: 0.95 }}
+                title={
+                  isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
+                }
+              >
+                <span className={styles.themeIcon}>
+                  {isDarkMode ? "☀️" : "🌙"}
+                </span>
+              </motion.button>
 
-            {/* Mobile Menu Button */}
-            <button
-              className={styles.mobileMenuButton}
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              <span
-                className={`${styles.hamburgerLine} ${
-                  isMobileMenuOpen ? styles.active : ""
-                }`}
-              ></span>
-              <span
-                className={`${styles.hamburgerLine} ${
-                  isMobileMenuOpen ? styles.active : ""
-                }`}
-              ></span>
-              <span
-                className={`${styles.hamburgerLine} ${
-                  isMobileMenuOpen ? styles.active : ""
-                }`}
-              ></span>
-            </button>
-
+              {/* Mobile Menu Button */}
+              <button
+                className={styles.mobileMenuButton}
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                <span
+                  className={`${styles.hamburgerLine} ${
+                    isMobileMenuOpen ? styles.active : ""
+                  }`}
+                ></span>
+                <span
+                  className={`${styles.hamburgerLine} ${
+                    isMobileMenuOpen ? styles.active : ""
+                  }`}
+                ></span>
+                <span
+                  className={`${styles.hamburgerLine} ${
+                    isMobileMenuOpen ? styles.active : ""
+                  }`}
+                ></span>
+              </button>
+            </div>
             {/* Mobile Navigation */}
             {isMobileMenuOpen && (
               <motion.div

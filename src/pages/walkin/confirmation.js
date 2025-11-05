@@ -2,10 +2,39 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../styles/WalkinConfirmation.module.css";
 import feedbackStyles from "../../styles/Feedback.module.css";
+import { motion } from "framer-motion";
+// Format time ago
+const formatTimeAgo = (date) => {
+  if (!date) return "N/A";
+  const now = new Date();
+  const diff = Math.floor((now - new Date(date)) / 1000 / 60);
+  if (diff < 1) return "Just now";
+  if (diff < 60) return `${diff}m ago`;
+  return `${Math.floor(diff / 60)}h ago`;
+};
+
+// Format expiry countdown
+const formatExpiry = (expiryDate) => {
+  if (!expiryDate) return "N/A";
+  const remaining = Math.ceil((new Date(expiryDate) - new Date()) / 1000 / 60);
+  if (remaining < 0) return "Expired";
+  if (remaining < 1) return "< 1m";
+  return `${remaining}m`;
+};
+
+// Format time left in service
+const formatTimeLeft = (completionTime) => {
+  if (!completionTime) return "N/A";
+  const remaining = Math.ceil(
+    (new Date(completionTime) - new Date()) / 1000 / 60
+  );
+  if (remaining < 0) return "Done";
+  return `${remaining}m left`;
+};
 
 export default function WalkinConfirmation() {
   const router = useRouter();
-  const { bookingId } = router.query;
+  const { bookingId, salonId } = router.query;
 
   const [booking, setBooking] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
@@ -24,58 +53,91 @@ export default function WalkinConfirmation() {
   });
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [salonState, setSalonState] = useState(null);
+  const [customerName, setCustomerName] = useState("");
+  const [queueInfo, setQueueInfo] = useState(null); // NEW: Queue position info
+  const [error, setError] = useState(null);
+  const [barberQueueData, setBarberQueueData] = useState(null);
 
+  // ==================== useEffects - START ====================
+
+  // 1. Fetch booking details on component mount (ORIGINAL)
   useEffect(() => {
     if (!bookingId) return;
 
     const fetchBooking = async () => {
       try {
-        const res = await fetch(`/api/walkin/booking/${bookingId}`);
+        setLoading(true);
+        console.log("📥 Fetching booking:", bookingId);
+
+        // Mark expired first
+        await fetch("/api/walkin/mark-expired", { method: "POST" });
+
+        const res = await fetch(`/api/walkin/booking/${bookingId}`, {
+          cache: "no-store",
+        });
         if (!res.ok) throw new Error("Failed to fetch booking");
+
         const data = await res.json();
+        console.log("✅ Booking fetched:", data.booking);
+        const bookingData = data.booking;
+
+        // Check if expired
+        const now = new Date();
+        const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
+        if (
+          bookingData.isExpired ||
+          (bookingData.queueStatus === "RED" &&
+            new Date(bookingData.expiresAt) < bufferTime)
+        ) {
+          setError("⚠️ This booking has EXPIRED. Please book again.");
+          setBooking({ ...bookingData, isExpired: true });
+          setLoading(false); // ✅ ADD THIS
+          return;
+        }
         setBooking(data.booking);
 
-        // Auto-show feedback when completed AND not already submitted
+        // Generate QR Code dynamically
+        if (data.booking?.bookingCode && !qrCodeUrl) {
+          try {
+            const QRCodeModule = await import("qrcode");
+            const qrUrl = await QRCodeModule.default.toDataURL(
+              data.booking.bookingCode,
+              {
+                width: 200,
+                margin: 2,
+                color: { dark: "#000000", light: "#FFFFFF" },
+              }
+            );
+            setQrCodeUrl(qrUrl);
+            console.log("✅ QR code generated");
+          } catch (qrErr) {
+            console.error("❌ QR code generation error:", qrErr);
+          }
+        }
+
+        // Auto-show feedback if completed and not submitted
         if (
           data.booking?.queueStatus === "COMPLETED" &&
           !data.booking?.feedback?.submitted
         ) {
           setShowFeedback(true);
-        } else if (data.booking?.feedback?.submitted) {
-          setShowFeedback(false); // Hide feedback form if already submitted
-        }
-
-        if (data.booking?.bookingCode) {
-          if (data.booking?.bookingCode && !qrCodeUrl) {
-            const QRCode = (await import("qrcode")).default;
-            const qrUrl = await QRCode.toDataURL(data.booking.bookingCode, {
-              width: 200,
-              margin: 2,
-              color: { dark: "#000000", light: "#FFFFFF" },
-            });
-            setQrCodeUrl(qrUrl);
-          }
-          const qrUrl = await QRCode.toDataURL(data.booking.bookingCode, {
-            width: 200,
-            margin: 2,
-            color: { dark: "#000000", light: "#FFFFFF" },
-          });
-          setQrCodeUrl(qrUrl);
         }
       } catch (error) {
-        console.error("Error fetching booking:", error);
+        console.error("❌ Error fetching booking:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchBooking();
-  }, [bookingId]);
+  }, [bookingId, qrCodeUrl]);
 
+  // 2. Countdown timer (ORIGINAL)
   useEffect(() => {
     if (!booking?.expiresAt) return;
 
-    const interval = setInterval(() => {
+    const updateCountdown = () => {
       const remaining = new Date(booking.expiresAt) - new Date();
       if (remaining > 0) {
         const minutes = Math.floor(remaining / 1000 / 60);
@@ -84,48 +146,100 @@ export default function WalkinConfirmation() {
       } else {
         setTimeLeft("EXPIRED");
       }
-    }, 1000);
+    };
+
+    updateCountdown(); // Call immediately
+    const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
-  }, [booking]);
+  }, [booking?.expiresAt]);
 
-  // Poll booking status every 5 seconds
+  // 3. Poll booking status every 5 seconds (NEW - for live queue updates)
   useEffect(() => {
     if (!bookingId) return;
 
     const pollStatus = async () => {
       try {
         const res = await fetch(`/api/walkin/booking/${bookingId}`);
-        const data = await res.json();
+        if (!res.ok) return;
 
+        const data = await res.json();
+        const updatedBooking = data.booking;
+
+        // Update relevant fields only
         setBooking((prev) => ({
           ...prev,
-          queueStatus: data.booking.queueStatus,
-          queuePosition: data.booking.queuePosition,
+          queueStatus: updatedBooking.queueStatus,
+          queuePosition: updatedBooking.queuePosition,
+          status: updatedBooking.status,
         }));
 
-        // Auto-show feedback ONLY if not already submitted
+        // Auto-show feedback when COMPLETED
         if (
-          data.booking.queueStatus === "COMPLETED" &&
-          !showFeedback &&
-          !data.booking.feedback?.submitted
+          updatedBooking.queueStatus === "COMPLETED" &&
+          !updatedBooking.feedback?.submitted &&
+          !showFeedback
         ) {
           setShowFeedback(true);
-        } else if (data.booking.feedback?.submitted && showFeedback) {
+        } else if (updatedBooking.feedback?.submitted && showFeedback) {
           setShowFeedback(false);
         }
 
-        if (data.booking.isExpired) {
+        // Update expiry status
+        if (updatedBooking.isExpired) {
           setTimeLeft("EXPIRED");
         }
-      } catch (error) {
-        console.error("Poll error:", error);
+      } catch (err) {
+        console.error("❌ Poll status error:", err);
       }
     };
 
     const interval = setInterval(pollStatus, 5000);
     return () => clearInterval(interval);
   }, [bookingId, showFeedback]);
+  // NEW: Fetch barber's specific queue every 5 seconds
+  // NEW: Fetch barber's specific queue every 5 seconds
+  useEffect(() => {
+    if (!booking?.barberId || !booking?.salonId) return;
+
+    console.log("🔄 Fetching barber queue for:", {
+      salonId: booking.salonId,
+      barberId: booking.barberId,
+    });
+
+    const fetchBarberQueue = async () => {
+      try {
+        const res = await fetch(
+          `/api/salons/${booking.salonId}/barber-queue?barberId=${booking.barberId}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          // Filter expired from queue
+          const now = new Date();
+          const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
+          const activeQueue = (data.queue || []).filter((q) => {
+            if (q.isExpired) return false;
+            if (q.queueStatus === "RED") {
+              return new Date(q.expiresAt) > bufferTime;
+            }
+            return true;
+          });
+
+          setBarberQueueData({ ...data, queue: activeQueue });
+        } else {
+          console.error("❌ Queue fetch failed:", res.status);
+        }
+      } catch (err) {
+        console.error("❌ Error fetching barber queue:", err);
+      }
+    };
+
+    fetchBarberQueue();
+    const interval = setInterval(fetchBarberQueue, 5000);
+    return () => clearInterval(interval);
+  }, [booking?.barberId, booking?.salonId]); // ✅ Depend on booking data
+
+  // ==================== useEffects - END ====================
 
   const submitFeedback = async () => {
     const unratedFields = Object.entries(ratings)
@@ -482,19 +596,40 @@ export default function WalkinConfirmation() {
               : styles.completed
           }`}
         >
-          <span className={styles.statusDot}></span>
-          <span>
-            {booking.queueStatus === "RED" &&
-              `Position #${booking.queuePosition || 1} in ${
-                booking.barberName
-              }'s queue`}
-            {booking.queueStatus === "ORANGE" &&
-              `In Queue - Position #${booking.queuePosition || 1} with ${
-                booking.barberName
-              }`}
-            {booking.queueStatus === "GREEN" && "🟢 Service Started"}
-            {booking.queueStatus === "COMPLETED" && "✅ Service Complete"}
-          </span>
+          <div className={styles.statusBadge}>
+            {booking.queueStatus === "RED" ? (
+              <div className={styles.greyStatus}>
+                <span className={styles.statusDot}>⚫</span>
+                <span>Booked - Not Arrived Yet in {booking.barber}s queue</span>
+                <span className={styles.expiryNote}>
+                  (Expires in {timeLeft})
+                </span>
+              </div>
+            ) : booking.queueStatus === "ORANGE" ? (
+              <div className={styles.goldenStatus}>
+                <span className={styles.statusDot}>🟠</span>
+                <span>
+                  In Priority Queue - Position #{booking.queuePosition} with{" "}
+                  {booking.barber}
+                </span>
+              </div>
+            ) : booking.queueStatus === "GREEN" ? (
+              <div className={styles.greenStatus}>
+                <span className={styles.statusDot}>🟢</span>
+                <span>Now Being Served by {booking.barber}</span>
+              </div>
+            ) : booking.queueStatus === "COMPLETED" ? (
+              <div className={styles.completedStatus}>
+                <span className={styles.statusDot}>✅</span>
+                <span>Service Complete</span>
+              </div>
+            ) : (
+              <div className={styles.expiredStatus}>
+                <span className={styles.statusDot}>❌</span>
+                <span>Booking Expired</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Expiry Timer */}
@@ -505,6 +640,431 @@ export default function WalkinConfirmation() {
               <strong>{timeLeft || "Calculating..."}</strong>
             </p>
             <p className={styles.note}>Booking expires after 45 minutes</p>
+          </div>
+        )}
+        {/* NEW: Queue Visualization */}
+        {queueInfo && (
+          <div style={styles.queueVisualizationContainer}>
+            <h3>📍 Your Queue Position</h3>
+
+            <div style={styles.queueStatsRow}>
+              <div style={{ ...styles.statBox, background: "#86efac" }}>
+                <div style={styles.statNumber}>{queueInfo.position}</div>
+                <div style={styles.statLabel}>Your Position</div>
+              </div>
+              <div style={{ ...styles.statBox, background: "#fbbf24" }}>
+                <div style={styles.statNumber}>{queueInfo.arrived}</div>
+                <div style={styles.statLabel}>Arrived (Priority)</div>
+              </div>
+              <div style={{ ...styles.statBox, background: "#d1d5db" }}>
+                <div style={styles.statNumber}>{queueInfo.booked}</div>
+                <div style={styles.statLabel}>Bookings (Temp)</div>
+              </div>
+            </div>
+
+            <div style={styles.queueVisualItems}>
+              {queueInfo.queueList.map((item) => {
+                const isYou = item.id === bookingId;
+                const bgColor =
+                  item.status === "SERVING"
+                    ? "#86efac"
+                    : item.status === "ARRIVED"
+                    ? "#fbbf24"
+                    : "#d1d5db";
+                const borderStyle =
+                  item.status === "BOOKED"
+                    ? "2px dotted #000"
+                    : "2px solid #000";
+
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      ...styles.queueVisItem,
+                      background: bgColor,
+                      border: borderStyle,
+                      opacity: isYou ? 1 : 0.7,
+                      boxShadow: isYou
+                        ? "0 0 12px rgba(132, 204, 22, 0.8)"
+                        : "none",
+                      transform: isYou ? "scale(1.05)" : "scale(1)",
+                    }}
+                  >
+                    <div style={styles.position}>#{item.position}</div>
+                    <div style={styles.name}>{item.name}</div>
+                    {isYou && <div style={styles.youBadge}>YOU</div>}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={styles.legend}>
+              <div style={styles.legendItem}>
+                <div
+                  style={{
+                    width: 20,
+                    height: 20,
+                    background: "#86efac",
+                    border: "2px solid #000",
+                    borderRadius: 4,
+                  }}
+                ></div>
+                <span>🟢 Serving Now</span>
+              </div>
+              <div style={styles.legendItem}>
+                <div
+                  style={{
+                    width: 20,
+                    height: 20,
+                    background: "#fbbf24",
+                    border: "2px solid #000",
+                    borderRadius: 4,
+                  }}
+                ></div>
+                <span>🟡 Arrived (Priority)</span>
+              </div>
+              <div style={styles.legendItem}>
+                <div
+                  style={{
+                    width: 20,
+                    height: 20,
+                    background: "#d1d5db",
+                    border: "2px dotted #000",
+                    borderRadius: 4,
+                  }}
+                ></div>
+                <span>⚫ Booked (Expires 45 min)</span>
+              </div>
+            </div>
+          </div>
+        )}
+        {barberQueueData && (
+          <div className={styles.modernQueueContainer}>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={styles.queueHeader}
+            >
+              <h3>
+                🪑 {booking.barberName}&lsquo;s Queue (Chair #
+                {barberQueueData.chairNumber})
+              </h3>
+            </motion.div>
+
+            {/* Modern Stats Cards */}
+            <div className={styles.modernStatsGrid}>
+              <motion.div
+                className={styles.modernStatCard}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                }}
+                whileHover={{ scale: 1.05 }}
+              >
+                <div className={styles.statIcon}>🟢</div>
+                <div className={styles.statNumber}>
+                  {barberQueueData.serving ? "1" : "0"}
+                </div>
+                <div className={styles.statLabel}>Now Serving</div>
+              </motion.div>
+
+              <motion.div
+                className={styles.modernStatCard}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                }}
+                whileHover={{ scale: 1.05 }}
+              >
+                <div className={styles.statIcon}>👥</div>
+                <div className={styles.statNumber}>
+                  {barberQueueData.priorityQueueCount || 0}
+                </div>
+                <div className={styles.statLabel}>Priority Queue</div>
+              </motion.div>
+
+              <motion.div
+                className={styles.modernStatCard}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)",
+                }}
+                whileHover={{ scale: 1.05 }}
+              >
+                <div className={styles.statIcon}>⏳</div>
+                <div className={styles.statNumber}>
+                  {barberQueueData.bookedCount || 0}
+                </div>
+                <div className={styles.statLabel}>Temporary Queue</div>
+              </motion.div>
+            </div>
+
+            {/* THE CHAIR - Modern Design */}
+            <div className={styles.chairContainer}>
+              <motion.div
+                className={styles.modernChair}
+                animate={{
+                  boxShadow: barberQueueData.serving
+                    ? [
+                        "0 0 20px rgba(16, 185, 129)",
+                        "0 0 40px rgba(16, 185, 129)",
+                        "0 0 20px rgba(16, 185, 129)",
+                      ]
+                    : "0 4px 20px rgba(0,0,0,0)",
+                }}
+              >
+                <div className={styles.chairIcon}>🪑</div>
+                <div className={styles.chairLabel}>
+                  CHAIR #{barberQueueData.chairNumber}
+                </div>
+
+                {barberQueueData.serving ? (
+                  <motion.div
+                    className={styles.servingCustomer}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 200 }}
+                  >
+                    <div className={styles.servingCircle}>
+                      <div className={styles.userIcon}>👤</div>
+                      <motion.div
+                        className={styles.pulseRing}
+                        animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                    </div>
+                    <div className={styles.servingName}>
+                      {barberQueueData.serving.customerName}
+                    </div>
+                    <div className={styles.servingBadge}>NOW SERVING</div>
+                    {barberQueueData.serving._id === booking._id && (
+                      <motion.div
+                        className={styles.youPill}
+                        animate={{ scale: [1, 1.1, 1] }}
+                      >
+                        YOU
+                      </motion.div>
+                    )}
+                  </motion.div>
+                ) : (
+                  <div className={styles.emptyChairState}>
+                    <div className={styles.emptyText}>Available</div>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+
+            {/* Horizontal Queue Flow */}
+            <div className={styles.queueFlowContainer}>
+              {/* <div className={styles.queueArrow}>→</div> */}
+
+              <div className={styles.horizontalQueue}>
+                {/* Priority Queue (Golden) */}
+                {barberQueueData.queue
+                  ?.filter((c) => c.queueStatus === "ORANGE")
+                  .map((customer, idx) => {
+                    const isYou = customer._id === booking._id;
+                    return (
+                      <motion.div
+                        key={customer._id}
+                        className={styles.modernQueueItem}
+                        initial={{ opacity: 0, x: -50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        whileHover={{ scale: 1.1, zIndex: 10 }}
+                        style={{
+                          background:
+                            "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                          border: "3px solid #000",
+                          boxShadow: isYou
+                            ? "0 0 30px rgba(251, 191, 36, 0.8), 0 8px 20px rgba(0,0,0,0.2)"
+                            : "0 4px 15px rgba(0,0,0,0.15)",
+                        }}
+                      >
+                        <div className={styles.positionBadge}>#{idx + 1}</div>
+                        <div className={styles.customerAvatar}>
+                          {customer.customerName.charAt(0)}
+                        </div>
+                        <div className={styles.customerName}>
+                          {customer.customerName}
+                        </div>
+                        <div className={styles.queueTime}>
+                          {formatTimeAgo(customer.arrivedAt)}
+                        </div>
+                        {isYou && (
+                          <motion.div
+                            className={styles.youPill}
+                            animate={{ scale: [1, 1.1, 1] }}
+                            transition={{ duration: 1, repeat: Infinity }}
+                          >
+                            YOU
+                          </motion.div>
+                        )}
+                        <div
+                          className={styles.statusDot}
+                          style={{ background: "#fbbf24" }}
+                        />
+                      </motion.div>
+                    );
+                  })}
+
+                {/* Temporary Queue (Grey Dotted) */}
+                {barberQueueData.queue
+                  ?.filter((c) => c.queueStatus === "RED")
+                  .map((customer, idx) => {
+                    const isYou = customer._id === booking._id;
+                    const priorityCount = barberQueueData.queue.filter(
+                      (c) => c.queueStatus === "ORANGE"
+                    ).length;
+
+                    return (
+                      <motion.div
+                        key={customer._id}
+                        className={styles.modernQueueItem}
+                        initial={{ opacity: 0, x: -50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: (priorityCount + idx) * 0.1 }}
+                        whileHover={{ scale: 1.1, zIndex: 10 }}
+                        style={{
+                          background:
+                            "linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)",
+                          border: "3px dotted #000",
+                          boxShadow: isYou
+                            ? "0 0 30px rgba(209, 213, 219, 0.8), 0 8px 20px rgba(0,0,0,0.2)"
+                            : "0 4px 15px rgba(0,0,0,0.15)",
+                        }}
+                      >
+                        <div
+                          className={styles.positionBadge}
+                          style={{ opacity: 0.6 }}
+                        >
+                          #{priorityCount + idx + 1}
+                        </div>
+                        <div
+                          className={styles.customerAvatar}
+                          style={{ opacity: 0.7 }}
+                        >
+                          {customer.customerName.charAt(0)}
+                        </div>
+                        <div className={styles.customerName}>
+                          {customer.customerName}
+                        </div>
+                        <div
+                          className={styles.queueTime}
+                          style={{ color: "#dc2626" }}
+                        >
+                          ⏱️ {formatExpiry(customer.expiresAt)}
+                        </div>
+                        {isYou && (
+                          <motion.div
+                            className={styles.youPill}
+                            animate={{ scale: [1, 1.1, 1] }}
+                            transition={{ duration: 1, repeat: Infinity }}
+                          >
+                            YOU
+                          </motion.div>
+                        )}
+                        <div
+                          className={styles.statusDot}
+                          style={{ background: "#9ca3af" }}
+                        />
+                      </motion.div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Modern Legend */}
+            <div className={styles.modernLegend}>
+              <div className={styles.legendItem}>
+                <div
+                  className={styles.legendIcon}
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                    borderRadius: "50%",
+                  }}
+                >
+                  🟢
+                </div>
+                <span>
+                  <strong>Now Serving</strong> - Currently getting service
+                </span>
+              </div>
+
+              <div className={styles.legendItem}>
+                <div
+                  className={styles.legendIcon}
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                  }}
+                />
+                <span>
+                  <strong>Priority Queue</strong> - Arrived at salon
+                </span>
+              </div>
+
+              <div className={styles.legendItem}>
+                <div
+                  className={styles.legendIcon}
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)",
+                    border: "2px dotted #000",
+                  }}
+                />
+                <span>
+                  <strong>Temporary Queue</strong> - Booked (45 min expiry)
+                </span>
+              </div>
+            </div>
+
+            {/* Queue Explanation */}
+            <motion.div
+              className={styles.queueExplanation}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              <h4>📋 How Queue Works:</h4>
+              <ul>
+                <li>
+                  💻 <strong>Book Online:</strong> Enter temporary queue (grey
+                  dotted). Arrive within 45 min.
+                </li>
+                <li>
+                  🚪 <strong>Arrive at Salon:</strong> Show booking code → Move
+                  to priority queue (golden).
+                </li>
+                <li>
+                  ⚡ <strong>Priority System:</strong> Arrived customers get
+                  served first. Next in line if someone ahead didn&lsquo;t
+                  arrive.
+                </li>
+                <li>
+                  ✅ <strong>Your Turn:</strong> You&lsquo;ll appear in the
+                  green circle on the chair.
+                </li>
+              </ul>
+            </motion.div>
+
+            {/* Estimated Wait */}
+            {booking.queueStatus === "ORANGE" &&
+              barberQueueData.estimatedWait && (
+                <motion.div
+                  className={styles.waitTimeCard}
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <span className={styles.waitIcon}>⏱️</span>
+                  <span className={styles.waitText}>
+                    Estimated Wait Time:{" "}
+                    <strong>{barberQueueData.estimatedWait} minutes</strong>
+                  </span>
+                </motion.div>
+              )}
           </div>
         )}
 

@@ -7,6 +7,16 @@ import styles from "../../styles/SalonDashboard.module.css";
 // Time Remaining Component
 function TimeRemaining({ endTime }) {
   const [timeLeft, setTimeLeft] = useState("");
+  // Run every hour
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      await fetch("/api/walkin/booking/mark-expired", {
+        method: "POST",
+      });
+    }, 60 * 60 * 1000); // Every hour
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const updateTime = () => {
@@ -194,23 +204,37 @@ export default function DashboardPage() {
   const loadBookings = useCallback(async (salonId, dateString) => {
     try {
       setLoading(true);
-      let dateParam = "";
 
+      // Mark expired first
+      await fetch("/api/walkin/mark-expired", { method: "POST" });
+
+      let dateParam;
       if (dateString === "all") {
-        dateParam = ""; // No filter
+        dateParam = "";
       } else {
         dateParam = `&date=${dateString}`;
       }
-
       const response = await fetch(
         `/api/salons/bookings?salonId=${salonId}${dateParam}&includeWalkins=true`,
-        { cache: "no-store", headers: { "Content-Type": "application/json" } }
+        {
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+        }
       );
-
-      if (!response.ok) throw new Error("Failed to fetch bookings");
-
       const data = await response.json();
-      setBookings(Array.isArray(data) ? data : []);
+
+      // Filter expired bookings
+      const now = new Date();
+      const bufferTime = new Date(now.getTime() - 5 * 60 * 1000); // 5 min buffer
+      const activeBookings = (Array.isArray(data) ? data : []).filter((b) => {
+        if (b.isExpired) return false;
+        if (b.queueStatus === "RED") {
+          return new Date(b.expiresAt) > bufferTime;
+        }
+        return true;
+      });
+
+      setBookings(activeBookings);
     } catch (err) {
       setError("Error loading bookings: " + err.message);
       setBookings([]);
@@ -978,6 +1002,127 @@ export default function DashboardPage() {
                 🔄 {loading ? "Refreshing..." : "Refresh"}
               </button>
             </div>
+            {bookings && bookings.length > 0 && (
+              <section className={styles.overallQueueSection}>
+                <h2 className={styles.queueTitle}>📊 Live Salon Queue</h2>
+
+                <div className={styles.queueStatsRow}>
+                  <div className={styles.queueStat}>
+                    <span className={styles.statIcon}>🟢</span>
+                    <div>
+                      <div className={styles.statValue}>
+                        {
+                          bookings.filter((b) => b.queueStatus === "GREEN")
+                            .length
+                        }
+                      </div>
+                      <div className={styles.statLabel}>Now Serving</div>
+                    </div>
+                  </div>
+                  <div className={styles.queueStat}>
+                    <span className={styles.statIcon}>🟠</span>
+                    <div>
+                      <div className={styles.statValue}>
+                        {
+                          bookings.filter((b) => b.queueStatus === "ORANGE")
+                            .length
+                        }
+                      </div>
+                      <div className={styles.statLabel}>Priority Queue</div>
+                    </div>
+                  </div>
+                  <div className={styles.queueStat}>
+                    <span className={styles.statIcon}>⚫</span>
+                    <div>
+                      <div className={styles.statValue}>
+                        {bookings.filter((b) => b.queueStatus === "RED").length}
+                      </div>
+                      <div className={styles.statLabel}>Booked</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* All Barbers with Queue */}
+                <div className={styles.allBarbersQueue}>
+                  {barbers &&
+                    barbers.map((barber) => {
+                      const barberBookings = bookings.filter(
+                        (b) =>
+                          b.barberId?.toString() ===
+                          (barber._id || barber.id)?.toString()
+                      );
+                      const greenBooking = barberBookings.find(
+                        (b) => b.queueStatus === "GREEN"
+                      );
+                      const orangeBookings = barberBookings.filter(
+                        (b) => b.queueStatus === "ORANGE"
+                      );
+                      const redBookings = barberBookings.filter(
+                        (b) => b.queueStatus === "RED"
+                      );
+
+                      return (
+                        <div
+                          key={barber._id || barber.id}
+                          className={styles.barberQueueOverview}
+                        >
+                          <div className={styles.barberQueueHeader}>
+                            <h4>
+                              {barber.name} - Chair #{barber.chairNumber}
+                            </h4>
+                            <span className={styles.queueCount}>
+                              {barberBookings.length}
+                            </span>
+                          </div>
+
+                          <div className={styles.barberQueueRow}>
+                            {greenBooking ? (
+                              <div
+                                className={`${styles.queueCard} ${styles.serving}`}
+                              >
+                                <span>🟢</span>
+                                <span>{greenBooking.customerName}</span>
+                                <span className={styles.status}>Serving</span>
+                              </div>
+                            ) : (
+                              <div
+                                className={`${styles.queueCard} ${styles.available}`}
+                              >
+                                <span>💺</span>
+                                <span>Available</span>
+                              </div>
+                            )}
+
+                            {orangeBookings.map((b, idx) => (
+                              <div
+                                key={b.id}
+                                className={`${styles.queueCard} ${styles.orange}`}
+                              >
+                                <span>#{idx + 1}</span>
+                                <span>{b.customerName}</span>
+                                <span className={styles.status}>Arrived</span>
+                              </div>
+                            ))}
+
+                            {redBookings.map((b) => (
+                              <div
+                                key={b.id}
+                                className={`${styles.queueCard} ${styles.red}`}
+                              >
+                                <span>⚫</span>
+                                <span>{b.customerName}</span>
+                                <span className={styles.status}>Booked</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </section>
+            )}
+
+            {/* ==================== END OVERALL QUEUE VIEW ==================== */}
 
             {error && <div className={styles.errorBox}>{error}</div>}
 
@@ -1083,9 +1228,24 @@ export default function DashboardPage() {
                 <div className={styles.barbersSection}>
                   <h3 className={styles.sectionTitle}>💈 Barbers</h3>
                   {barbers.map((barber) => {
-                    const barberBookings = bookings.filter(
-                      (b) => b.barberId?.toString() === barber._id?.toString()
-                    );
+                    // NEW: Expire old bookings for this barber
+                    const now = new Date();
+                    // const expiryTime = new Date(now - 45 * 60 * 1000);
+
+                    const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
+
+                    const barberBookings = bookings.filter((b) => {
+                      // Filter expired
+                      if (b.isExpired) return false;
+                      if (
+                        b.queueStatus === "RED" &&
+                        new Date(b.expiresAt) < bufferTime
+                      )
+                        return false;
+
+                      return b.barberId?.toString() === barber._id?.toString();
+                    });
+
                     return (
                       <details
                         key={barber._id}
@@ -1135,135 +1295,322 @@ export default function DashboardPage() {
                             </button>
                           </div>
                         </div>
+                        {/* NEW: Per-Barber Queue Visualization */}
+                        {bookings &&
+                          bookings.length > 0 &&
+                          (() => {
+                            const barberBookings = bookings.filter(
+                              (b) =>
+                                b.barberId?.toString() ===
+                                (barber._id || barber.id)?.toString()
+                            );
+                            const greenBooking = barberBookings.find(
+                              (b) => b.queueStatus === "GREEN"
+                            );
+                            const orangeBookings = barberBookings.filter(
+                              (b) => b.queueStatus === "ORANGE"
+                            );
+                            const redBookings = barberBookings.filter(
+                              (b) => b.queueStatus === "RED"
+                            );
+
+                            return barberBookings.length > 0 ? (
+                              <div className={styles.barberAccordionQueue}>
+                                {/* CHAIR */}
+                                <div className={styles.chairBox}>
+                                  <div className={styles.chairLabel}>
+                                    Chair #{barber.chairNumber}
+                                  </div>
+                                  {greenBooking ? (
+                                    <div className={styles.servingBox}>
+                                      <span>
+                                        🟢 {greenBooking.customerName}
+                                      </span>
+                                      <span className={styles.now}>
+                                        NOW SERVING
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className={styles.availableBox}>
+                                      Available
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* QUEUE */}
+                                {(orangeBookings.length > 0 ||
+                                  redBookings.length > 0) && (
+                                  <div className={styles.barberQueueLine}>
+                                    <div className={styles.queueLabel}>
+                                      Queue (
+                                      {orangeBookings.length +
+                                        redBookings.length}
+                                      )
+                                    </div>
+                                    <div className={styles.queueItems}>
+                                      {orangeBookings.map((b, idx) => (
+                                        <div
+                                          key={b.id}
+                                          className={styles.queueItem}
+                                        >
+                                          <span>#{idx + 1}</span>
+                                          <span>{b.customerName}</span>
+                                          <span>🟠</span>
+                                        </div>
+                                      ))}
+                                      {redBookings.map((b) => (
+                                        <div
+                                          key={b.id}
+                                          className={styles.queueItem}
+                                        >
+                                          <span>⚫</span>
+                                          <span>{b.customerName}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : null;
+                          })()}
+
+                        {/* EXISTING: Assignment & Bookings */}
 
                         <div className={styles.barberBookings}>
                           {barberBookings.length === 0 ? (
                             <p className={styles.noBookings}>No bookings</p>
                           ) : (
-                            barberBookings.map((b) => (
-                              <div
-                                key={b._id || b.id}
-                                className={styles.bookingCard}
-                              >
-                                <div className={styles.bookingDetails}>
-                                  <h3 className={styles.customerName}>
-                                    {b.customerName}
-                                    {b.customerAge && (
-                                      <span className={styles.customerAge}>
-                                        {" "}
-                                        ({b.customerAge} yrs)
-                                      </span>
-                                    )}
-                                  </h3>
-                                  <p className={styles.bookingInfo}>
-                                    📞 {b.customerPhone}
-                                  </p>
-                                  <p className={styles.bookingInfo}>
-                                    {b.service}
-                                  </p>
-                                  {b.status === "started" &&
-                                    b.serviceEndTime && (
-                                      <p className={styles.timeRemaining}>
-                                        ⏱{" "}
-                                        <TimeRemaining
-                                          endTime={b.serviceEndTime}
-                                        />
+                            barberBookings.map((b) => {
+                              // NEW: Calculate queue status color & label
+                              const now = new Date();
+                              const createdTime = b.createdAt
+                                ? new Date(b.createdAt)
+                                : new Date();
+                              const expiryTime = new Date(
+                                createdTime.getTime() + 45 * 60 * 1000
+                              );
+                              const timeUntilExpiry = expiryTime - now;
+                              const minutesLeft = Math.floor(
+                                timeUntilExpiry / 1000 / 60
+                              );
+
+                              let statusColor = "#d1d5db"; // grey for BOOKED
+                              let statusLabel = b.queueStatus || b.status;
+                              let borderStyle = "2px solid #ccc";
+
+                              if (b.queueStatus === "SERVING") {
+                                statusColor = "#86efac";
+                                statusLabel = "🟢 SERVING";
+                                borderStyle = "2px solid #000";
+                              } else if (b.queueStatus === "ARRIVED") {
+                                statusColor = "#fbbf24";
+                                statusLabel = "🟡 ARRIVED (Priority)";
+                                borderStyle = "2px solid #000";
+                              } else if (b.queueStatus === "BOOKED") {
+                                borderStyle = "2px dotted #000";
+                                if (minutesLeft < 5 && minutesLeft > 0) {
+                                  statusColor = "#fca5a5"; // Red warning
+                                  statusLabel = `⚠️ Expires in ${minutesLeft}m`;
+                                } else if (minutesLeft <= 0) {
+                                  statusColor = "#9ca3af";
+                                  statusLabel = "🔴 EXPIRED";
+                                } else {
+                                  statusLabel = `📅 Booked (${minutesLeft}m)`;
+                                }
+                              }
+
+                              return (
+                                <div
+                                  key={b._id || b.id}
+                                  className={styles.bookingCard}
+                                  style={{
+                                    background: statusColor,
+                                    border: borderStyle,
+                                    opacity: b.isExpired ? 0.5 : 1,
+                                  }}
+                                >
+                                  <div className={styles.bookingDetails}>
+                                    <h3 className={styles.customerName}>
+                                      {b.customerName}
+                                      {b.customerAge && (
+                                        <span className={styles.customerAge}>
+                                          {" "}
+                                          ({b.customerAge} yrs)
+                                        </span>
+                                      )}
+                                    </h3>
+                                    <p className={styles.bookingInfo}>
+                                      📞 {b.customerPhone}
+                                    </p>
+                                    <p className={styles.bookingInfo}>
+                                      {b.service}
+                                    </p>
+                                    {b.status === "started" &&
+                                      b.serviceEndTime && (
+                                        <p className={styles.timeRemaining}>
+                                          ⏱{" "}
+                                          <TimeRemaining
+                                            endTime={b.serviceEndTime}
+                                          />
+                                        </p>
+                                      )}
+
+                                    <p className={styles.bookingInfo}>
+                                      📅 {b.date || "Walk-in"}{" "}
+                                      {b.time && `at ${b.time}`}
+                                    </p>
+                                    {b.price && (
+                                      <p className={styles.bookingInfo}>
+                                        💰 ₹{b.price}
                                       </p>
                                     )}
 
-                                  <p className={styles.bookingInfo}>
-                                    📅 {b.date || "Walk-in"}{" "}
-                                    {b.time && `at ${b.time}`}
-                                  </p>
-                                  {b.price && (
-                                    <p className={styles.bookingInfo}>
-                                      💰 ₹{b.price}
-                                    </p>
-                                  )}
-                                  <span
-                                    className={`${
-                                      styles.statusBadge
-                                    } ${getStatusClassName(b.status)}`}
-                                  >
-                                    {b.queueStatus || b.status}
-                                  </span>
-                                </div>
-
-                                <div className={styles.barberActions}>
-                                  {b.status === "confirmed" && (
-                                    <button
-                                      onClick={() =>
-                                        updateBookingStatus(b._id, "arrived")
-                                      }
-                                      className={styles.arrivedBtn}
-                                    >
-                                      Mark Arrived
-                                    </button>
-                                  )}
-
-                                  {b.status === "arrived" && (
-                                    <button
-                                      onClick={() => {
-                                        setBookingToStart(b);
-                                        setTimeEstimate(
-                                          b.estimatedDuration || 30
-                                        );
-                                        setShowTimeModal(true);
+                                    {/* NEW: Updated status badge with queue color */}
+                                    <span
+                                      className={styles.statusBadge}
+                                      style={{
+                                        background: statusColor,
+                                        color:
+                                          statusColor === "#fbbf24"
+                                            ? "#000"
+                                            : "#fff",
+                                        border: "none",
+                                        fontWeight: 700,
+                                        padding: "6px 12px",
+                                        borderRadius: "4px",
+                                        display: "inline-block",
                                       }}
-                                      className={styles.startBtn}
                                     >
-                                      Start Service
-                                    </button>
-                                  )}
+                                      {statusLabel}
+                                    </span>
 
-                                  <button
-                                    className={styles.timeBtn}
-                                    onClick={() =>
-                                      handleAddTime(b._id || b.id, 5)
-                                    }
-                                  >
-                                    +5min
-                                  </button>
-                                  <button
-                                    className={styles.timeBtn}
-                                    onClick={() =>
-                                      handleAddTime(b._id || b.id, 10)
-                                    }
-                                  >
-                                    +10min
-                                  </button>
+                                    {/* NEW: Show booking code only for BOOKED status */}
+                                    {b.queueStatus === "BOOKED" && (
+                                      <p
+                                        className={styles.bookingInfo}
+                                        style={{
+                                          fontWeight: 700,
+                                          color: "#000",
+                                          marginTop: "8px",
+                                        }}
+                                      >
+                                        Code: {b.bookingCode}
+                                      </p>
+                                    )}
+                                  </div>
 
-                                  <button
-                                    className={`${styles.pauseBtn} ${
-                                      pausedBarbers.has(barber._id || barber.id)
-                                        ? styles.pausedBtn
-                                        : ""
-                                    }`}
-                                    onClick={() =>
-                                      handleTogglePause(
-                                        barber._id || barber.id,
-                                        barber.name
-                                      )
-                                    }
-                                  >
-                                    {pausedBarbers.has(barber._id || barber.id)
-                                      ? "▶ Resume"
-                                      : "⏸ Pause"}
-                                  </button>
+                                  <div className={styles.barberActions}>
+                                    {b.status === "confirmed" &&
+                                      (() => {
+                                        const now = new Date();
+                                        const bufferTime = new Date(
+                                          now.getTime() - 5 * 60 * 1000
+                                        );
+                                        const isExpired =
+                                          b.isExpired ||
+                                          (b.queueStatus === "RED" &&
+                                            new Date(b.expiresAt) < bufferTime);
 
-                                  {b.status === "started" && (
+                                        return (
+                                          <button
+                                            onClick={() =>
+                                              !isExpired &&
+                                              updateBookingStatus(
+                                                b._id,
+                                                "arrived"
+                                              )
+                                            }
+                                            className={
+                                              isExpired
+                                                ? styles.expiredBtn
+                                                : styles.arrivedBtn
+                                            }
+                                            disabled={isExpired}
+                                            style={{
+                                              opacity: isExpired ? 0.5 : 1,
+                                              cursor: isExpired
+                                                ? "not-allowed"
+                                                : "pointer",
+                                            }}
+                                          >
+                                            {isExpired
+                                              ? "EXPIRED"
+                                              : "Mark Arrived"}
+                                          </button>
+                                        );
+                                      })()}
+
+                                    {b.status === "arrived" && (
+                                      <button
+                                        onClick={() => {
+                                          setBookingToStart(b);
+                                          setTimeEstimate(
+                                            b.estimatedDuration || 30
+                                          );
+                                          setShowTimeModal(true);
+                                        }}
+                                        className={styles.startBtn}
+                                      >
+                                        Start Service
+                                      </button>
+                                    )}
+
                                     <button
+                                      className={styles.timeBtn}
                                       onClick={() =>
-                                        updateBookingStatus(b._id, "completed")
+                                        handleAddTime(b._id || b.id, 5)
                                       }
-                                      className={styles.doneBtn}
                                     >
-                                      Done
+                                      +5min
                                     </button>
-                                  )}
+                                    <button
+                                      className={styles.timeBtn}
+                                      onClick={() =>
+                                        handleAddTime(b._id || b.id, 10)
+                                      }
+                                    >
+                                      +10min
+                                    </button>
+
+                                    <button
+                                      className={`${styles.pauseBtn} ${
+                                        pausedBarbers.has(
+                                          barber._id || barber.id
+                                        )
+                                          ? styles.pausedBtn
+                                          : ""
+                                      }`}
+                                      onClick={() =>
+                                        handleTogglePause(
+                                          barber._id || barber.id,
+                                          barber.name
+                                        )
+                                      }
+                                    >
+                                      {pausedBarbers.has(
+                                        barber._id || barber.id
+                                      )
+                                        ? "▶ Resume"
+                                        : "⏸ Pause"}
+                                    </button>
+
+                                    {b.status === "started" && (
+                                      <button
+                                        onClick={() =>
+                                          updateBookingStatus(
+                                            b._id,
+                                            "completed"
+                                          )
+                                        }
+                                        className={styles.doneBtn}
+                                      >
+                                        Done
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))
+                              );
+                            })
                           )}
                         </div>
                       </details>

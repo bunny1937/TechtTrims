@@ -65,39 +65,35 @@ export default async function handler(req, res) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 45 * 60 * 1000);
 
-    // Handle barber assignment
+    // Lines with barber assignment
     let barberObjectId = null;
     let barberName = "Unassigned";
     let assignmentStatus = "pending";
 
     if (barberId && barberId !== "ANY") {
-      barberObjectId = new ObjectId(barberId);
-      assignmentStatus = "assigned";
-
-      const barberDoc = await db
-        .collection("barbers")
-        .findOne({ _id: barberObjectId });
-      barberName = barberDoc?.name || "Unknown";
+      try {
+        barberObjectId = new ObjectId(barberId); // Convert to ObjectId
+        const barberDoc = await db
+          .collection("barbers")
+          .findOne({ _id: barberObjectId });
+        barberName = barberDoc?.name || "Unknown";
+        console.log("✅ Barber assigned:", barberName);
+      } catch (error) {
+        console.error("Invalid barber ID:", barberId, error);
+        barberObjectId = null;
+      }
     }
 
-    // ✅ CHANGED: Calculate queue position BEFORE inserting
-    // ✅ Calculate queue position ONLY for ORANGE (arrived) customers
-    let queuePosition = 1; // Default to 1 for new bookings
+    // CRITICAL: Ensure barberId in document is ObjectId
 
-    if (barberObjectId) {
-      // Count only ORANGE bookings (customers who have arrived)
-      const existingOrangeCount = await db
-        .collection("bookings")
-        .countDocuments({
-          barberId: barberObjectId,
-          salonId: new ObjectId(salonId),
-          queueStatus: "ORANGE",
-          isExpired: { $ne: true },
-        });
-      queuePosition = existingOrangeCount + 1;
-    } else {
-      queuePosition = "Pending";
-    }
+    // NEW LOGIC: Queue position ONLY assigned when user ARRIVES (queueStatus = ORANGE)
+    // At booking time, queuePosition = null (not yet arrived)
+    let queuePosition = null; // Position assigned later on arrival
+
+    console.log("Booking created with RED status - no queue position yet", {
+      barber: barberName,
+      bookingCode,
+    });
 
     console.log("✅ Queue position calculated:", {
       barber: barberName,
@@ -130,7 +126,12 @@ export default async function handler(req, res) {
       createdAt: now,
       updatedAt: now,
     };
-
+    console.log("✅ Booking created:", {
+      bookingCode,
+      barber: barberName,
+      barberId: barberObjectId?.toString(),
+      salonId,
+    });
     const result = await db.collection("bookings").insertOne(bookingDoc);
 
     // ✅ UPDATE BARBER STATS WHEN BOOKING IS CREATED

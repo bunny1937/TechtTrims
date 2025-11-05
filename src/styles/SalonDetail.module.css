@@ -5,7 +5,547 @@
   background: var(--background-primary);
   color: var(--text-primary);
   padding-bottom: var(--space-24);
+} /* Barber Card */
+/* ==================== SALON QUEUE OVERVIEW ==================== */
+.dotTime {
+  font-size: 9px;
+  color: #666;
+  font-weight: 600;
 }
+
+.dotExpiry {
+  font-size: 9px;
+  font-weight: 700;
+  color: #d32f2f;
+}
+
+.salonQueueOverview {
+  max-width: 1400px;
+  margin: 60px auto;
+  padding: 50px 30px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 24px;
+  border: 4px solid #2196f3;
+}
+
+.queueOverviewTitle {
+  font-size: 32px;
+  font-weight: 700;
+  text-align: center;
+  color: #1a237e;
+  margin-bottom: 40px;
+}
+
+/* OVERALL STATS */
+.overallStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 25px;
+  margin-bottom: 50px;
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 25px;
+  background: white;
+  border-radius: 16px;
+  border: 3px solid #e0e0e0;
+  transition: all 0.3s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.statIcon {
+  font-size: 48px;
+}
+
+.statContent {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.statValue {
+  font-size: 36px;
+  font-weight: 700;
+  color: #1a237e;
+}
+
+.statLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* PER-BARBER QUEUE CARDS */
+.barbersQueueContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  gap: 30px;
+}
+.bookingTime {
+  font-size: 10px;
+  color: #666;
+  font-weight: 600;
+}
+
+.expiry {
+  font-size: 10px;
+  font-weight: 700;
+  color: #d32f2f;
+}
+
+.barberQueueCard {
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  border: 3px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+/* BARBER HEADER */
+.barberQueueHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 20px;
+  border-bottom: 3px solid #f0f0f0;
+}
+
+.barberInfo {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.barberQueueName {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a237e;
+}
+
+.chairBadge {
+  background: #2196f3;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.queueCount .countBadge {
+  background: #f0f0f0;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  color: #666;
+}
+
+/* CHAIR STATUS ROW */
+.chairStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f0f7ff 0%, #e3f2fd 100%);
+  border-radius: 12px;
+  border: 2px solid #2196f3;
+}
+
+.chairIconBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 15px;
+  background: white;
+  border-radius: 12px;
+  min-width: 80px;
+}
+
+.chairEmoji {
+  font-size: 40px;
+}
+
+.chairLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  letter-spacing: 1px;
+}
+
+.servingBox {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+  padding: 15px;
+  background: #e8f5e9;
+  border-radius: 12px;
+  border: 2px solid #4caf50;
+}
+
+.servingIndicator {
+  font-size: 32px;
+}
+
+.servingDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.servingName {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a237e;
+}
+
+.servingStatus {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4caf50;
+}
+
+.availableBox {
+  flex: 1;
+  padding: 20px;
+  background: #f5f5f5;
+  border-radius: 12px;
+  border: 2px dashed #999;
+  text-align: center;
+}
+
+.availableText {
+  font-size: 16px;
+  font-weight: 600;
+  color: #999;
+}
+
+/* QUEUE LINE */
+.queueLineContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.queueLineLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a237e;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #2196f3;
+}
+
+.queueLine {
+  display: flex;
+  gap: 15px;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 12px;
+  min-height: 150px;
+  overflow-x: auto;
+  align-items: flex-end;
+}
+
+.queueDot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+  border-radius: 12px;
+  border: 3px solid;
+  min-width: 100px;
+  min-height: 130px;
+  flex-shrink: 0;
+  text-align: center;
+  justify-content: flex-end;
+  background: white;
+  transition: all 0.3s ease;
+}
+
+.queueDot:hover {
+  transform: scale(1.05) translateY(-5px);
+}
+
+.orangeDot {
+  background: #fff8e1;
+  border-color: #ffa500;
+}
+
+.redDot {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.dotNumber {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a237e;
+}
+
+.dotName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  word-break: break-word;
+}
+
+.dotStatus {
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.orangeDot .dotStatus {
+  background: #ffa500;
+}
+
+.redDot .dotStatus {
+  background: #999;
+}
+
+.emptyQueue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 30px;
+  color: #999;
+  font-weight: 600;
+}
+
+/* QUICK STATS */
+.barberQuickStats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  padding-top: 20px;
+  border-top: 2px solid #f0f0f0;
+}
+
+.quickStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.quickStatLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.quickStatValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a237e;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1200px) {
+  .barbersQueueContainer {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .salonQueueOverview {
+    padding: 30px 20px;
+  }
+
+  .overallStats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+
+  .queueLine {
+    min-height: 120px;
+  }
+
+  .queueDot {
+    min-width: 80px;
+    min-height: 110px;
+    padding: 12px;
+  }
+
+  .barberQuickStats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.barberCard {
+  position: relative;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  overflow: hidden;
+}
+
+.barberCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(102, 126, 234, 0.15);
+  border-color: #b8941e;
+}
+
+.barberCard.selected {
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.1) 0%,
+    rgba(118, 75, 162, 0.1) 100%
+  );
+  border-color: #d4af37;
+  box-shadow: 0 12px 28px rgba(102, 126, 234, 0.2);
+}
+
+.barberPhoto {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #4b4c50;
+  display: block;
+  flex-shrink: 0;
+}
+
+.barberCard.selected .barberPhoto {
+  border-color: #d4af37;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.barberImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.barberName {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 8px 0 4px;
+}
+
+.barberExperience {
+  font-size: 14px;
+  color: #718096;
+  margin: 4px 0;
+}
+
+.barberRating {
+  font-size: 14px;
+  color: #f59e0b;
+  font-weight: 600;
+  margin: 4px 0;
+}
+
+.walkInStatusBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 10;
+}
+
+.availableNow {
+  background: #4caf50;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.occupiedNow {
+  background: #ff9800;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.queueBadge {
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pausedBadge {
+  background: #ef4444;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.waitEstimate {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.noWait {
+  color: #10b981;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.waitTime {
+  color: #f59e0b;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.pausedWait {
+  color: #ef4444;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.queueSection {
+  margin-top: 32px;
+  padding: 24px;
+  background: #f9fafb;
+  border-radius: 16px;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 16px;
+}
+
 .barberSkeleton {
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;

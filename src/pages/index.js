@@ -124,12 +124,14 @@ export default function Home() {
           console.error("Error parsing stored location:", error);
         }
       } else if (liveUserLocation && !salonsLoadedRef.current) {
-        // PRIORITY: Use live location if available
-        await loadNearbySalons(
-          liveUserLocation.latitude,
-          liveUserLocation.longitude,
-          userOnboarding?.gender || "all"
-        );
+        // Use BOTH lat/lng formats for compatibility
+        const lat = liveUserLocation.latitude || liveUserLocation.lat;
+        const lng = liveUserLocation.longitude || liveUserLocation.lng;
+
+        if (lat && lng) {
+          await loadNearbySalons(lat, lng, userData?.gender);
+        }
+
         salonsLoadedRef.current = true;
       } else if (!liveUserLocation && !salonsLoadedRef.current) {
         // FALLBACK: Use cached location from localStorage if live location not available
@@ -157,6 +159,7 @@ export default function Home() {
       initializeUser();
     }
   }, [liveUserLocation, router]); // Dependency on location only for initial load
+
   // Update location in session storage whenever it changes
   useEffect(() => {
     if (liveUserLocation) {
