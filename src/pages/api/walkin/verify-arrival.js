@@ -43,29 +43,43 @@ export default async function handler(req, res) {
       });
     }
 
-    // Calculate correct position based on who checked in BEFORE this booking
+    // NEW LOGIC: Calculate position based on ARRIVAL TIME
+    // Count all ORANGE bookings that arrived BEFORE this user (by arrivedAt timestamp)
+    const currentTime = new Date();
+
+    // Position = how many users arrived before this user + 1
     const position = await db.collection("bookings").countDocuments({
       salonId: new ObjectId(salonId),
       barberId: booking.barberId,
       queueStatus: "ORANGE",
       isExpired: { $ne: true },
+      arrivedAt: { $exists: true }, // Only count those who arrived
     });
 
-    const correctQueuePosition = position + 1;
+    const correctQueuePosition = position + 1; // This user becomes position+1
 
-    // Update booking to ORANGE with correct position
+    // Update booking to ORANGE with correct position and arrival timestamp
     await db.collection("bookings").updateOne(
-      { _id: booking._id },
+      { _id: booking._id }, // Use _id not id
       {
         $set: {
-          queueStatus: "ORANGE",
+          queueStatus: "ORANGE", // Changed from RED to ORANGE - now in priority queue
           queuePosition: correctQueuePosition,
           status: "arrived",
-          arrivedAt: new Date(),
+          arrivedAt: currentTime, // Record exact arrival time
+          lastUpdated: new Date(),
           updatedAt: new Date(),
         },
       }
     );
+
+    console.log("User checked in - assigned to priority queue", {
+      bookingCode: booking.bookingCode,
+      customer: booking.customerName,
+      barber: booking.barber,
+      position: correctQueuePosition,
+      arrivedAt: currentTime.toLocaleTimeString(),
+    });
 
     console.log("✅ Checked in:", {
       code: booking.bookingCode,

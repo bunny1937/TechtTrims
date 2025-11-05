@@ -11,6 +11,7 @@ import ReviewsSection from "@/components/Salon/ReviewSection";
 import ImageCarousel from "@/components/ImageCarousel";
 import LocationMap from "../../components/Maps/LocationMap";
 import { useLocation } from "../../hooks/useLocation";
+import QueueDisplay from "@/components/Walkin/QueueDisplay";
 
 // Dynamic map import to avoid SSR issues
 const MapContainer = dynamic(
@@ -28,7 +29,27 @@ const Marker = dynamic(
 const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
   ssr: false,
 });
+// Helper to format time difference
+const formatTime = (date) => {
+  if (!date) return "N/A";
+  const now = new Date();
+  const diff = Math.floor((now - new Date(date)) / 1000 / 60); // minutes
+  if (diff < 1) return "Just now";
+  if (diff < 60) return `${diff}m ago`;
+  return new Date(date).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
+// Helper to format remaining time
+const formatTimeRemaining = (expiryDate) => {
+  if (!expiryDate) return "N/A";
+  const remaining = Math.ceil((new Date(expiryDate) - new Date()) / 1000 / 60); // minutes
+  if (remaining < 0) return "Expired";
+  if (remaining < 1) return "< 1 min";
+  return `${remaining}m`;
+};
 export default function SalonDetail({ initialSalon }) {
   const router = useRouter();
   const { id, mode } = router.query;
@@ -64,6 +85,8 @@ export default function SalonDetail({ initialSalon }) {
   const [closingCountdown, setClosingCountdown] = useState(null); // seconds remaining
   const [showClosingTimer, setShowClosingTimer] = useState(false);
   const [salonClosed, setSalonClosed] = useState(false);
+  const [allBookings, setAllBookings] = useState([]); // NEW: Store all bookings for queue details
+
   const {
     userLocation,
     locationStatus,
@@ -102,6 +125,43 @@ export default function SalonDetail({ initialSalon }) {
     }
   }, [salon?._id]); // Only recreate if salon ID changes
 
+  // NEW: Fetch all bookings for detailed per-barber queue info
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchAllBookings = async () => {
+      try {
+        // Mark expired first
+        await fetch("/api/walkin/mark-expired", { method: "POST" });
+
+        const res = await fetch(`/api/salons/${id}/bookings-detailed`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+
+        const now = new Date();
+        const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
+        const activeBookings = (data.bookings || []).filter((b) => {
+          if (b.isExpired) return false;
+          if (b.queueStatus === "RED") {
+            return new Date(b.expiresAt) > bufferTime;
+          }
+          return true;
+        });
+
+        setAllBookings(activeBookings); // ✅ FIX: Set filtered bookings
+      } catch (error) {
+        console.error("Error fetching bookings:", error);
+      }
+    };
+
+    fetchAllBookings();
+    // Poll every 5 seconds for live updates
+    const interval = setInterval(fetchAllBookings, 5000);
+    return () => clearInterval(interval);
+  }, [id]);
+
+  // UPDATED: Fetch barber states - now 5 second polling for real-time
   useEffect(() => {
     if (bookingMode !== "walkin" || !id) return;
 
@@ -109,7 +169,8 @@ export default function SalonDetail({ initialSalon }) {
       try {
         const res = await fetch(`/api/walkin/salon-state?salonId=${id}`);
         const data = await res.json();
-        setBarberStates(data.barbers || []);
+        setBarberStates(data.barbers);
+        console.log("Barber states updated (LIVE):", data.barbers);
       } catch (error) {
         console.error("Error fetching barber states:", error);
       }
@@ -117,9 +178,8 @@ export default function SalonDetail({ initialSalon }) {
 
     fetchBarberStates();
 
-    // Update every 30 seconds
-    const interval = setInterval(fetchBarberStates, 30000);
-
+    // CHANGED: Update every 5 seconds (faster for live queue updates)
+    const interval = setInterval(fetchBarberStates, 5000);
     return () => clearInterval(interval);
   }, [bookingMode, id]);
 
@@ -1082,6 +1142,7 @@ export default function SalonDetail({ initialSalon }) {
                     </p>
                     <span className={styles.flexibleBadge}>Flexible</span>
                   </motion.div>
+
                   {availableBarbers.map((barber) => {
                     const barberState =
                       bookingMode === "walkin"
@@ -1089,6 +1150,26 @@ export default function SalonDetail({ initialSalon }) {
                             (b) => b.barberId === barber._id.toString()
                           )
                         : null;
+
+                    // NEW: Get per-barber queue data
+                    const barberBookings =
+                      allBookings?.filter(
+                        (b) => b.barberId === barber._id.toString()
+                      ) || [];
+                    const greenBookings = barberBookings.filter(
+                      (b) => b.queueStatus === "GREEN"
+                    );
+                    const orangeBookings = barberBookings
+                      .filter((b) => b.queueStatus === "ORANGE")
+                      .sort(
+                        (a, b) => new Date(a.arrivedAt) - new Date(b.arrivedAt)
+                      );
+                    const redBookings = barberBookings.filter(
+                      (b) =>
+                        b.queueStatus === "RED" &&
+                        !b.isExpired &&
+                        new Date(b.expiresAt) > new Date()
+                    );
 
                     return (
                       <motion.div
@@ -1118,9 +1199,9 @@ export default function SalonDetail({ initialSalon }) {
                                     🟢 Busy ({barberState.timeLeft}m left)
                                   </span>
                                 )}
-                                {barberState.queueCount > 0 && (
+                                {orangeBookings.length > 0 && (
                                   <span className={styles.queueBadge}>
-                                    {barberState.queueCount} in queue
+                                    {orangeBookings.length} in priority queue
                                   </span>
                                 )}
                               </>
@@ -1147,17 +1228,7 @@ export default function SalonDetail({ initialSalon }) {
                           </p>
                         )}
 
-                        {/* {barber.skills && barber.skills.length > 0 && (
-                          <div className={styles.barberSkills}>
-                            {barber.skills.slice(0, 3).map((skill, idx) => (
-                              <span key={idx} className={styles.skillChip}>
-                                {skill}
-                              </span>
-                            ))}
-                          </div>
-                        )} */}
-
-                        {/* ✅ Walk-in: Show wait time estimate at bottom */}
+                        {/* Walk-in: Show wait time estimate at bottom */}
                         {bookingMode === "walkin" && barberState && (
                           <div className={styles.waitEstimate}>
                             {barberState.isPaused ? (
@@ -1170,8 +1241,27 @@ export default function SalonDetail({ initialSalon }) {
                               <span className={styles.waitTime}>
                                 ~
                                 {barberState.timeLeft +
-                                  barberState.queueCount * 45}{" "}
+                                  orangeBookings.length * 45}{" "}
                                 mins
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* NEW: Per-Barber Queue Summary (Walk-in only) */}
+                        {bookingMode === "walkin" && (
+                          <div className={styles.queueSummaryMini}>
+                            {greenBookings.length > 0 && (
+                              <span className={styles.greenDot}>●</span>
+                            )}
+                            {orangeBookings.length > 0 && (
+                              <span className={styles.orangeCount}>
+                                {orangeBookings.length}
+                              </span>
+                            )}
+                            {redBookings.length > 0 && (
+                              <span className={styles.greyCount}>
+                                +{redBookings.length}
                               </span>
                             )}
                           </div>
@@ -1186,146 +1276,395 @@ export default function SalonDetail({ initialSalon }) {
                     Salon Will Assign Best Available Barber
                   </h4>
                 </div>
-              )}{" "}
-              {/* Chair Visualization */}
-              <div className={styles.chairsSection}>
-                {/* <h4 className={styles.chairsTitle}>💈 Barber Chairs</h4> */}
-                <div className={styles.chairsGrid}>
-                  {barberStates.map((barber, index) => (
-                    <div key={barber.barberId} className={styles.chairItem}>
-                      <div
-                        className={`${styles.chair} ${
-                          barber.status === "AVAILABLE"
-                            ? styles.available
-                            : barber.status === "OCCUPIED"
-                            ? styles.occupied
-                            : styles.available
-                        }`}
-                      >
-                        <div className={styles.chairIcon}>💺</div>
-                        <div
-                          className={`${styles.chairStatus} ${
-                            barber.isPaused
-                              ? styles.paused
-                              : barber.status === "AVAILABLE"
-                              ? styles.green
-                              : barber.status === "OCCUPIED"
-                              ? styles.orange
-                              : styles.green
-                          }`}
-                        >
-                          {barber.isPaused ? "⏸" : "●"}
-                        </div>
-                      </div>
-                      <p className={styles.chairLabel}>Chair #{index + 1}</p>
-                      <p className={styles.chairBarber}>{barber.name}</p>
+              )}
 
-                      {barber.isPaused ? (
-                        <div className={styles.chairPaused}>
-                          <span className={styles.chairBadgePaused}>
-                            ⏸ Queue Paused
+              {/* NEW: Chair Visualization with DETAILED Queue Info */}
+              {/* <div className={styles.chairsSection}>
+                <h4 className={styles.chairsTitle}>💈 Live Barber Status</h4>
+                <div className={styles.chairsGrid}>
+                  {barberStates.map((barber, index) => {
+                    // Get this barber's queue data
+                    const barberBookings =
+                      allBookings?.filter(
+                        (b) => b.barberId === barber.barberId
+                      ) || [];
+                    const greenBookings = barberBookings.filter(
+                      (b) => b.queueStatus === "GREEN"
+                    );
+                    const orangeBookings = barberBookings
+                      .filter((b) => b.queueStatus === "ORANGE")
+                      .sort(
+                        (a, b) => new Date(a.arrivedAt) - new Date(b.arrivedAt)
+                      );
+                    const redBookings = barberBookings.filter(
+                      (b) =>
+                        b.queueStatus === "RED" &&
+                        !b.isExpired &&
+                        new Date(b.expiresAt) > new Date()
+                    );
+
+                    return (
+                      <motion.div
+                        key={barber.barberId}
+                        className={styles.chairDetailCard}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <div className={styles.chairHeader}>
+                          <h5 className={styles.chairBarberName}>
+                            {barber.name}
+                          </h5>
+                          <span className={styles.chairNumber}>
+                            Chair #{index + 1}
                           </span>
-                          <p className={styles.pausedMessage}>
-                            Barber is temporarily unavailable
-                          </p>
                         </div>
-                      ) : barber.status === "AVAILABLE" ? (
-                        <span className={styles.chairBadge}>Available</span>
-                      ) : (
-                        <div className={styles.chairBusy}>
-                          <span className={styles.chairBadgeOccupied}>
-                            In Service
-                          </span>
-                          <p className={styles.chairCustomer}>
-                            {barber.currentCustomer}
-                          </p>
-                          <p className={styles.chairTime}>
-                            ~{barber.timeLeft}m left
-                          </p>
-                          {barber.queueCount > 0 && (
-                            <p className={styles.chairQueue}>
-                              {barber.queueCount} waiting
-                            </p>
+
+                        <div className={styles.currentService}>
+                          <p className={styles.statusLabel}>Now Serving:</p>
+                          {greenBookings.length > 0 ? (
+                            <div className={styles.greenCustomer}>
+                              <span className={styles.greenIndicator}>●</span>
+                              <span className={styles.customerName}>
+                                {greenBookings[0].customerName}
+                              </span>
+                              <span className={styles.timeInfo}>
+                                {barber.timeLeft > 0
+                                  ? `${barber.timeLeft}m left`
+                                  : "Finishing..."}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className={styles.available}>Available</span>
                           )}
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {/* Walk-in: Show real-time status below barbers */}
-              <motion.section
-                className={styles.realTimeStatus}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <h3 className={styles.statusTitle}>📊 Live Salon Status</h3>
 
-                <div className={styles.statusGrid}>
-                  <div className={styles.statusCard}>
-                    <div className={styles.statusIcon}>🟢</div>
-                    <div className={styles.statusValue}>
-                      {salonStats.totalServing}
-                    </div>
-                    <div className={styles.statusLabel}>Serving Now</div>
-                    {barberStates
-                      .filter((b) => b.status === "OCCUPIED")
-                      .map((b) => (
-                        <div key={b.barberId} className={styles.miniInfo}>
-                          {b.name}: {b.timeLeft}m
+                        {orangeBookings.length > 0 && (
+                          <div className={styles.priorityQueueMini}>
+                            <p className={styles.queueLabel}>
+                              Priority Queue ({orangeBookings.length}):
+                            </p>
+                            <div className={styles.queueItems}>
+                              {orangeBookings.slice(0, 2).map((booking, i) => (
+                                <div
+                                  key={booking._id}
+                                  className={styles.queueItemMini}
+                                >
+                                  <span className={styles.goldenBadge}>
+                                    #{i + 1}
+                                  </span>
+                                  <span className={styles.customerNameMini}>
+                                    {booking.customerName}
+                                  </span>
+                                </div>
+                              ))}
+                              {orangeBookings.length > 2 && (
+                                <span className={styles.moreCount}>
+                                  +{orangeBookings.length - 2} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {redBookings.length > 0 && (
+                          <div className={styles.temporaryBookings}>
+                            <span className={styles.greyIndicator}>
+                              {redBookings.length} booked (not arrived)
+                            </span>
+                          </div>
+                        )}
+
+                        <div className={styles.queueStats}>
+                          <span className={styles.totalWait}>
+                            Est. Wait:{" "}
+                            {barber.timeLeft + orangeBookings.length * 45}m
+                          </span>
                         </div>
-                      ))}
-                  </div>
-
-                  <div className={styles.statusCard}>
-                    <div className={styles.statusIcon}>🟠</div>
-                    <div className={styles.statusValue}>
-                      {salonStats.totalWaiting}
-                    </div>
-                    <div className={styles.statusLabel}>In Queue</div>
-                  </div>
-
-                  <div className={styles.statusCard}>
-                    <div className={styles.statusIcon}>🔴</div>
-                    <div className={styles.statusValue}>
-                      {salonStats.totalBooked}
-                    </div>
-                    <div className={styles.statusLabel}>
-                      Booked (Not Arrived)
-                    </div>
-                  </div>
-
-                  <div className={styles.statusCard}>
-                    <div className={styles.statusIcon}>⏱️</div>
-                    <div className={styles.statusValue}>
-                      ~{salonStats.avgWaitTime} min
-                    </div>
-                    <div className={styles.statusLabel}>Avg Wait</div>
-                  </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
+              </div> */}
 
-                {/* Legend */}
-                {/* <div className={styles.statusLegend}>
-                    <div className={styles.legendItem}>
-                      <span className={`${styles.legendDot} ${styles.green}`}>
-                        ●
-                      </span>
-                      <span>Available</span>
+              {/* NEW: Complete Salon Queue Overview */}
+              {bookingMode === "walkin" && allBookings && (
+                <motion.section
+                  className={styles.salonQueueOverview}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                >
+                  <h3 className={styles.queueOverviewTitle}>
+                    💈 Live Salon Queue Status
+                  </h3>
+
+                  {/* Overall Salon Stats */}
+                  <div className={styles.overallStats}>
+                    <div className={styles.statCard}>
+                      <span className={styles.statIcon}>🟢</span>
+                      <div className={styles.statContent}>
+                        <span className={styles.statValue}>
+                          {
+                            allBookings.filter((b) => b.queueStatus === "GREEN")
+                              .length
+                          }
+                        </span>
+                        <span className={styles.statLabel}>Now Serving</span>
+                      </div>
                     </div>
-                    <div className={styles.legendItem}>
-                      <span className={`${styles.legendDot} ${styles.orange}`}>
-                        ●
-                      </span>
-                      <span>In Service</span>
+                    <div className={styles.statCard}>
+                      <span className={styles.statIcon}>🟠</span>
+                      <div className={styles.statContent}>
+                        <span className={styles.statValue}>
+                          {
+                            allBookings.filter(
+                              (b) => b.queueStatus === "ORANGE"
+                            ).length
+                          }
+                        </span>
+                        <span className={styles.statLabel}>Priority Queue</span>
+                      </div>
                     </div>
-                    <div className={styles.legendItem}>
-                      <span className={`${styles.legendDot} ${styles.red}`}>
-                        ●
-                      </span>
-                      <span>Booked</span>
+                    <div className={styles.statCard}>
+                      <span className={styles.statIcon}>⚫</span>
+                      <div className={styles.statContent}>
+                        <span className={styles.statValue}>
+                          {
+                            allBookings.filter((b) => b.queueStatus === "RED")
+                              .length
+                          }
+                        </span>
+                        <span className={styles.statLabel}>
+                          Booked (Not Arrived)
+                        </span>
+                      </div>
                     </div>
-                  </div> */}
-              </motion.section>
+                    <div className={styles.statCard}>
+                      <span className={styles.statIcon}>💺</span>
+                      <div className={styles.statContent}>
+                        <span className={styles.statValue}>
+                          {availableBarbers?.length || 0}
+                        </span>
+                        <span className={styles.statLabel}>Total Chairs</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Per-Barber Queue Display */}
+                  <div className={styles.barbersQueueContainer}>
+                    {availableBarbers.map((barber, barberIndex) => {
+                      const barberBookings = allBookings.filter(
+                        (b) => b.barberId === barber._id
+                      );
+                      const greenBooking = barberBookings.find(
+                        (b) => b.queueStatus === "GREEN"
+                      );
+                      const orangeBookings = barberBookings
+                        .filter((b) => b.queueStatus === "ORANGE")
+                        .sort(
+                          (a, b) =>
+                            new Date(a.arrivedAt) - new Date(b.arrivedAt)
+                        );
+                      const redBookings = barberBookings.filter(
+                        (b) => b.queueStatus === "RED"
+                      );
+
+                      return (
+                        <motion.div
+                          key={barber._id}
+                          className={styles.barberQueueCard}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: barberIndex * 0.2 }}
+                        >
+                          {/* Barber Header */}
+                          <div className={styles.barberQueueHeader}>
+                            <div className={styles.barberInfo}>
+                              <h4 className={styles.barberQueueName}>
+                                {barber.name}
+                              </h4>
+                              <span className={styles.chairBadge}>
+                                Chair #{barberIndex + 1}
+                              </span>
+                            </div>
+                            <div className={styles.queueCount}>
+                              <span className={styles.countBadge}>
+                                {orangeBookings.length + redBookings.length}{" "}
+                                waiting
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Chair Status */}
+                          <div className={styles.chairStatusRow}>
+                            <div className={styles.chairIconBox}>
+                              <span className={styles.chairEmoji}>💺</span>
+                              <span className={styles.chairLabel}>CHAIR</span>
+                            </div>
+                            {greenBooking ? (
+                              <div className={styles.servingBox}>
+                                <span className={styles.servingIndicator}>
+                                  🟢
+                                </span>
+                                <div className={styles.servingDetails}>
+                                  <span className={styles.servingName}>
+                                    {greenBooking.customerName}
+                                  </span>
+                                  <span className={styles.servingStatus}>
+                                    Now Serving
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className={styles.availableBox}>
+                                <span className={styles.availableText}>
+                                  Available
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Queue Line */}
+                          <div className={styles.queueLineContainer}>
+                            <div className={styles.queueLineLabel}>
+                              QUEUE (
+                              {orangeBookings.length + redBookings.length}{" "}
+                              waiting)
+                            </div>
+                            <div className={styles.queueLine}>
+                              {/* Priority Queue (ORANGE) */}
+                              {orangeBookings.map((booking, idx) => (
+                                <motion.div
+                                  key={booking._id}
+                                  className={`${styles.queueDot} ${styles.orangeDot}`}
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  transition={{ delay: idx * 0.1 }}
+                                >
+                                  <span className={styles.dotNumber}>
+                                    #{idx + 1}
+                                  </span>
+                                  <span className={styles.dotName}>
+                                    {booking.customerName}
+                                  </span>
+                                  <span className={styles.dotStatus}>
+                                    Arrived
+                                  </span>
+                                </motion.div>
+                              ))}
+
+                              {/* Temporary Queue (RED) */}
+                              {redBookings.map((booking, idx) => {
+                                const bookingTime = new Date(
+                                  booking.createdAt
+                                ).toLocaleTimeString("en-US", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  hour12: true,
+                                });
+                                const remaining = Math.max(
+                                  0,
+                                  Math.ceil(
+                                    (new Date(booking.expiresAt) - new Date()) /
+                                      1000 /
+                                      60
+                                  )
+                                );
+
+                                return (
+                                  <motion.div
+                                    key={booking._id}
+                                    className={`${styles.queueDot} ${styles.redDot}`}
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    transition={{
+                                      delay:
+                                        (orangeBookings.length + idx) * 0.1,
+                                    }}
+                                  >
+                                    <span className={styles.dotNumber}>⚫</span>
+                                    <span className={styles.dotName}>
+                                      {booking.customerName}
+                                    </span>
+                                    <span className={styles.dotStatus}>
+                                      Booked
+                                    </span>
+                                    <span className={styles.dotTime}>
+                                      Booked at - {bookingTime}
+                                    </span>
+                                    <span className={styles.dotExpiry}>
+                                      {remaining}m
+                                    </span>
+                                  </motion.div>
+                                );
+                              })}
+
+                              {/* Empty State */}
+                              {barberBookings.length === 0 && (
+                                <div className={styles.emptyQueue}>
+                                  <span>No one in queue</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Quick Stats */}
+                          <div className={styles.barberQuickStats}>
+                            <div className={styles.quickStat}>
+                              <span className={styles.quickStatLabel}>
+                                Serving:
+                              </span>
+                              <span className={styles.quickStatValue}>
+                                {greenBooking ? "1" : "0"}
+                              </span>
+                            </div>
+                            <div className={styles.quickStat}>
+                              <span className={styles.quickStatLabel}>
+                                Priority:
+                              </span>
+                              <span className={styles.quickStatValue}>
+                                {orangeBookings.length}
+                              </span>
+                            </div>
+                            <div className={styles.quickStat}>
+                              <span className={styles.quickStatLabel}>
+                                Booked:
+                              </span>
+                              <span className={styles.quickStatValue}>
+                                {redBookings.length}
+                              </span>
+                            </div>
+                            <div className={styles.quickStat}>
+                              <span className={styles.quickStatLabel}>
+                                Est. Wait:
+                              </span>
+                              <span className={styles.quickStatValue}>
+                                {greenBooking
+                                  ? Math.max(
+                                      0,
+                                      Math.ceil(
+                                        (new Date(
+                                          greenBooking.expectedCompletionTime
+                                        ) -
+                                          new Date()) /
+                                          1000 /
+                                          60
+                                      )
+                                    ) +
+                                    orangeBookings.length * 30
+                                  : orangeBookings.length * 30}
+                                m
+                              </span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </motion.section>
+              )}
+
               <div className={styles.cardActions}>
                 <button
                   className={styles.prevButton}

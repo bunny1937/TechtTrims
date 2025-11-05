@@ -1,0 +1,142 @@
+.timeMonitor {
+  background: #f0fdf4;
+  padding: 12px;
+  border-radius: 8px;
+  margin: 12px 0;
+  border-left: 4px solid #10b981;
+  transition: all 0.3s ease;
+}
+
+.timeMonitor.alert_warning {
+  background: #fef3c7;
+  border-left-color: #f59e0b;
+}
+
+.timeMonitor.alert_danger {
+  background: #fed7aa;
+  border-left-color: #f97316;
+}
+
+.timeMonitor.alert_critical {
+  background: #fee2e2;
+  border-left-color: #dc2626;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.timeDisplay {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.elapsed {
+  color: #10b981;
+}
+
+.slash {
+  color: #d1d5db;
+  font-size: 18px;
+}
+
+.duration {
+  color: #6b7280;
+  font-size: 18px;
+}
+
+.progressBar {
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  transition: width 1s linear;
+}
+
+.progressFill.fill_warning {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+.progressFill.fill_danger {
+  background: linear-gradient(90deg, #fb923c, #f97316);
+}
+
+.progressFill.fill_critical {
+  background: linear-gradient(90deg, #fca5a5, #dc2626);
+}
+
+.alertMsg {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: white;
+  color: #374151;
+}
+
+.extendedInfo {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.serviceControls {
+  display: grid;
+  grid-template-columns: 1fr 0.8fr 0.8fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.doneBtn,
+.extendBtn5,
+.extendBtn10 {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.doneBtn {
+  background: #10b981;
+  color: white;
+}
+
+.doneBtn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.extendBtn5,
+.extendBtn10 {
+  background: #3b82f6;
+  color: white;
+}
+
+.extendBtn5:hover,
+.extendBtn10:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}

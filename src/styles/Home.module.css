@@ -9,6 +9,7 @@
   position: relative;
   overflow-x: hidden;
 }
+
 .locationRequired {
   position: fixed;
   top: 0;
@@ -179,11 +180,19 @@
   color: white;
   margin: 0;
 }
-
+.rightControls {
+  display: none;
+}
 @media (max-width: 768px) {
   .modeButton {
     padding: 12px 24px;
     font-size: 14px;
+  }
+  .rightControls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto; /* pushes it to the right end */
   }
 
   .modeBadge {

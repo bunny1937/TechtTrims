@@ -78,28 +78,28 @@ export default async function handler(req, res) {
       })
     );
 
-    // Count RED bookings - EXCLUDE EXPIRED BY TIME
+    // Count RED bookings - Only count non-expired, future expiry
     const redCount = await db.collection("bookings").countDocuments({
       salonId: new ObjectId(salonId),
-      queueStatus: "RED",
-      isExpired: { $ne: true },
-      expiresAt: { $gt: now }, // ✅ Only count if expiry is in future
+      queueStatus: "RED", // GREY UI - booked but not arrived
+      isExpired: false, // NOT expired yet
+      expiresAt: { $gt: now }, // Expiry time still in future
     });
 
-    // Count ORANGE bookings
+    // Count ORANGE bookings - Arrived users in priority queue (GOLDEN UI)
     const orangeCount = await db.collection("bookings").countDocuments({
       salonId: new ObjectId(salonId),
-      queueStatus: "ORANGE",
-      isExpired: { $ne: true },
-      expiresAt: { $gt: now }, // ✅ Check expiry
+      queueStatus: "ORANGE", // GOLDEN UI - arrived at salon
+      isExpired: false,
+      arrivedAt: { $exists: true }, // Must have arrival timestamp
     });
 
-    // Count GREEN bookings
+    // Count GREEN bookings - Currently being served
     const greenCount = await db.collection("bookings").countDocuments({
       salonId: new ObjectId(salonId),
-      queueStatus: "GREEN",
-      isExpired: { $ne: true },
-      // GREEN doesn't need expiry check (already in service)
+      queueStatus: "GREEN", // GREEN UI - serving now
+      isExpired: false,
+      serviceStartedAt: { $exists: true }, // Service must have started
     });
 
     const availableCount = barbers.filter((b) => !b.currentBookingId).length;

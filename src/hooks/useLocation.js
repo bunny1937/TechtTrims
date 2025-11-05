@@ -9,9 +9,9 @@ export const useLocation = () => {
   const lastUpdateRef = useRef(0);
 
   // INCREASED THRESHOLDS FOR STABILITY
-  const MIN_UPDATE_INTERVAL = 30000; // 30 seconds between updates (was 5s)
-  const MIN_DISTANCE_DELTA = 0.0005; // ~50m (was 10m - too sensitive)
-  const MAX_ACCURACY = 100; // Only accept positions with <100m accuracy
+  const MIN_UPDATE_INTERVAL = 0; // 30 seconds between updates (was 5s)
+  const MIN_DISTANCE_DELTA = 0; // ~50m (was 10m - too sensitive)
+  const MAX_ACCURACY = 500; // Only accept positions with <100m accuracy
 
   // ----------------- START WATCHING -----------------
   const startWatchingLocation = useCallback(() => {
@@ -27,15 +27,30 @@ export const useLocation = () => {
       }
 
       // Only accept high-accuracy positions
+      // ✅ REJECT TERRIBLE ACCURACY (259km+ is device error)
+      if (position.coords.accuracy > 1000) {
+        console.log(
+          `⚠️ Position accuracy too low: ${position.coords.accuracy}m - IGNORING`
+        );
+        return; // ✅ DON'T SAVE THIS
+      }
+
+      // Also reject if accuracy check happens in later logic
       if (position.coords.accuracy > MAX_ACCURACY) {
         console.log(
-          `⚠️ Position accuracy too low: ${position.coords.accuracy}m`
+          `⚠️ Position accuracy suspicious: ${position.coords.accuracy}m`
         );
         return;
       }
 
       const { latitude, longitude, accuracy } = position.coords;
-      const newLocation = { latitude, longitude, accuracy };
+      const newLocation = {
+        latitude,
+        longitude,
+        lat: latitude,
+        lng: longitude,
+        accuracy,
+      };
 
       // Check if location has actually changed enough to warrant an update
       if (userLocation) {
@@ -67,20 +82,28 @@ export const useLocation = () => {
     const handleError = (error) => {
       console.error("Watch position error:", error);
 
-      if (error.code === 3) {
-        // TIMEOUT - Retry after 5 seconds
-        setLocationError(
-          "Location request timed out. Retrying in 5 seconds..."
-        );
-        setLocationStatus("error");
+      // ✅ IF WE ALREADY HAVE LOCATION, DON'T RETRY
+      if (userLocation && error.code === 3) {
+        console.log("⚠️ Timeout but we already have location - ignoring");
+        return; // ✅ DON'T RETRY - We already have good location
+      }
 
-        setTimeout(() => {
-          console.log("🔄 Retrying location fetch...");
-          if (watchIdRef.current) {
-            navigator.geolocation.clearWatch(watchIdRef.current);
-          }
-          startWatchingLocation(); // Retry
-        }, 5000);
+      if (error.code === 3) {
+        // TIMEOUT - Only retry if we DON'T have a location
+        if (!userLocation) {
+          setLocationError(
+            "Location request timed out. Retrying in 5 seconds..."
+          );
+          setLocationStatus("error");
+
+          setTimeout(() => {
+            console.log("🔄 Retrying location fetch...");
+            if (watchIdRef.current) {
+              navigator.geolocation.clearWatch(watchIdRef.current);
+            }
+            startWatchingLocation(); // Retry ONLY if no location
+          }, 5000);
+        }
       } else if (error.code === 1) {
         // PERMISSION DENIED
         setLocationError(
@@ -139,7 +162,19 @@ export const useLocation = () => {
         });
       });
 
+      // ✅ VALIDATE ACCURACY BEFORE SAVING
+      if (position.coords.accuracy > 1000) {
+        // Silently skip - don't log as warning
+
+        setLocationError("Location accuracy too poor. Retrying...");
+        // Try watchPosition instead
+        startWatchingLocation();
+        return;
+      }
+
       const newLocation = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
         lat: position.coords.latitude,
         lng: position.coords.longitude,
         accuracy: position.coords.accuracy,
@@ -168,32 +203,50 @@ export const useLocation = () => {
 
   // ----------------- SETUP ON MOUNT -----------------
   useEffect(() => {
-    // Try to load from SESSION STORAGE on mount
-    const stored = sessionStorage.getItem("userLocation");
-
-    if (stored) {
+    // Try localStorage first
+    const cached = localStorage.getItem("cachedUserLocation");
+    if (cached) {
       try {
-        const parsed = JSON.parse(stored);
-        setUserLocation(parsed);
-        setLocationStatus("granted");
-        console.log("📍 Loaded cached location");
+        const parsed = JSON.parse(cached);
+
+        // ✅ VALIDATE ACCURACY BEFORE LOADING
+        if (parsed.accuracy && parsed.accuracy > 1000) {
+          console.warn(
+            "❌ Cached location has bad accuracy:",
+            parsed.accuracy,
+            "- DISCARDING"
+          );
+          localStorage.removeItem("cachedUserLocation");
+          // Don't load bad cache - let requestLocationPermission() get fresh location
+        } else {
+          // ✅ Only load if accuracy is reasonable
+          const normalized = {
+            latitude: parsed.latitude || parsed.lat,
+            longitude: parsed.longitude || parsed.lng,
+            lat: parsed.latitude || parsed.lat,
+            lng: parsed.longitude || parsed.lng,
+            accuracy: parsed.accuracy,
+            timestamp: parsed.timestamp,
+          };
+          setUserLocation(normalized);
+          setLocationStatus("granted");
+          console.log(
+            "📍 Loaded cached location from localStorage",
+            normalized
+          );
+        }
       } catch (e) {
-        console.error("Error parsing stored location", e);
+        console.error("Error parsing cached location", e);
       }
     }
 
-    // Always request fresh location on mount
-    if (!stored) {
-      requestLocationPermission();
-    } else {
-      // If we have cached location, start watching
-      startWatchingLocation();
-    }
+    // ALWAYS request fresh location immediately
+    requestLocationPermission();
 
     return () => {
       stopWatchingLocation();
     };
-  }, [requestLocationPermission, startWatchingLocation, stopWatchingLocation]); // ONLY RUN ONCE ON MOUNT
+  }, []); // ✅ EMPTY DEPS - Run ONCE
 
   return {
     userLocation,

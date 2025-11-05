@@ -20,9 +20,9 @@ export default function FeedbackPage() {
   const [userOnboardingData, setUserOnboardingData] = useState(null);
 
   useEffect(() => {
-    // Get user onboarding data from localStorage
+    // Get user onboarding data from sessionStorage ✅ CHANGED
     if (typeof window !== "undefined") {
-      const onboardingData = localStorage.getItem("userOnboardingData");
+      const onboardingData = sessionStorage.getItem("userOnboardingData");
       if (onboardingData) {
         try {
           setUserOnboardingData(JSON.parse(onboardingData));
@@ -155,29 +155,28 @@ export default function FeedbackPage() {
       if (response.ok) {
         alert("Thank you for your feedback!");
 
-        // Check if user is logged in
-        const userToken = localStorage.getItem("userToken");
-        const authenticatedUserData = localStorage.getItem(
-          "authenticatedUserData"
-        );
+        // ✅ Check sessionStorage for existing user
+        const userData = sessionStorage.getItem("userData");
+        const hasOnboarded = sessionStorage.getItem("hasOnboarded");
 
-        if (userToken && authenticatedUserData) {
-          // User is logged in - redirect to dashboard
+        if (userData && hasOnboarded === "true") {
+          // ✅ Existing user - redirect to dashboard
+          console.log("✅ Existing user, redirecting to dashboard");
           router.push("/user/dashboard");
         } else {
-          // User is not logged in - store prefill data and redirect to register
+          // ✅ New user - store prefill data and redirect to register
           if (bookings) {
             const prefillData = {
               name: bookings.customerName,
-              customerName: bookings.customerName, // Add both formats
+              customerName: bookings.customerName,
               phone: bookings.customerPhone || userOnboardingData?.phoneNumber,
               phoneNumber:
-                bookings.customerPhone || userOnboardingData?.phoneNumber, // Add both formats
+                bookings.customerPhone || userOnboardingData?.phoneNumber,
               customerPhone:
                 bookings.customerPhone || userOnboardingData?.phoneNumber,
               gender: bookings.customerGender || userOnboardingData?.gender,
               customerGender:
-                bookings.customerGender || userOnboardingData?.gender, // Add both formats
+                bookings.customerGender || userOnboardingData?.gender,
               age: bookings.customerAge || userOnboardingData?.age,
               customerAge: bookings.customerAge || userOnboardingData?.age,
               lastbookings: {
@@ -188,10 +187,9 @@ export default function FeedbackPage() {
               },
               timestamp: new Date().getTime(),
             };
-            console.log("Storing complete prefill data:", prefillData); // Debug log
-
-            console.log("Storing prefill data:", prefillData);
-            localStorage.setItem(
+            console.log("📝 New user, storing prefill data:", prefillData);
+            sessionStorage.setItem(
+              // ✅ CHANGED from localStorage
               "userPrefillData",
               JSON.stringify(prefillData)
             );

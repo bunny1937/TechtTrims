@@ -1,4 +1,4 @@
-// Lines 1-35 - COMPLETE REPLACEMENT
+//pages/api/salons/profile.js
 import clientPromise from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
 
