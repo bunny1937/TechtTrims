@@ -69,10 +69,6 @@ export default async function handler(req, res) {
       })
       .toArray();
 
-    console.log(
-      `Found ${existingBookings.length} existing bookings for this user`
-    );
-
     const newUser = {
       name,
       email,
@@ -101,9 +97,6 @@ export default async function handler(req, res) {
           { _id: { $in: existingBookings.map((b) => b._id) } },
           { $set: { userId: result.insertedId } }
         );
-      console.log(
-        `Updated ${existingBookings.length} bookings with new userId`
-      );
     }
 
     // Generate JWT token
@@ -111,11 +104,17 @@ export default async function handler(req, res) {
 
     // Remove password from response
     const { hashedPassword: _, ...userResponse } = newUser;
-    userResponse._id = result.insertedId;
+    userResponse.id = result.insertedId;
+
+    // Ensure gender is in the response
+    console.log("✅ User registered with gender:", userResponse.gender);
 
     res.status(201).json({
       message: "User registered successfully",
-      user: userResponse,
+      user: {
+        ...userResponse,
+        gender: userResponse.gender || "other", // Ensure gender is always present
+      },
       token,
     });
   } catch (error) {

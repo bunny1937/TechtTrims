@@ -106,7 +106,6 @@ export default async function handler(req, res) {
             {
               $push: { bookingHistory: bookingId },
               $set: {
-                updatedAt: new Date(),
                 // Update location if new location data is provided
                 ...(user.location && { location: user.location }),
               },
@@ -136,7 +135,6 @@ export default async function handler(req, res) {
           { _id: new ObjectId(body.userId) },
           {
             $push: { bookingHistory: bookingId },
-            $set: { updatedAt: new Date() },
           },
           { session }
         );
@@ -156,7 +154,6 @@ export default async function handler(req, res) {
             },
           },
           $inc: { "stats.totalBookings": 1 },
-          $set: { updatedAt: new Date() },
         },
         { session }
       );

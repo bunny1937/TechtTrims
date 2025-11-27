@@ -132,7 +132,7 @@ export default function SalonDetail({ initialSalon }) {
     const fetchAllBookings = async () => {
       try {
         // Mark expired first
-        await fetch("/api/walkin/mark-expired", { method: "POST" });
+        await fetch("/api/walkin/booking/mark-expired", { method: "POST" });
 
         const res = await fetch(`/api/salons/${id}/bookings-detailed`, {
           cache: "no-store",
@@ -170,7 +170,6 @@ export default function SalonDetail({ initialSalon }) {
         const res = await fetch(`/api/walkin/salon-state?salonId=${id}`);
         const data = await res.json();
         setBarberStates(data.barbers);
-        console.log("Barber states updated (LIVE):", data.barbers);
       } catch (error) {
         console.error("Error fetching barber states:", error);
       }
@@ -873,12 +872,6 @@ export default function SalonDetail({ initialSalon }) {
         </div>
       )}
       {/* Location Status Feedback */}
-      {locationStatus === "requesting" && (
-        <div className={styles.locationBanner}>
-          <span>📍</span>
-          <p>Fetching your location for accurate distance...</p>
-        </div>
-      )}
 
       {locationError && locationStatus === "denied" && (
         <div className={styles.locationBannerError}>

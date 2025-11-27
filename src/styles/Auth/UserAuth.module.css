@@ -37,9 +37,10 @@
   content: "";
   position: absolute;
   top: 0;
-  left: 0;
+  width: 93%;
+  left: 3.5%;
   right: 0;
-  height: 4px;
+  height: 3px;
   background: linear-gradient(
     90deg,
     var(--primary),
@@ -333,11 +334,11 @@
 
 /* Dark mode */
 [data-theme="dark"] .container {
-  background: linear-gradient(135deg, var(--gray-900) 0%, var(--gray-800) 100%);
+  background: var(--black);
 }
 
 [data-theme="dark"] .authCard {
-  background: var(--gray-800);
+  background: var(--background-primary);
   border-color: var(--gray-700);
 }
 

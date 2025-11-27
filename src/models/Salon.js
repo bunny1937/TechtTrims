@@ -21,6 +21,7 @@ export class Salon {
       images: data.salonDetails.images || [],
       description: data.salonDetails.description || "",
     };
+    this.salonGender = data.salonGender || "Unisex";
     this.services = data.services || [];
     this.barbers = data.barbers || [];
     this.ratings = data.ratings || {
@@ -86,6 +87,13 @@ export class Salon {
       },
     ];
 
+    // Add salon gender filtering if specified
+    if (options.salonGender && options.salonGender !== "all") {
+      pipeline.push({
+        $match: { salonGender: options.salonGender },
+      });
+    }
+
     // Add gender-based service filtering if specified
     if (options.gender) {
       pipeline.push({
@@ -143,7 +151,6 @@ export class Salon {
       { _id: new ObjectId(id) },
       {
         $inc: { "stats.totalBookings": 1 },
-        $set: { updatedAt: new Date() },
       }
     );
   }

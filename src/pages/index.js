@@ -7,8 +7,9 @@ import styles from "../styles/Home.module.css";
 import { useLocation } from "../hooks/useLocation";
 import { UserDataManager } from "../lib/userData";
 import { getAuthToken, getUserData } from "../lib/cookieAuth";
+import DarkVeil from "@/components/Backgrounds/DarkVeil";
 
-export default function Home() {
+export default function Home(theme) {
   const router = useRouter();
   const [salons, setSalons] = useState([]);
   const [userOnboarding, setUserOnboarding] = useState(null);
@@ -29,7 +30,10 @@ export default function Home() {
     requestLocationPermission,
   } = useLocation();
   const [mapKey, setMapKey] = useState(0);
+  const [searchRadius, setSearchRadius] = useState(10000); // Default 30km
 
+  const [salonLoadError, setSalonLoadError] = useState(null);
+  const [debugInfo, setDebugInfo] = useState(null);
   // ADD: Track if salons were loaded
   const salonsLoadedRef = useRef(false);
   const initialLocationRef = useRef(null);
@@ -68,29 +72,38 @@ export default function Home() {
 
   useEffect(() => {
     const initializeUser = async () => {
-      if (typeof window === "undefined") return;
+      console.log("🔍 INITIALIZING USER - START");
+
+      if (typeof window === "undefined") {
+        console.log("❌ Window undefined, skipping");
+        return;
+      }
 
       // Check if user has completed onboarding
       const hasOnboarded = sessionStorage.getItem("hasOnboarded");
+      console.log("📋 Onboarding status:", hasOnboarded);
 
       // If not onboarded, redirect to onboarding
       if (!hasOnboarded) {
+        console.log("❌ Not onboarded, redirecting...");
         router.push("/onboarding");
         return;
       }
 
       // USE COOKIE INSTEAD OF LOCALSTORAGE for auth
       const userToken = getAuthToken();
+      console.log("🔑 Auth token:", userToken ? "EXISTS" : "MISSING");
 
       if (userToken) {
         try {
           // Fetch fresh user data from API
           const userData = await UserDataManager.fetchAndStoreUserData();
           if (userData) {
+            console.log("✅ User data loaded:", userData.name);
             setUserOnboarding(userData);
           }
         } catch (error) {
-          console.error("Error loading user data:", error);
+          console.error("❌ Error loading user data:", error);
         }
       } else {
         // Check session onboarding data for guest users
@@ -98,81 +111,240 @@ export default function Home() {
         if (onboardingData) {
           try {
             const userData = JSON.parse(onboardingData);
+            console.log("✅ Guest onboarding data loaded");
             setUserOnboarding(userData);
           } catch (error) {
-            console.error("Error parsing onboarding data:", error);
+            console.error("❌ Error parsing onboarding data:", error);
           }
         }
       }
 
       // Get location from session storage (persistent location)
       const storedLocation = sessionStorage.getItem("userLocation");
+      console.log("📦 Stored location RAW:", storedLocation);
+
       if (storedLocation) {
         try {
           const locationData = JSON.parse(storedLocation);
+          console.log("✅ Parsed stored location:", locationData);
+
+          // Normalize coordinates
+          const lat = locationData.latitude || locationData.lat;
+          const lng = locationData.longitude || locationData.lng;
+
+          console.log("📍 Normalized coords from storage:", { lat, lng });
+          console.log(
+            "📍 salonsLoadedRef.current BEFORE check:",
+            salonsLoadedRef.current
+          );
+
           // Use stored location to load salons
-          if (!salonsLoadedRef.current) {
-            await loadNearbySalons(
-              locationData.lat, // Uses 'lat' not 'latitude'
-              locationData.lng, // Uses 'lng' not 'longitude'
-              userOnboarding?.gender || "all"
+          if (lat && lng && !salonsLoadedRef.current) {
+            console.log(
+              "✅✅✅ CONDITION MET: Will call loadNearbySalons from sessionStorage"
+            );
+            console.log(
+              "🚀 CALLING loadNearbySalons from sessionStorage:",
+              lat,
+              lng
             );
 
-            salonsLoadedRef.current = true;
+            try {
+              await loadNearbySalons(lat, lng, userOnboarding?.gender || "all");
+              console.log("✅ loadNearbySalons COMPLETED");
+              salonsLoadedRef.current = true;
+              console.log("✅ Set salonsLoadedRef.current = true");
+            } catch (err) {
+              console.error("❌ loadNearbySalons FAILED:", err);
+            }
+          } else {
+            console.warn("⚠️⚠️⚠️ SKIPPING salon load from storage:", {
+              hasLat: !!lat,
+              hasLng: !!lng,
+              alreadyLoaded: salonsLoadedRef.current,
+            });
           }
         } catch (error) {
-          console.error("Error parsing stored location:", error);
+          console.error("❌ Error parsing stored location:", error);
         }
       } else if (liveUserLocation && !salonsLoadedRef.current) {
+        console.log("📡 Using live location:", liveUserLocation);
+
         // Use BOTH lat/lng formats for compatibility
         const lat = liveUserLocation.latitude || liveUserLocation.lat;
         const lng = liveUserLocation.longitude || liveUserLocation.lng;
 
-        if (lat && lng) {
-          await loadNearbySalons(lat, lng, userData?.gender);
-        }
+        console.log("📍 Extracted coords from live:", { lat, lng });
+        console.log(
+          "📍 salonsLoadedRef.current BEFORE check:",
+          salonsLoadedRef.current
+        );
 
-        salonsLoadedRef.current = true;
+        if (lat && lng) {
+          console.log(
+            "✅✅✅ CONDITION MET: Will call loadNearbySalons from liveUserLocation"
+          );
+          console.log(
+            "🚀 CALLING loadNearbySalons from liveUserLocation:",
+            lat,
+            lng
+          );
+
+          try {
+            await loadNearbySalons(lat, lng, userOnboarding?.gender || "all");
+            console.log("✅ loadNearbySalons COMPLETED");
+            salonsLoadedRef.current = true;
+            console.log("✅ Set salonsLoadedRef.current = true");
+          } catch (err) {
+            console.error("❌ loadNearbySalons FAILED:", err);
+          }
+        } else {
+          console.error("❌❌❌ Live location missing coordinates:", {
+            lat,
+            lng,
+            liveUserLocation,
+          });
+        }
       } else if (!liveUserLocation && !salonsLoadedRef.current) {
+        console.log("💾 Trying cached location fallback");
+
         // FALLBACK: Use cached location from localStorage if live location not available
         const cachedLocation = localStorage.getItem("cachedUserLocation");
+        console.log("💾 cachedUserLocation RAW:", cachedLocation);
+
         if (cachedLocation) {
           try {
             const locationData = JSON.parse(cachedLocation);
-            await loadNearbySalons(
-              locationData.latitude,
-              locationData.longitude,
-              userOnboarding?.gender || "all"
-            );
-            salonsLoadedRef.current = true;
+            console.log("✅ Using cached location:", locationData);
+
+            const lat = locationData.latitude || locationData.lat;
+            const lng = locationData.longitude || locationData.lng;
+
+            if (lat && lng) {
+              console.log(
+                "✅✅✅ CONDITION MET: Will call loadNearbySalons from cache"
+              );
+              console.log("🚀 CALLING loadNearbySalons from cache:", lat, lng);
+
+              try {
+                await loadNearbySalons(
+                  lat,
+                  lng,
+                  userOnboarding?.gender || "all"
+                );
+                console.log("✅ loadNearbySalons COMPLETED");
+                salonsLoadedRef.current = true;
+                console.log("✅ Set salonsLoadedRef.current = true");
+              } catch (err) {
+                console.error("❌ loadNearbySalons FAILED:", err);
+              }
+            }
           } catch (error) {
-            console.error("Error using cached location:", error);
+            console.error("❌ Error using cached location:", error);
           }
+        } else {
+          console.warn("❌ No cached location available");
         }
+      } else {
+        console.log("⏭⏭⏭ SKIPPING salon load - already loaded or no location", {
+          hasLiveLocation: !!liveUserLocation,
+          salonsLoadedRef: salonsLoadedRef.current,
+        });
       }
 
       setIsLoading(false);
+      console.log("✅ INITIALIZING USER - DONE");
     };
 
-    // ONLY run when location is first available
-    if (liveUserLocation && !salonsLoadedRef.current) {
-      initializeUser();
-    }
-  }, [liveUserLocation, router]); // Dependency on location only for initial load
+    console.log("🔄🔄🔄 useEffect TRIGGERED:", {
+      hasLiveLocation: !!liveUserLocation,
+      salonsLoaded: salonsLoadedRef.current,
+      locationKeys: liveUserLocation ? Object.keys(liveUserLocation) : "none",
+      liveUserLocationFull: liveUserLocation,
+    });
+
+    // Run initialization
+    initializeUser();
+  }, [liveUserLocation, router]);
 
   // Update location in session storage whenever it changes
   useEffect(() => {
     if (liveUserLocation) {
-      sessionStorage.setItem(
-        "userLocation",
-        JSON.stringify({
-          lat: liveUserLocation.latitude,
-          lng: liveUserLocation.longitude,
-          timestamp: Date.now(),
-        })
-      );
+      const normalized = {
+        lat: liveUserLocation.latitude || liveUserLocation.lat,
+        lng: liveUserLocation.longitude || liveUserLocation.lng,
+        latitude: liveUserLocation.latitude || liveUserLocation.lat,
+        longitude: liveUserLocation.longitude || liveUserLocation.lng,
+        accuracy: liveUserLocation.accuracy,
+        timestamp: Date.now(),
+      };
+
+      console.log("💾💾💾 Saving location to sessionStorage:", normalized);
+      sessionStorage.setItem("userLocation", JSON.stringify(normalized));
     }
   }, [liveUserLocation]);
+
+  // Reset ref if we have location but 0 salons
+  useEffect(() => {
+    console.log("🔄 Reset effect check:", {
+      hasLocation: !!liveUserLocation,
+      salonsLength: salons.length,
+      refValue: salonsLoadedRef.current,
+    });
+
+    if (liveUserLocation && salons.length === 0 && salonsLoadedRef.current) {
+      console.log(
+        "🔄🔄🔄 RESETTING salonsLoadedRef - have location but 0 salons"
+      );
+      const timeoutId = setTimeout(() => {
+        salonsLoadedRef.current = false;
+        console.log("✅ salonsLoadedRef reset to false");
+      }, 3000); // 3 seconds
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [liveUserLocation, salons.length]);
+
+  // Update location in session storage whenever it changes
+  useEffect(() => {
+    if (liveUserLocation) {
+      const normalized = {
+        lat: liveUserLocation.latitude || liveUserLocation.lat,
+        lng: liveUserLocation.longitude || liveUserLocation.lng,
+        latitude: liveUserLocation.latitude || liveUserLocation.lat,
+        longitude: liveUserLocation.longitude || liveUserLocation.lng,
+        accuracy: liveUserLocation.accuracy,
+        timestamp: Date.now(),
+      };
+
+      console.log("💾 Saving location to sessionStorage:", normalized);
+      sessionStorage.setItem("userLocation", JSON.stringify(normalized));
+    }
+  }, [liveUserLocation]);
+
+  // Listen for gender filter changes from header
+  useEffect(() => {
+    const handleGenderChange = (event) => {
+      const newGender = event.detail;
+      console.log("🚻 Gender filter changed to:", newGender);
+
+      // Reload salons with new gender filter
+      if (liveUserLocation?.latitude && liveUserLocation?.longitude) {
+        salonsLoadedRef.current = false;
+        loadNearbySalons(
+          liveUserLocation.latitude,
+          liveUserLocation.longitude,
+          userOnboarding?.gender || "all",
+          newGender
+        );
+        salonsLoadedRef.current = true;
+      }
+    };
+
+    window.addEventListener("genderFilterChange", handleGenderChange);
+    return () =>
+      window.removeEventListener("genderFilterChange", handleGenderChange);
+  }, [liveUserLocation, userOnboarding]);
 
   // useEffect(() => {
   //   const stored = sessionStorage.getItem("manualLocation");
@@ -193,21 +365,76 @@ export default function Home() {
   //   }
   // }, []);
 
-  const loadNearbySalons = async (lat, lng, gender = "all") => {
+  const loadNearbySalons = async (
+    lat,
+    lng,
+    gender = "all",
+    salonGender = "all"
+  ) => {
+    console.log("🚀 loadNearbySalons CALLED:", {
+      receivedLat: lat,
+      receivedLng: lng,
+      latType: typeof lat,
+      lngType: typeof lng,
+      gender,
+      salonGender,
+    });
+
+    // Normalize coordinates
+    const normalizedLat =
+      lat || liveUserLocation?.latitude || liveUserLocation?.lat;
+    const normalizedLng =
+      lng || liveUserLocation?.longitude || liveUserLocation?.lng;
+
+    console.log("📍 After normalization:", {
+      normalizedLat,
+      normalizedLng,
+      normalizedLatType: typeof normalizedLat,
+      normalizedLngType: typeof normalizedLng,
+    });
+
+    if (
+      !normalizedLat ||
+      !normalizedLng ||
+      isNaN(normalizedLat) ||
+      isNaN(normalizedLng)
+    ) {
+      console.error("❌ INVALID COORDINATES:", {
+        normalizedLat,
+        normalizedLng,
+      });
+      setSalonLoadError("Unable to load salons: Invalid location coordinates");
+      return;
+    }
+
     // ✅ ONLY skip if manual mode AND salons already exist
     const isManual = sessionStorage.getItem("isManualMode") === "true";
     if (isManual && salons.length > 0) {
-      console.log(
-        "⏭️ Skipping salon reload - manual mode with existing salons"
-      );
+      console.log("⏭ Skipping salon reload - manual mode with existing salons");
       return;
     }
 
     try {
-      console.log("🔍 Loading salons for coordinates:", lat, lng);
+      console.log(
+        "🔍 Loading salons for coordinates:",
+        normalizedLat,
+        normalizedLng
+      );
 
-      const url = `/api/salons/nearby?latitude=${lat}&longitude=${lng}&radius=100&gender=${gender}`;
-      console.log("📡 Fetching from:", url);
+      // Get salonGender from sessionStorage if not provided
+      const genderFilter =
+        salonGender === "all"
+          ? sessionStorage.getItem("selectedGender") || "all"
+          : salonGender;
+
+      const url = `/api/salons/nearby?latitude=${normalizedLat}&longitude=${normalizedLng}&radius=${searchRadius}&gender=${gender}&salonGender=${genderFilter}`;
+      console.log("📡 FULL API URL:", url);
+
+      setDebugInfo({
+        userLat: normalizedLat,
+        userLng: normalizedLng,
+        timestamp: new Date().toLocaleString(),
+      });
 
       const response = await fetch(url);
 
@@ -215,10 +442,53 @@ export default function Home() {
       console.log("📦 Response ok:", response.ok);
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error("❌ API ERROR RESPONSE:", errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log("📦 API returned data:", data);
+      console.log("📦 Salons count:", data?.salons?.length || 0);
+
+      if (data.salons && data.salons.length > 0) {
+        console.log(`📍 Found ${data.salons.length} salons:`);
+        data.salons.forEach((salon, idx) => {
+          const salonLat = salon.location?.coordinates?.latitude;
+          const salonLng = salon.location?.coordinates?.longitude;
+
+          if (salonLat && salonLng) {
+            // Haversine distance calculation
+            const R = 6371; // Earth radius in km
+            const dLat = ((salonLat - lat) * Math.PI) / 180;
+            const dLng = ((salonLng - lng) * Math.PI) / 180;
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos((lat * Math.PI) / 180) *
+                Math.cos((salonLat * Math.PI) / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2);
+
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+
+            console.log(
+              `   ${idx + 1}. ${salon.salonName}: ${distance.toFixed(
+                2
+              )} km away (${salonLat}, ${salonLng})`
+            );
+          }
+        });
+      } else {
+        console.log("❌ NO SALONS RETURNED FROM API");
+        setSalonLoadError(
+          `No salons found within ${searchRadius}km of your location (${lat.toFixed(
+            4
+          )}, ${lng.toFixed(
+            4
+          )}). Try increasing search radius or check if salons exist in your area.`
+        );
+      }
 
       console.log("📦 Raw API response:", data);
       console.log("📦 Data type:", typeof data);
@@ -236,10 +506,13 @@ export default function Home() {
 
       console.log("✅ State updated - salons count:", salonsArray.length);
     } catch (error) {
-      console.error("❌ Error loading salons:", error.message);
-      console.error("❌ Full error:", error);
-      setSalons([]);
-      setFilteredSalons([]);
+      console.error("❌ Salon load error:", error);
+      setSalonLoadError(
+        `Failed to load salons: ${error.message}. Check your internet connection.`
+      );
+      setNearbySalons([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -266,7 +539,7 @@ export default function Home() {
     });
 
     if (salons.length === 0) {
-      console.log("⚠️ No salons loaded yet");
+      console.log("⚠ No salons loaded yet");
       return;
     }
 
@@ -421,10 +694,12 @@ export default function Home() {
   const handleRefreshSalons = () => {
     if (liveUserLocation && userOnboarding) {
       salonsLoadedRef.current = false; // Allow reload
+      const salonGender = sessionStorage.getItem("selectedGender") || "all";
       loadNearbySalons(
         liveUserLocation.latitude,
         liveUserLocation.longitude,
-        userOnboarding?.gender
+        userOnboarding?.gender,
+        salonGender
       );
 
       salonsLoadedRef.current = true;
@@ -509,7 +784,7 @@ export default function Home() {
         if (nextDayHours && !nextDayHours.closed) {
           return i === 1
             ? `Opens Tomorrow at ${formatTime(nextDayHours.open)}`
-            : `Closed`;
+            : "Closed";
         }
       }
       return "Closed";
@@ -620,7 +895,14 @@ export default function Home() {
       {/* Enhanced Header */}
       {/* Hero Section */}
       <main id="main-content">
+        {/* MOBILE DEBUG PANEL - REMOVE AFTER FIXING */}
+
+        {/* <div style={{ width: '100%', height: '600px', position: 'relative' }}>
+  <DarkVeil />  
+</div> */}
         <section className={styles.heroSection}>
+          <div className={styles.heroBackground}></div>
+
           <div className={styles.heroBackground}>
             <div className={styles.heroPattern}></div>
             <div className={styles.floatingElements}>
@@ -726,11 +1008,11 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 1, delay: 0.8 }}
                 >
-                  <button className={`${styles.heroCta} ${styles.primary}`}>
+                  <button className={${styles.heroCta} ${styles.primary}}>
                     <span className={styles.ctaIcon}>🔍</span>
                     Find Salons Near Me
                   </button>
-                  <button className={`${styles.heroCta} ${styles.secondary}`}>
+                  <button className={${styles.heroCta} ${styles.secondary}}>
                     <span className={styles.ctaIcon}>📅</span>
                     Book Appointment
                   </button>
@@ -762,7 +1044,7 @@ export default function Home() {
                       animate={{ y: [0, -10, 0] }}
                       transition={{ duration: 3, repeat: Infinity }}
                     >
-                      <div className={styles.cardIcon}>💇‍♀️</div>
+                      <div className={styles.cardIcon}>💇‍♀</div>
                       <div className={styles.cardText}>
                         <span className={styles.cardTitle}>Hair Styling</span>
                         <span className={styles.cardPrice}>from ₹299</span>
@@ -784,7 +1066,7 @@ export default function Home() {
                     </motion.div>
 
                     <motion.div
-                      className={`${styles.floatingCard} ${styles.card3}`}
+                      className={`${styles.floatingCard} ${styles.card3} `}
                       animate={{ y: [0, -8, 0] }}
                       transition={{ duration: 3, repeat: Infinity, delay: 2 }}
                     >
@@ -890,7 +1172,7 @@ export default function Home() {
               transition={{ duration: 0.8 }}
             >
               {userOnboarding
-                ? `Perfect for ${userOnboarding.gender || "Everyone"}`
+                ? Perfect for ${userOnboarding.gender || "Everyone"}
                 : "Perfect Services for You"}
             </motion.h3>
             <motion.p
@@ -964,7 +1246,7 @@ export default function Home() {
             className={styles.locationAlertError}
           >
             <div className={styles.locationAlertContent}>
-              <span className={styles.locationIcon}>⚠️</span>
+              <span className={styles.locationIcon}>⚠</span>
               <div>
                 <p>
                   <strong>Location Access Needed</strong>
@@ -988,7 +1270,7 @@ export default function Home() {
             className={styles.locationAlertWarning}
           >
             <div className={styles.locationAlertContent}>
-              <span className={styles.locationIcon}>⏱️</span>
+              <span className={styles.locationIcon}>⏱</span>
               <p>{locationError}</p>
             </div>
           </motion.div>
@@ -1021,7 +1303,6 @@ export default function Home() {
               </p>
             </div>
           </div>
-
           {/* ✅ BANNER ABOVE TABS - Show when NO location */}
           {!liveUserLocation && (
             <div className={styles.fallbackBanner}>
@@ -1030,7 +1311,8 @@ export default function Home() {
                 <h3 className={styles.bannerTitle}>
                   Want to see nearby salons?
                 </h3>
-                <p className={styles.bannerText}>
+
+                <p className={styles.loginNotice}>
                   Please login or complete onboarding to view salons near you
                 </p>
                 <div className={styles.bannerActions}>
@@ -1050,7 +1332,6 @@ export default function Home() {
               </div>
             </div>
           )}
-
           {/* Booking Mode Tabs */}
           <div className={styles.bookingModeToggle}>
             <button
@@ -1070,7 +1351,37 @@ export default function Home() {
               📅 Pre-book <span className={styles.modeBadge}>ADVANCE</span>
             </button>
           </div>
-
+          {/* Radius Control */}
+          <div className={styles.radiusControl}>
+            <label className={styles.radiusLabel}>
+              📍 Search Radius:{" "}
+              <strong>
+                {searchRadius >= 2000 ? "2000+ km" : `${searchRadius} km`}
+              </strong>
+            </label>
+            <input
+              type="range"
+              min="10"
+              max="2000"
+              value={searchRadius}
+              onChange={(e) => setSearchRadius(Number(e.target.value))}
+              step="50"
+              className={styles.radiusSlider}
+            />
+            {/* <div className={styles.radiusMarkers}>
+                  <span>5km</span>
+                  <span>50km</span>
+                  <span>100+km</span>
+                </div> */}
+          </div>
+          <button
+            onClick={handleRefreshSalons}
+            className={styles.refreshButton}
+            disabled={isLoadingSalons}
+          >
+            🔄 Refresh Salons
+          </button>
+          3
           {/* Walk-in Instruction - ONLY show on Walk-in tab
           {!isPrebook && (
             <div className={styles.walkInInstruction}>
@@ -1081,7 +1392,6 @@ export default function Home() {
               </p>
             </div>
           )} */}
-
           {/* View toggle (only show for pre-book with location) */}
           {salons.length > 0 && (
             <div className={styles.SalonControls}>
@@ -1110,17 +1420,8 @@ export default function Home() {
                   Map View
                 </motion.button>
               </div>
-
-              <button
-                onClick={handleRefreshSalons}
-                className={styles.refreshButton}
-                disabled={isLoadingSalons}
-              >
-                🔄 Refresh Salons
-              </button>
             </div>
           )}
-
           {/* Salons Display */}
           {isLoadingSalons ? (
             <div className={styles.loadingSalons}>
@@ -1130,11 +1431,69 @@ export default function Home() {
               </div>
               <p>Discovering premium salons near you...</p>
             </div>
-          ) : salons.length === 0 ? ( // ✅ CHANGE nearbySalons to salons
-            <div className={styles.noSalons}>
-              <p>
-                No salons found in your area. Try adjusting your search filters.
-              </p>
+          ) : salons.length === 0 ? (
+            <div className={styles.errorSection}>
+              <h3>No Salons Found</h3>
+
+              {salonLoadError && (
+                <p className={styles.errorMessage}>{salonLoadError}</p>
+              )}
+
+              {debugInfo && (
+                <details className={styles.debugInfo}>
+                  <summary>🔍 Debug Info (tap to expand)</summary>
+                  <pre>
+                    {`Your Location: ${debugInfo.userLat}, ${debugInfo.userLng}
+${
+  liveUserLocation
+    ? `Accuracy: ${(liveUserLocation.accuracy / 1000).toFixed(1)}km`
+    : ""
+}
+${
+  liveUserLocation
+    ? `Location Type: ${
+        liveUserLocation.accuracy > 50000
+          ? "IP-based (approximate)"
+          : "GPS (precise)"
+      }`
+    : ""
+}
+Time: ${debugInfo.timestamp}`}
+                  </pre>
+                </details>
+              )}
+
+              <div className={styles.suggestions}>
+                <h4>Try this:</h4>
+                <ul>
+                  <li>Check if location permission is enabled for this site</li>
+                  <li>
+                    On mobile: Enable &quot;High accuracy&quot; GPS in phone
+                    settings
+                  </li>
+                  <li>
+                    On desktop: Use the map pin to manually set your location
+                  </li>
+                  <li>Refresh the page to retry location detection</li>
+                </ul>
+              </div>
+
+              <button
+                className={styles.retryButton}
+                onClick={() => {
+                  if (liveUserLocation) {
+                    loadNearbySalons(
+                      liveUserLocation.latitude || liveUserLocation.lat,
+                      liveUserLocation.longitude || liveUserLocation.lng,
+                      userOnboarding?.gender
+                    );
+                  } else {
+                    requestLocationPermission();
+                  }
+                }}
+              >
+                🔄 Retry Location & Reload Salons
+              </button>
             </div>
           ) : showMapView ? (
             <div className={styles.mapViewWrapper}>
@@ -1237,7 +1596,7 @@ export default function Home() {
                             📍{" "}
                             {salon.distance
                               ? salon.distance < 1
-                                ? `${Math.round(salon.distance * 1000)}m away`
+                                ? `${Math.round(salon.distance * 10000)}m away`
                                 : `${salon.distance}km away`
                               : "N/A"}
                           </span>
@@ -1446,7 +1805,7 @@ export default function Home() {
                   <h5 className={styles.footerColumnTitle}>Connect</h5>
                   <div className={styles.footerContact}>
                     <p>📞 +91 98765 43210</p>
-                    <p>✉️ hello@techtrims.com</p>
+                    <p>✉ hello@techtrims.com</p>
                     <p>📍 Mumbai, Maharashtra</p>
                   </div>
                 </div>
@@ -1488,14 +1847,14 @@ function highlightText(text, highlight) {
 
 function getGenderBasedServices(gender) {
   const maleServices = [
-    { name: "Premium Haircut", price: 299, duration: 45, icon: "✂️" },
+    { name: "Premium Haircut", price: 299, duration: 45, icon: "✂" },
     { name: "Beard Styling", price: 199, duration: 30, icon: "🧔" },
-    { name: "Hair Styling", price: 349, duration: 35, icon: "💇‍♂️" },
+    { name: "Hair Styling", price: 349, duration: 35, icon: "💇‍♂" },
     { name: "Face Treatment", price: 449, duration: 60, icon: "🧴" },
   ];
 
   const femaleServices = [
-    { name: "Hair Styling", price: 599, duration: 90, icon: "💇‍♀️" },
+    { name: "Hair Styling", price: 599, duration: 90, icon: "💇‍♀" },
     { name: "Hair Coloring", price: 1299, duration: 150, icon: "🎨" },
     { name: "Facial Glow", price: 799, duration: 90, icon: "✨" },
     { name: "Luxury Manicure", price: 499, duration: 60, icon: "💅" },

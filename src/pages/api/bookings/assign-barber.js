@@ -71,7 +71,6 @@ export default async function handler(req, res) {
       { _id: new ObjectId(barberId) },
       {
         $inc: { queueLength: 1 },
-        $set: { updatedAt: new Date() },
       }
     );
 

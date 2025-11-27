@@ -100,7 +100,6 @@ async function handler(req, res) {
           { _id: finalUserId },
           {
             $push: { bookingHistory: bookingId },
-            $set: { updatedAt: new Date() },
           },
           { session }
         );
@@ -144,7 +143,6 @@ async function handler(req, res) {
             {
               $push: { bookingHistory: bookingId },
               $set: {
-                updatedAt: new Date(),
                 // Update location if new location data is provided
                 ...(user.location && { location: user.location }),
               },
@@ -170,7 +168,6 @@ async function handler(req, res) {
           $push: {
             bookings: { _id: bookingId, date, time, service, barber },
           },
-          $set: { updatedAt: new Date() },
         },
         { session }
       );

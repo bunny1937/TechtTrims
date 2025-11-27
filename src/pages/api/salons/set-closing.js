@@ -35,7 +35,6 @@ export default async function handler(req, res) {
           [`operatingHours.${today}.close`]: closingTime,
           closingTime,
           isActive: true, // ✅ Force open!
-          updatedAt: new Date(),
         },
       }
     );

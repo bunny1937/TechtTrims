@@ -46,6 +46,7 @@ export default async function handler(req, res) {
       services,
       barbers = [],
       operatingHours,
+      salonGender,
       description,
       amenities,
       salonImages,
@@ -199,6 +200,7 @@ export default async function handler(req, res) {
       salonImages: Array.isArray(salonImages) ? salonImages : [],
 
       services: services || {},
+      salonGender: salonGender || "Unisex",
       services: defaultServices,
       operatingHours: defaultOperatingHours,
       description: description || "",

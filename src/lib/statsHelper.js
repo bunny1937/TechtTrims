@@ -56,7 +56,6 @@ export async function updateSalonStats(salonId) {
           "stats.completedBookings": completed.length,
           "stats.repeatCustomers": repeatCustomers,
           "stats.averageWaitTime": averageWaitTime,
-          updatedAt: new Date(),
         },
       }
     );
@@ -118,7 +117,6 @@ export async function updateSalonRatings(salonId) {
       {
         $set: {
           ratings: ratings,
-          updatedAt: new Date(),
         },
       }
     );
@@ -174,7 +172,6 @@ export async function updateBarberStats(barberId, barberName, salonId) {
           totalBookings,
           earnings,
           rating,
-          updatedAt: new Date(),
         },
       }
     );

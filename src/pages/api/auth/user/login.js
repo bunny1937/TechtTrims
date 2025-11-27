@@ -1,12 +1,13 @@
+// pages/api/auth/login.js
 import clientPromise from "../../../../lib/mongodb";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import {
   sanitizeInput,
   validateEmail,
-} from "../../../..//lib/middleware/sanitize";
+} from "../../../../lib/middleware/sanitize";
 import { checkRateLimit } from "../../../../lib/rateLimit";
-import crypto from "crypto";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {

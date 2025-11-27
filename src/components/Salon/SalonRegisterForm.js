@@ -30,6 +30,7 @@ const SalonRegisterForm = () => {
     longitude: "",
     openingTime: "09:00",
     closingTime: "21:00",
+    salonGender: "Unisex",
 
     // IMAGE ADDITIONS
     profilePicture: "",
@@ -87,6 +88,8 @@ const SalonRegisterForm = () => {
         errors.location = "Please select a location on the map";
       }
       if (!formData.address) errors.address = "Address is required";
+      if (!formData.salonGender)
+        errors.salonGender = "Please select salon type";
     }
 
     if (step === 4) {
@@ -240,6 +243,7 @@ const SalonRegisterForm = () => {
         coordinates: [lng, lat],
         openingTime: formData.openingTime,
         closingTime: formData.closingTime,
+        salonGender: formData.salonGender,
         services: formData.services,
         barbers: formData.barbers,
         profilePicture: formData.profilePicture,
@@ -504,6 +508,62 @@ const SalonRegisterForm = () => {
                   </div>
                 </div>
 
+                {/* Salon Gender Type */}
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>
+                    <Store size={20} />
+                    Salon Type <span className={styles.required}>*</span>
+                  </label>
+                  <div className={styles.genderOptions}>
+                    <button
+                      type="button"
+                      className={`${styles.genderOption} ${
+                        formData.salonGender === "Male" ? styles.active : ""
+                      }`}
+                      onClick={() => handleInputChange("salonGender", "Male")}
+                    >
+                      <span className={styles.genderIcon}>👨</span>
+                      <span className={styles.genderText}>
+                        <strong>Male Only</strong>
+                        <small>Services for men</small>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`${styles.genderOption} ${
+                        formData.salonGender === "Female" ? styles.active : ""
+                      }`}
+                      onClick={() => handleInputChange("salonGender", "Female")}
+                    >
+                      <span className={styles.genderIcon}>👩</span>
+                      <span className={styles.genderText}>
+                        <strong>Female Only</strong>
+                        <small>Services for women</small>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`${styles.genderOption} ${
+                        formData.salonGender === "Unisex" ? styles.active : ""
+                      }`}
+                      onClick={() => handleInputChange("salonGender", "Unisex")}
+                    >
+                      <span className={styles.genderIcon}>⚥</span>
+                      <span className={styles.genderText}>
+                        <strong>Unisex</strong>
+                        <small>Services for all</small>
+                      </span>
+                    </button>
+                  </div>
+                  {validationErrors.salonGender && (
+                    <span className={styles.errorText}>
+                      {validationErrors.salonGender}
+                    </span>
+                  )}
+                </div>
+
                 <div className={`${styles.formGroup} ${styles.formGridFull}`}>
                   <label className={styles.formLabel}>Address</label>
                   <textarea
@@ -753,7 +813,7 @@ const SalonRegisterForm = () => {
                       {barber.photo && (
                         <img
                           src={barber.photo}
-                          alt={`Barber ${index + 1}`}
+                          alt={Barber`${index + 1}`}
                           style={{
                             width: "80px",
                             height: "80px",

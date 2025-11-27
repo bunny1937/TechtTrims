@@ -149,7 +149,6 @@ export default async function handler(req, res) {
             { _id: barber._id },
             {
               $inc: { totalBookings: 1 },
-              $set: { updatedAt: new Date() },
             }
           );
           console.log(

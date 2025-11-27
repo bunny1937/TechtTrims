@@ -203,17 +203,23 @@ export default function DashboardPage() {
 
   const loadBookings = useCallback(async (salonId, dateString) => {
     try {
-      setLoading(true);
+      console.log(
+        "🔄 Loading bookings for salon:",
+        salonId,
+        "date:",
+        dateString
+      );
 
       // Mark expired first
-      await fetch("/api/walkin/mark-expired", { method: "POST" });
+      await fetch(`/api/walkin/mark-expired`, { method: "POST" });
 
-      let dateParam;
+      let dateParam = ``;
       if (dateString === "all") {
-        dateParam = "";
+        dateParam = ``;
       } else {
         dateParam = `&date=${dateString}`;
       }
+
       const response = await fetch(
         `/api/salons/bookings?salonId=${salonId}${dateParam}&includeWalkins=true`,
         {
@@ -221,7 +227,34 @@ export default function DashboardPage() {
           headers: { "Content-Type": "application/json" },
         }
       );
-      const data = await response.json();
+
+      let data = []; // Declare data outside the if block
+
+      if (response.ok) {
+        data = await response.json();
+        console.log("✅ Loaded bookings:", data.length);
+      } else {
+        console.error("❌ API response not ok:", response.status);
+        setBookings([]);
+        setError(`Failed to load bookings: HTTP ${response.status}`);
+        setLoading(false);
+        return;
+      }
+
+      // **ALSO fetch barbers to check availability**
+      try {
+        const barbersRes = await fetch(
+          `/api/salons/barbers?salonId=${salonId}`
+        );
+        if (barbersRes.ok) {
+          const barbersData = await barbersRes.json();
+          console.log("✅ Loaded barbers:", barbersData.length);
+          setBarbers(barbersData);
+        }
+      } catch (barberError) {
+        console.error("⚠️ Barbers fetch failed:", barberError);
+        // Continue even if barbers fail
+      }
 
       // Filter expired bookings
       const now = new Date();
@@ -234,14 +267,42 @@ export default function DashboardPage() {
         return true;
       });
 
+      console.log(
+        `✅ Active bookings after filtering: ${activeBookings.length}`
+      );
       setBookings(activeBookings);
+      setError(null); // Clear any previous errors
     } catch (err) {
+      console.error("❌ Error loading bookings:", err);
       setError("Error loading bookings: " + err.message);
       setBookings([]);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // Load bookings initially
+  useEffect(() => {
+    if (!salon?.id) return;
+    loadBookings(salon.id, selectedDate);
+  }, [salon?.id, selectedDate, loadBookings]);
+
+  // Auto-refresh bookings every 5 seconds
+  useEffect(() => {
+    if (!salon?.id) return;
+
+    console.log("🔄 Auto-refresh started");
+
+    const interval = setInterval(() => {
+      console.log("🔄 Refreshing bookings...");
+      loadBookings(salon.id, selectedDate);
+    }, 5000); // Refresh every 5 seconds
+
+    return () => {
+      console.log("🛑 Auto-refresh stopped");
+      clearInterval(interval);
+    };
+  }, [salon?.id, selectedDate, loadBookings]);
 
   const loadBarbers = useCallback(async (salonId) => {
     try {
@@ -1394,7 +1455,7 @@ export default function DashboardPage() {
                                 timeUntilExpiry / 1000 / 60
                               );
 
-                              let statusColor = "#d1d5db"; // grey for BOOKED
+                              let statusColor = "#ddd3c8"; // grey for BOOKED
                               let statusLabel = b.queueStatus || b.status;
                               let borderStyle = "2px solid #ccc";
 
@@ -1540,20 +1601,48 @@ export default function DashboardPage() {
                                         );
                                       })()}
 
-                                    {b.status === "arrived" && (
-                                      <button
-                                        onClick={() => {
-                                          setBookingToStart(b);
-                                          setTimeEstimate(
-                                            b.estimatedDuration || 30
-                                          );
-                                          setShowTimeModal(true);
-                                        }}
-                                        className={styles.startBtn}
-                                      >
-                                        Start Service
-                                      </button>
-                                    )}
+                                    {b.status === "arrived" &&
+                                      b.queueStatus === "ORANGE" && (
+                                        <>
+                                          {/* DEBUG - REMOVE AFTER TESTING */}
+                                          {console.log("🔍 Booking:", {
+                                            name: b.customerName,
+                                            status: b.status,
+                                            queueStatus: b.queueStatus,
+                                            position: b.queuePosition,
+                                            barberId: b.barberId,
+                                          })}
+
+                                          {/* Only Position 1 can start service */}
+                                          {b.queuePosition === 1 ? (
+                                            <button
+                                              onClick={() => {
+                                                console.log(
+                                                  "🚀 Starting service for:",
+                                                  b.customerName
+                                                );
+                                                setBookingToStart(b);
+                                                setTimeEstimate(
+                                                  b.estimatedDuration || 30
+                                                );
+                                                setShowTimeModal(true);
+                                              }}
+                                              className={styles.startBtn}
+                                            >
+                                              ✅ Start Service (Pos{" "}
+                                              {b.queuePosition})
+                                            </button>
+                                          ) : (
+                                            <button
+                                              className={styles.disabledBtn}
+                                              disabled
+                                              title={`Position ${b.queuePosition} - Must wait for position 1 to complete`}
+                                            >
+                                              🔒 Waiting (Pos {b.queuePosition})
+                                            </button>
+                                          )}
+                                        </>
+                                      )}
 
                                     <button
                                       className={styles.timeBtn}
