@@ -11,97 +11,97 @@ export default async function handler(req, res) {
   try {
     const { bookingCode, salonId } = req.body;
 
-    console.log("Received:", { bookingCode, salonId });
-
-    if (!bookingCode) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Booking code required" });
+    if (!bookingCode || !salonId) {
+      return res.status(400).json({
+        success: false,
+        message: "Booking code and salon ID required",
+      });
     }
 
     const client = await clientPromise;
     const db = client.db("techtrims");
 
+    // Find booking
     const booking = await db.collection("bookings").findOne({
       bookingCode: bookingCode.toUpperCase(),
       salonId: new ObjectId(salonId),
     });
 
-    console.log("Found booking:", booking);
-
     if (!booking) {
       return res.status(404).json({
         success: false,
-        message: "Booking not found. Check the code.",
+        message: "Booking not found",
       });
     }
 
     if (booking.queueStatus !== "RED") {
       return res.status(400).json({
         success: false,
-        message: `Already checked in (Status: ${booking.queueStatus})`,
+        message: `Already checked in (${booking.queueStatus})`,
       });
     }
 
-    // NEW LOGIC: Calculate position based on ARRIVAL TIME
-    // Count all ORANGE bookings that arrived BEFORE this user (by arrivedAt timestamp)
-    const currentTime = new Date();
+    const now = new Date();
 
-    // Position = how many users arrived before this user + 1
-    const position = await db.collection("bookings").countDocuments({
-      salonId: new ObjectId(salonId),
-      barberId: booking.barberId,
-      queueStatus: "ORANGE",
-      isExpired: { $ne: true },
-      arrivedAt: { $exists: true }, // Only count those who arrived
-    });
-
-    const correctQueuePosition = position + 1; // This user becomes position+1
-
-    // Update booking to ORANGE with correct position and arrival timestamp
+    // Mark as ORANGE
     await db.collection("bookings").updateOne(
-      { _id: booking._id }, // Use _id not id
+      { _id: booking._id },
       {
         $set: {
-          queueStatus: "ORANGE", // Changed from RED to ORANGE - now in priority queue
-          queuePosition: correctQueuePosition,
+          queueStatus: "ORANGE",
           status: "arrived",
-          arrivedAt: currentTime, // Record exact arrival time
-          lastUpdated: new Date(),
-          updatedAt: new Date(),
+          arrivedAt: now,
+          lastUpdated: now,
         },
       }
     );
 
-    console.log("User checked in - assigned to priority queue", {
-      bookingCode: booking.bookingCode,
-      customer: booking.customerName,
-      barber: booking.barber,
-      position: correctQueuePosition,
-      arrivedAt: currentTime.toLocaleTimeString(),
-    });
+    // Get all ORANGE bookings for same barber
+    const orangeBookings = await db
+      .collection("bookings")
+      .find({
+        barberId: booking.barberId,
+        queueStatus: "ORANGE",
+        isExpired: { $ne: true },
+      })
+      .sort({ createdAt: 1 })
+      .toArray();
 
-    console.log("✅ Checked in:", {
-      code: booking.bookingCode,
-      customer: booking.customerName,
-      barber: booking.barber,
-      position: correctQueuePosition,
-      arrivedAt: new Date().toLocaleTimeString(),
-    });
+    // Update positions
+    const bulkOps = orangeBookings.map((b, idx) => ({
+      updateOne: {
+        filter: { _id: b._id },
+        update: { $set: { queuePosition: idx + 1 } },
+      },
+    }));
 
-    res.status(200).json({
+    if (bulkOps.length > 0) {
+      await db.collection("bookings").bulkWrite(bulkOps);
+    }
+
+    const myPos =
+      orangeBookings.findIndex(
+        (b) => b._id.toString() === booking._id.toString()
+      ) + 1;
+
+    console.log(
+      `✅ ${booking.customerName} → Position ${myPos}/${orangeBookings.length}`
+    );
+
+    return res.status(200).json({
       success: true,
-      message: "Customer checked in successfully",
+      message: "Checked in successfully",
       booking: {
         customerName: booking.customerName,
-        queuePosition: correctQueuePosition,
-        barber: booking.barber,
+        queuePosition: myPos,
+        totalInQueue: orangeBookings.length,
       },
     });
   } catch (error) {
     console.error("Verify arrival error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error: " + error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 }

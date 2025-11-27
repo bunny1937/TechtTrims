@@ -17,15 +17,16 @@ export default async function handler(req, res) {
     const db = client.db("techtrims");
 
     if (action === "START") {
-      if (!duration)
+      if (!duration) {
         return res
           .status(400)
           .json({ message: "Duration is required for START action" });
+      }
 
       const now = new Date();
       const serviceEndTime = new Date(now.getTime() + duration * 60 * 1000);
 
-      // Get the booking to verify it's in priority queue (ORANGE)
+      // Get the booking
       const booking = await db.collection("bookings").findOne({
         _id: new ObjectId(bookingId),
       });
@@ -37,18 +38,62 @@ export default async function handler(req, res) {
       // CRITICAL: Only ORANGE (arrived) bookings can be served
       if (booking.queueStatus !== "ORANGE") {
         return res.status(400).json({
-          message:
-            "Only arrived users (ORANGE status) can be served. Current status: " +
-            booking.queueStatus,
+          message: `Only arrived users (ORANGE status) can be served. Current status: ${booking.queueStatus}`,
         });
       }
 
+      // **STRICT QUEUE ENFORCEMENT - Only Position 1 allowed**
+      if (booking.queuePosition !== 1) {
+        const position1Booking = await db.collection("bookings").findOne({
+          barberId: new ObjectId(barberId),
+          queueStatus: "ORANGE",
+          isExpired: false,
+          queuePosition: 1,
+        });
+
+        return res.status(403).json({
+          success: false,
+          message: `❌ Queue violation! ${booking.customerName} is position ${booking.queuePosition}. Only position 1 can be served.`,
+          currentPosition: booking.queuePosition,
+          firstInQueue: position1Booking
+            ? {
+                customerName: position1Booking.customerName,
+                bookingCode: position1Booking.bookingCode,
+                position: 1,
+              }
+            : null,
+        });
+      }
+
+      // **Check if barber is already occupied**
+      const barber = await db.collection("barbers").findOne({
+        _id: new ObjectId(barberId),
+      });
+
+      if (!barber) {
+        return res.status(404).json({ message: "Barber not found" });
+      }
+
+      if (barber.currentStatus === "OCCUPIED" && barber.currentBookingId) {
+        return res.status(400).json({
+          success: false,
+          message: `❌ Barber ${barber.name} is already serving ${barber.currentCustomerName}!`,
+          currentBooking: {
+            customerName: barber.currentCustomerName,
+            timeLeft: Math.ceil(
+              (new Date(barber.currentServiceEndTime) - now) / 1000 / 60
+            ),
+          },
+        });
+      }
+
+      // ✅ All checks passed - Start service
       // Update booking to GREEN - NOW BEING SERVED
       await db.collection("bookings").updateOne(
         { _id: new ObjectId(bookingId) },
         {
           $set: {
-            queueStatus: "GREEN", // User is now being served
+            queueStatus: "GREEN",
             status: "inservice",
             serviceStartedAt: now,
             selectedDuration: duration,
@@ -74,8 +119,8 @@ export default async function handler(req, res) {
         }
       );
 
-      console.log("Service STARTED (GREEN)", {
-        barber: barberId,
+      console.log("✅ Service STARTED (GREEN)", {
+        barber: barber.name,
         customer: booking.customerName,
         bookingCode: booking.bookingCode,
         duration: duration + " mins",
@@ -94,7 +139,7 @@ export default async function handler(req, res) {
     } else if (action === "END") {
       const now = new Date();
 
-      // Get booking to calculate actual duration
+      // Get booking
       const booking = await db.collection("bookings").findOne({
         _id: new ObjectId(bookingId),
       });
@@ -105,17 +150,15 @@ export default async function handler(req, res) {
 
       if (booking.queueStatus !== "GREEN") {
         return res.status(400).json({
-          message:
-            "Only GREEN (in-service) bookings can be ended. Current status: " +
-            booking.queueStatus,
+          message: `Only GREEN (in-service) bookings can be ended. Current status: ${booking.queueStatus}`,
         });
       }
 
       const actualDuration = booking?.serviceStartedAt
-        ? Math.round((now - new Date(booking.serviceStartedAt)) / (1000 * 60))
+        ? Math.round((now - new Date(booking.serviceStartedAt)) / 1000 / 60)
         : null;
 
-      // Update booking to COMPLETED
+      // 1. Mark booking as COMPLETED
       await db.collection("bookings").updateOne(
         { _id: new ObjectId(bookingId) },
         {
@@ -129,33 +172,28 @@ export default async function handler(req, res) {
         }
       );
 
-      // Get NEXT customer in PRIORITY QUEUE (ORANGE - arrived users only)
-      const nextCustomer = await db.collection("bookings").findOne(
-        {
-          barberId: new ObjectId(barberId),
-          queueStatus: "ORANGE", // Only arrived users (GOLDEN/ORANGE)
-          isExpired: false,
-        },
-        { sort: { arrivedAt: 1 } } // Sort by arrival time (first arrived, first served)
-      );
-
-      // Update barber status - either to next customer or AVAILABLE
+      // 2. Free the barber IMMEDIATELY
       await db.collection("barbers").updateOne(
         { _id: new ObjectId(barberId) },
         {
           $set: {
-            currentStatus: "AVAILABLE", // Always AVAILABLE after service ends (they'll pick next)
+            currentStatus: "AVAILABLE",
             currentBookingId: null,
             currentCustomerName: null,
             currentServiceStartTime: null,
             currentServiceEndTime: null,
-            timeLeftInMinutes: 0,
+            timeLeftInMinutes: null,
             lastUpdated: now,
+          },
+          $inc: {
+            totalBookings: 1,
           },
         }
       );
 
-      // Update all ORANGE queue positions (re-order after one completes)
+      console.log(`✅ Service ENDED - Barber ${barberId} is now AVAILABLE`);
+
+      // 3. **CRITICAL: Re-calculate ALL ORANGE positions by createdAt**
       const orangeBookings = await db
         .collection("bookings")
         .find({
@@ -163,26 +201,43 @@ export default async function handler(req, res) {
           queueStatus: "ORANGE",
           isExpired: false,
         })
-        .sort({ arrivedAt: 1 })
+        .sort({ createdAt: 1 }) // EARLIEST BOOKING FIRST
         .toArray();
+
+      console.log(
+        `📊 Found ${orangeBookings.length} waiting customers (ORANGE)`
+      );
 
       if (orangeBookings.length > 0) {
         const bulkOps = orangeBookings.map((b, index) => ({
           updateOne: {
             filter: { _id: b._id },
-            update: { $set: { queuePosition: index + 1, lastUpdated: now } },
+            update: {
+              $set: {
+                queuePosition: index + 1, // First = Pos 1
+                lastUpdated: now,
+              },
+            },
           },
         }));
+
         await db.collection("bookings").bulkWrite(bulkOps);
+
+        console.log(`✅ Updated ${orangeBookings.length} queue positions`);
+        orangeBookings.forEach((b, i) => {
+          console.log(`  ${i + 1}. ${b.customerName} → Position ${i + 1}`);
+        });
       }
 
-      console.log("Service ENDED", {
-        customer: booking.customerName,
-        bookingCode: booking.bookingCode,
-        actualDuration: actualDuration + " mins",
-        completedAt: now.toLocaleTimeString(),
-        nextInQueue: nextCustomer ? nextCustomer.customerName : "None",
-        totalWaitingCount: orangeBookings.length,
+      const nextCustomer = orangeBookings[0] || null;
+
+      console.log("✅ Service ENDED", {
+        completed: booking.customerName,
+        duration: actualDuration + " mins",
+        nextInLine: nextCustomer
+          ? `${nextCustomer.customerName} (Pos 1)`
+          : "None",
+        totalWaiting: orangeBookings.length,
       });
 
       res.status(200).json({
@@ -193,7 +248,7 @@ export default async function handler(req, res) {
           ? {
               bookingCode: nextCustomer.bookingCode,
               customerName: nextCustomer.customerName,
-              queuePosition: 1, // Next person is always position 1
+              queuePosition: 1,
             }
           : null,
       });

@@ -251,7 +251,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
           [lat, lng],
         ],
         {
-          color: "#d4af37",
+          color: "#c38f0a",
           weight: 3,
           opacity: 0.7,
           dashArray: "10, 10",

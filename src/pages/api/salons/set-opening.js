@@ -35,7 +35,6 @@ export default async function handler(req, res) {
         $set: {
           [`operatingHours.${today}.open`]: openingTime,
           openingTime, // Temporary field
-          updatedAt: new Date(),
         },
       }
     );

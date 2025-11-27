@@ -75,8 +75,17 @@ export default function UserLoginPage() {
 
       if (response.ok) {
         const result = await response.json();
-        // ✅ Don't call setAuthToken - backend sets HttpOnly cookie
-        setUserData(result.user);
+
+        // ✅ Ensure gender is included in userData
+        const userWithGender = {
+          ...result.user,
+          gender: result.user.gender || "other",
+        };
+
+        console.log("✅ Login successful with gender:", userWithGender.gender);
+
+        // ✅ Store user data with gender
+        setUserData(userWithGender);
 
         // ✅ Mark as onboarded
         sessionStorage.setItem("hasOnboarded", "true");
@@ -132,7 +141,7 @@ export default function UserLoginPage() {
 
             {error && (
               <div className={styles.error}>
-                <span>⚠️ {error}</span>
+                <span>⚠ {error}</span>
               </div>
             )}
 
@@ -245,7 +254,7 @@ export default function UserLoginPage() {
 
             {error && (
               <div className={styles.error}>
-                <span>⚠️ {error}</span>
+                <span>⚠ {error}</span>
               </div>
             )}
 

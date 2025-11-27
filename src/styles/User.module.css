@@ -33,7 +33,7 @@
 }
 
 .activeTab {
-  background: linear-gradient(135deg, #d4af37 0%, #f5e6b8 100%) !important;
+  background: linear-gradient(135deg, #c38f0a 0%, #f5e6b8 100%) !important;
   color: #1a1a1a !important;
   font-weight: 600;
 }
@@ -754,7 +754,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  background: linear-gradient(135deg, #d4af37 0%, #f5e6b8 100%);
+  background: linear-gradient(135deg, #c38f0a 0%, #f5e6b8 100%);
   padding: 8px 16px;
   border-radius: 20px;
 }
@@ -804,7 +804,7 @@
 
 .ratingValue {
   font-weight: 600;
-  color: #d4af37;
+  color: #c38f0a;
 }
 
 .reviewComment {
@@ -831,7 +831,7 @@
 }
 
 .addPaymentBtn {
-  background: #d4af37;
+  background: #c38f0a;
   color: #fff;
   border: none;
   padding: 10px 20px;
@@ -842,7 +842,7 @@
 }
 
 .addPaymentBtn:hover {
-  background: #b8941f;
+  background: #a37608;
 }
 
 .addPaymentForm {
@@ -873,7 +873,7 @@
 }
 
 .paymentOption:hover {
-  border-color: #d4af37;
+  border-color: #c38f0a;
   transform: translateY(-2px);
 }
 
@@ -901,7 +901,7 @@
 }
 
 .saveBtn {
-  background: #d4af37;
+  background: #c38f0a;
   color: #fff;
   border: none;
   padding: 12px 24px;
@@ -944,7 +944,7 @@
 }
 
 .defaultBadge {
-  background: #d4af37;
+  background: #c38f0a;
   color: #fff;
   padding: 4px 12px;
   border-radius: 12px;
@@ -967,7 +967,7 @@
 }
 
 .setDefaultBtn {
-  background: #d4af37;
+  background: #c38f0a;
   color: #fff;
   border: none;
 }
@@ -1030,7 +1030,7 @@
 }
 
 .statCard {
-  background: linear-gradient(135deg, #d4af37 0%, #f5e6b8 100%);
+  background: var(--gray-200);
   padding: 20px;
   border-radius: 12px;
   text-align: center;

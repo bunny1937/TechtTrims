@@ -60,7 +60,6 @@ export class User {
       { _id: new ObjectId(userId) },
       {
         $push: { bookingHistory: bookingId },
-        $set: { updatedAt: new Date() },
       }
     );
   }

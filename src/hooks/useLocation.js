@@ -28,7 +28,7 @@ export const useLocation = () => {
 
       // Only accept high-accuracy positions
       // ✅ REJECT TERRIBLE ACCURACY (259km+ is device error)
-      if (position.coords.accuracy > 1000) {
+      if (position.coords.accuracy > 2000000) {
         console.log(
           `⚠️ Position accuracy too low: ${position.coords.accuracy}m - IGNORING`
         );
@@ -38,9 +38,9 @@ export const useLocation = () => {
       // Also reject if accuracy check happens in later logic
       if (position.coords.accuracy > MAX_ACCURACY) {
         console.log(
-          `⚠️ Position accuracy suspicious: ${position.coords.accuracy}m`
+          `⚠️ Position accuracy poor: ${position.coords.accuracy}m - USING ANYWAY`
         );
-        return;
+        // Don't return - continue to save
       }
 
       const { latitude, longitude, accuracy } = position.coords;
@@ -163,11 +163,9 @@ export const useLocation = () => {
       });
 
       // ✅ VALIDATE ACCURACY BEFORE SAVING
-      if (position.coords.accuracy > 1000) {
-        // Silently skip - don't log as warning
-
-        setLocationError("Location accuracy too poor. Retrying...");
-        // Try watchPosition instead
+      if (position.coords.accuracy > 2000000) {
+        // 2000km
+        setLocationError("Location accuracy extremely poor. Retrying...");
         startWatchingLocation();
         return;
       }
@@ -246,6 +244,7 @@ export const useLocation = () => {
     return () => {
       stopWatchingLocation();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // ✅ EMPTY DEPS - Run ONCE
 
   return {

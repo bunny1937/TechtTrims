@@ -973,7 +973,7 @@
 /* ==================== BOOKING CARD - PREMIUM ==================== */
 .bookingCard {
   display: flex;
-  background: var(--background-primary);
+  background: var(--gray-200);
   border: 2px solid var(--border-color);
   border-radius: var(--radius-xl);
   padding: var(--space-6);
@@ -1015,7 +1015,7 @@
 
 .unassignedCard {
   border: 3px solid var(--warning) !important;
-  background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #fffbeb 0%, #faf6ef 100%);
   box-shadow: var(--shadow-md), 0 4px 16px rgba(245, 158, 11, 0.15) !important;
 }
 
@@ -1097,11 +1097,25 @@
 
 .bookingInfo {
   font-size: 0.9375rem;
-  color: var(--text-secondary);
   font-weight: 500;
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+.disabledBtn {
+  padding: 8px 16px;
+  background: #d1d5db;
+  color: #6b7280;
+  border: none;
+  border-radius: 8px;
+  cursor: not-allowed;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+.disabledBtn:hover {
+  background: #d1d5db;
+  transform: none;
 }
 
 .timeRemaining {
@@ -1224,7 +1238,7 @@
 }
 
 .timeBtn {
-  background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
+  background: var(--gray-900);
   color: white;
 }
 
@@ -2298,7 +2312,7 @@
 
 .timeInput:focus {
   outline: none;
-  border-color: #d4af37;
+  border-color: #c38f0a;
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
 }
 

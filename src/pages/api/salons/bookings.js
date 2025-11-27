@@ -38,7 +38,10 @@ export default async function handler(req, res) {
     const bookings = await db
       .collection("bookings")
       .find(query)
-      .sort({ createdAt: -1 })
+      .sort({
+        queueStatus: 1, // ORANGE first, then GREEN, then RED
+        createdAt: 1, // Within same status, earliest booking first
+      })
       .toArray();
 
     // Format bookings with additional info

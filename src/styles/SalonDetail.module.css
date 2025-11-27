@@ -21,19 +21,23 @@
 
 .salonQueueOverview {
   max-width: 1400px;
-  margin: 60px auto;
-  padding: 50px 30px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  margin: 40px auto;
+  padding: 40px 24px;
+  background: linear-gradient(135deg, #fafbff 0%, #f0f4ff 100%);
   border-radius: 24px;
-  border: 4px solid #2196f3;
+  border: 1px solid rgba(33, 150, 243, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
 }
 
 .queueOverviewTitle {
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 800;
   text-align: center;
-  color: #1a237e;
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   margin-bottom: 40px;
+  letter-spacing: -0.5px;
 }
 
 /* OVERALL STATS */
@@ -415,7 +419,7 @@
     rgba(102, 126, 234, 0.1) 0%,
     rgba(118, 75, 162, 0.1) 100%
   );
-  border-color: #d4af37;
+  border-color: #c38f0a;
   box-shadow: 0 12px 28px rgba(102, 126, 234, 0.2);
 }
 
@@ -431,7 +435,7 @@
 }
 
 .barberCard.selected .barberPhoto {
-  border-color: #d4af37;
+  border-color: #c38f0a;
   box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
 }
 
@@ -673,7 +677,7 @@
 }
 
 .progressStep.active .stepNumber {
-  background: linear-gradient(135deg, #d4af37, #b8941e);
+  background: linear-gradient(135deg, #c38f0a, #b8941e);
   color: white;
   border-color: white;
   transform: scale(1.1);
@@ -682,12 +686,8 @@
 .stepLabel {
   font-size: 14px;
   font-weight: 600;
-  color: #999;
-  transition: all 0.3s ease;
-}
 
-.progressStep.active .stepLabel {
-  color: #111;
+  transition: all 0.3s ease;
 }
 
 .progressLine {
@@ -706,7 +706,7 @@
   left: 0;
   height: 100%;
   width: 0%;
-  background: linear-gradient(135deg, #d4af37, #b8941e);
+  background: linear-gradient(135deg, #c38f0a, #b8941e);
   animation: fillLine 0.6s ease forwards;
 }
 
@@ -739,7 +739,7 @@
 }
 
 .step.completed .stepNumber {
-  background: #d4af37;
+  background: #c38f0a;
   color: #000;
 }
 
@@ -757,7 +757,7 @@
 }
 
 .step.active .stepNumber {
-  background: #d4af37;
+  background: #c38f0a;
   color: #000;
   box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
 }
@@ -810,7 +810,7 @@
 }
 
 .nextButton {
-  background: linear-gradient(135deg, #d4af37, #b8941e);
+  background: linear-gradient(135deg, #c38f0a, #b8941e);
   border: none;
   color: #000;
 }
@@ -836,7 +836,6 @@
 
 /* Stepped Booking Card */
 .bookingCard {
-  background: white;
   border-radius: 24px;
   padding: 40px;
   margin: 32px auto;
@@ -854,7 +853,7 @@
   left: 0;
   right: 0;
   height: 6px;
-  background: linear-gradient(135deg, #d4af37, #b8941e);
+  background: linear-gradient(135deg, #c38f0a, #b8941e);
 }
 
 .cardContent {
@@ -872,7 +871,7 @@
   color: #2d3748;
   margin-bottom: 32px;
   text-align: center;
-  background: linear-gradient(135deg, #d4af37, #b8941e);
+  background: linear-gradient(135deg, #c38f0a, #b8941e);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -915,7 +914,7 @@
 }
 
 .nextButton {
-  background: linear-gradient(135deg, #d4af37, #b8941e);
+  background: linear-gradient(135deg, #c38f0a, #b8941e);
   color: white;
   box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
 }
@@ -965,7 +964,7 @@
 .realTimeStatusCompact .statusValue {
   font-size: 24px;
   font-weight: 700;
-  color: #d4af37;
+  color: #c38f0a;
   margin-bottom: 4px;
 }
 
@@ -984,7 +983,7 @@
 }
 
 .cardContent .serviceCard {
-  background: linear-gradient(135deg, #f6f8fb 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #f6f8fb 0%, #faf6ef 100%);
   border: 2px solid #e2e8f0;
   border-radius: 16px;
   padding: 24px;
@@ -1000,7 +999,7 @@
 }
 
 .cardContent .serviceCard.selected {
-  background: linear-gradient(135deg, #d4af37, #b8941e);
+  background: linear-gradient(135deg, #c38f0a, #b8941e);
   border-color: #b8941e;
   color: white;
   box-shadow: 0 12px 28px rgba(102, 126, 234, 0.4);
@@ -1059,7 +1058,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(135deg, #d4af37, #b8941e);
+  background: linear-gradient(135deg, #c38f0a, #b8941e);
   transform: scaleX(0);
   transition: transform 0.3s ease;
 }
@@ -1081,7 +1080,7 @@
     rgba(102, 126, 234, 0.1) 0%,
     rgba(118, 75, 162, 0.1) 100%
   );
-  border-color: #d4af37;
+  border-color: #c38f0a;
   box-shadow: 0 12px 28px rgba(102, 126, 234, 0.2);
 }
 
@@ -1102,7 +1101,7 @@
 }
 
 .cardContent .barberCard.selected .barberPhoto {
-  border-color: #d4af37;
+  border-color: #c38f0a;
   box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
 }
 
@@ -1370,13 +1369,13 @@
 }
 
 .modeButton:hover {
-  border-color: var(--gold-primary, #d4af37);
+  border-color: var(--gold-primary, #c38f0a);
   transform: translateY(-2px);
 }
 
 .modeButton.active {
-  background: linear-gradient(135deg, #d4af37 0%, #b8941f 100%);
-  border-color: #d4af37;
+  background: linear-gradient(135deg, #c38f0a 0%, #a37608 100%);
+  border-color: #c38f0a;
   color: #fff;
   box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
 }
@@ -1430,7 +1429,7 @@
 }
 
 .barberCard.selected {
-  border-color: #d4af37;
+  border-color: #c38f0a;
   background: #fffbf0;
   box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
 }
@@ -2756,12 +2755,12 @@
     rgba(255, 215, 0, 0.35),
     rgba(255, 215, 0, 0.25)
   );
-  border-color: #ffd700;
+  border-color: #c38f0a;
   box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.35), var(--shadow-xl);
 }
 
 [data-theme="dark"] .serviceCard.selected::after {
-  background: #ffd700;
+  background: #c38f0a;
   color: #000;
   box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
 }
@@ -2772,20 +2771,20 @@
     rgba(255, 215, 0, 0.35),
     rgba(255, 215, 0, 0.25)
   );
-  border-color: #ffd700;
+  border-color: #c38f0a;
   box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.35), var(--shadow-xl);
 }
 
 [data-theme="dark"] .barberCard.selected .barberImage {
-  border-color: #ffd700;
+  border-color: #c38f0a;
   box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.4),
     0 8px 24px rgba(255, 215, 0, 0.3);
 }
 
 [data-theme="dark"] .timeSlot.selected {
-  background: linear-gradient(135deg, #ffd700, #f0c000);
+  background: linear-gradient(135deg, #c38f0a, #f0c000);
   color: #000;
-  border-color: #ffd700;
+  border-color: #c38f0a;
   box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.35),
     0 8px 16px rgba(255, 215, 0, 0.4);
 }

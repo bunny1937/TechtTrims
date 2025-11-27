@@ -116,22 +116,39 @@ export default function UserRegisterPage() {
       if (response.ok) {
         const result = await response.json();
 
+        // Ensure user data includes gender
+        const userWithGender = {
+          ...result.user,
+          gender: result.user.gender || formData.gender || "other",
+        };
+
+        console.log("✅ Storing user data with gender:", userWithGender.gender);
+
         // Store authentication data using cookie helper
         setAuthToken(result.token, true);
-        setUserData(result.user);
+        setUserData(userWithGender);
 
-        // Mark as onboarded (registered users don't need onboarding again)
+        // Mark as onboarded
         sessionStorage.setItem("hasOnboarded", "true");
 
         // Clean up temporary data
         localStorage.removeItem("userPrefillData");
 
-        // Keep onboarding data in session for preferences
+        // Keep onboarding data in session for preferences - UPDATE WITH GENDER
         const onboardingData = sessionStorage.getItem("userOnboardingData");
         if (onboardingData) {
-          // Merge onboarding preferences with user data
           try {
             const preferences = JSON.parse(onboardingData);
+            // Merge with registered user data
+            const mergedData = {
+              ...preferences,
+              ...userWithGender,
+              gender: userWithGender.gender, // Ensure gender persists
+            };
+            sessionStorage.setItem(
+              "userOnboardingData",
+              JSON.stringify(mergedData)
+            );
             sessionStorage.setItem(
               "userPreferences",
               JSON.stringify(preferences)
@@ -139,6 +156,12 @@ export default function UserRegisterPage() {
           } catch (e) {
             console.error("Error parsing onboarding data:", e);
           }
+        } else {
+          // If no onboarding data, create it with user data
+          sessionStorage.setItem(
+            "userOnboardingData",
+            JSON.stringify(userWithGender)
+          );
         }
 
         alert("Registration successful! Welcome to TechTrims!");

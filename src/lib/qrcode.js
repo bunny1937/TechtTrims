@@ -6,8 +6,8 @@ export async function generateQRCode(bookingCode) {
       width: 300,
       margin: 2,
       color: {
-        dark: "#000000",
-        light: "#FFFFFF",
+        dark: "#1a0f00",
+        light: "#faf6ef",
       },
     });
 

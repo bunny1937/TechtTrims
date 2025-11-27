@@ -116,7 +116,7 @@ export default function UploadImageButton({
       <label
         style={{
           display: "inline-block",
-          background: "linear-gradient(135deg, #d4af37 0%, #f5e6b8 100%)",
+          background: "linear-gradient(135deg, #c38f0a 0%, #f5e6b8 100%)",
           color: "#000",
           fontWeight: 600,
           padding: "12px 24px",

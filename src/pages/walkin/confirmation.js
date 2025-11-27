@@ -106,7 +106,7 @@ export default function WalkinConfirmation() {
               {
                 width: 200,
                 margin: 2,
-                color: { dark: "#000000", light: "#FFFFFF" },
+                color: { dark: "#1a0f00", light: "#faf6ef" },
               }
             );
             setQrCodeUrl(qrUrl);

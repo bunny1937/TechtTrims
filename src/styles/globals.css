@@ -9,51 +9,50 @@
 
 :root {
   /* Luxury Color Palette */
-  --gold-50: #fffbeb;
-  --gold-100: #fef3c7;
-  --gold-200: #fde68a;
-  --gold-300: #fcd34d;
-  --gold-400: #fbbf24;
-  --gold-500: #f59e0b;
-  --gold-600: #d97706;
-  --gold-700: #b45309;
-  --gold-800: #92400e;
-  --gold-900: #78350f;
-
-  --primary: #d4af37;
-  --primary-dark: #b8941f;
-  --primary-light: #f5e99b;
-  --accent: #8b4513;
-  --accent-light: #daa520;
+  --gold-50: #fef9f0;
+  --gold-100: #fcecc8;
+  --gold-200: #f9d89a;
+  --gold-300: #f5c66d;
+  --gold-400: #e8a934;
+  --gold-500: #c38f0a;
+  --gold-600: #a37608;
+  --gold-700: #805208;
+  --gold-800: #5a3106;
+  --gold-900: #3d1a04;
+  --primary: #c38f0a;
+  --primary-dark: #a37608;
+  --primary-light: #f9d89a;
+  --accent: #c38f0a;
+  --accent-light: #e8a934;
 
   /* Neutral Colors */
-  --white: #ffffff;
-  --black: #000000;
-  --gray-50: #fafafa;
-  --gray-100: #f5f5f5;
-  --gray-200: #e5e5e5;
-  --gray-300: #d4d4d4;
-  --gray-400: #a3a3a3;
-  --gray-500: #737373;
-  --gray-600: #525252;
-  --gray-700: #404040;
-  --gray-800: #262626;
-  --gray-900: #171717;
+  --white: #faf6ef;
+  --black: #1a0f00;
+  --gray-50: #f5f0e6;
+  --gray-100: #ede6da;
+  --gray-200: #ddd3c8;
+  --gray-300: #c9baa9;
+  --gray-400: #9d8b79;
+  --gray-500: #7d6e5e;
+  --gray-600: #6b5644;
+  --gray-700: #4a3516;
+  --gray-800: #3d2400;
+  --gray-900: #2c1600;
 
   /* Semantic Colors */
   --success: #10b981;
-  --warning: #f59e0b;
+  --warning: #c38f0a;
   --error: #ef4444;
   --info: #3b82f6;
 
   /* Light Theme */
-  --background-primary: var(--white);
-  --background-secondary: var(--gray-50);
-  --background-tertiary: var(--gray-100);
-  --text-primary: var(--gray-900);
-  --text-secondary: var(--gray-600);
-  --text-tertiary: var(--gray-400);
-  --border-color: var(--gray-200);
+  --background-primary: #faf6ef;
+  --background-secondary: #f5f0e6;
+  --background-tertiary: #ede6da;
+  --text-primary: #2c1600;
+  --text-secondary: #6b5644;
+  --text-tertiary: #9d8b79;
+  --border-color: #ddd3c8;
   --border-color-hover: var(--primary);
   transition: background-color 0.4s ease, color 0.4s ease;
 
@@ -95,7 +94,7 @@
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1),
     0 8px 10px -6px rgb(0 0 0 / 0.1);
   --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  --shadow-luxury: 0 32px 64px -12px rgba(212, 175, 55, 0.25);
+  --shadow-luxury: 0 32px 64px -12px rgba(195, 143, 10, 0.25);
 
   /* Transitions */
   --transition-fast: 0.15s ease-out;
@@ -111,19 +110,16 @@
 
 /* Dark Theme */
 [data-theme="dark"] {
-  --background-primary: #000000;
-  --background-secondary: #0a0a0a;
-  --background-tertiary: #111111;
-
-  --text-primary: #ffffff;
-  --text-secondary: #cccccc;
-  --text-tertiary: #888888;
-
-  --border-color: #222222;
-
-  --primary: #ffd700;
-  --primary-dark: #e6c200;
-  --primary-light: #fff4b3;
+  --background-primary: #030302;
+  --background-secondary: #040302;
+  --background-tertiary: #080705;
+  --text-primary: #faf6ef;
+  --text-secondary: #ddd3c8;
+  --text-tertiary: #9d8b79;
+  --border-color: #4a3516;
+  --primary: #c38f0a;
+  --primary-dark: #a37608;
+  --primary-light: #f9d89a;
   transition: background-color 0.4s ease, color 0.4s ease;
 }
 
@@ -263,12 +259,12 @@ h6 {
     var(--primary-dark) 100%
   );
   color: var(--black);
-  box-shadow: var(--shadow-lg), 0 0 20px rgba(212, 175, 55, 0.3);
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(195, 143, 10, 0.3);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px) scale(1.02);
-  box-shadow: var(--shadow-xl), 0 0 30px rgba(212, 175, 55, 0.4);
+  box-shadow: var(--shadow-xl), 0 0 30px rgba(195, 143, 10, 0.4);
 }
 
 .btn-secondary {
@@ -284,13 +280,13 @@ h6 {
 }
 
 .btn-ghost {
-  background: rgba(212, 175, 55, 0.1);
+  background: rgba(195, 143, 10, 0.1);
   color: var(--primary);
-  border: 1px solid rgba(212, 175, 55, 0.2);
+  border: 1px solid rgba(195, 143, 10, 0.2);
 }
 
 .btn-ghost:hover {
-  background: rgba(212, 175, 55, 0.2);
+  background: rgba(195, 143, 10, 0.2);
   transform: translateY(-1px);
 }
 
@@ -355,7 +351,7 @@ h6 {
 .form-input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 0 3px rgba(195, 143, 10, 0.1);
   transform: scale(1.01);
 }
 

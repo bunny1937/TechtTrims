@@ -52,7 +52,6 @@ async function handler(req, res) {
       {
         $set: {
           bookingHistory: bookingIds,
-          updatedAt: new Date(),
         },
       }
     );

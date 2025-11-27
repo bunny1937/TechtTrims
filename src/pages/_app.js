@@ -15,6 +15,8 @@ function MyApp({ Component, pageProps }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [userGender, setUserGender] = useState(null);
+  const [selectedGender, setSelectedGender] = useState("all");
 
   // Don't show header on onboarding AND auth pages
   // Check if user needs onboarding on route change
@@ -70,6 +72,82 @@ function MyApp({ Component, pageProps }) {
     }
   }, []);
 
+  // NEW: Load user gender from session storage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Small delay to ensure sessionStorage is ready
+    const timer = setTimeout(() => {
+      // Try userData first (for logged in users)
+      let userData = sessionStorage.getItem("userData");
+
+      // Fallback to onboardingData (for guests)
+      if (!userData || !JSON.parse(userData)?.gender) {
+        userData = sessionStorage.getItem("userOnboardingData");
+      }
+
+      if (userData) {
+        try {
+          const parsedData = JSON.parse(userData);
+          if (parsedData?.gender) {
+            console.log("✅ Setting user gender:", parsedData.gender);
+            setUserGender(parsedData.gender);
+
+            const storedGender = sessionStorage.getItem("selectedGender");
+            if (storedGender) {
+              setSelectedGender(storedGender);
+            } else {
+              const initialGender =
+                parsedData.gender === "Male" ? "Male" : "Female";
+              setSelectedGender(initialGender);
+              sessionStorage.setItem("selectedGender", initialGender);
+            }
+          } else {
+            console.log("⚠ No gender found in userData");
+          }
+        } catch (error) {
+          console.error("Error parsing user data:", error);
+        }
+      } else {
+        console.log("⚠ No user data found in sessionStorage");
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Prompt existing users to set gender if missing
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const userData = sessionStorage.getItem("userData");
+    if (userData) {
+      try {
+        const parsedData = JSON.parse(userData);
+
+        // If user is logged in but has no gender or gender is 'other'
+        if (
+          parsedData.id &&
+          (!parsedData.gender || parsedData.gender === "other")
+        ) {
+          // Show a one-time prompt
+          const hasPrompted = sessionStorage.getItem("genderPromptShown");
+          if (!hasPrompted) {
+            const userChoice = confirm(
+              "To provide better salon recommendations, please update your gender in your profile settings."
+            );
+            if (userChoice) {
+              router.push("/user/dashboard");
+            }
+            sessionStorage.setItem("genderPromptShown", "true");
+          }
+        }
+      } catch (error) {
+        console.error("Error checking user gender:", error);
+      }
+    }
+  }, [router]);
+
   const toggleDarkMode = async (event) => {
     if (!document.startViewTransition) {
       // fallback (instant toggle)
@@ -107,6 +185,7 @@ function MyApp({ Component, pageProps }) {
             `circle(0px at ${x}px ${y}px)`,
             `circle(${radius}px at ${x}px ${y}px)`,
           ],
+
           filter: [
             newMode
               ? "drop-shadow(0 0 25px rgba(255, 215, 0, 0.25))"
@@ -155,16 +234,16 @@ function MyApp({ Component, pageProps }) {
               }
             >
               <span className={styles.themeIcon}>
-                {isDarkMode ? "☀️" : "🌙"}
+                {isDarkMode ? "☀" : "🌙"}
               </span>
             </motion.button> */}
             {/* Desktop Navigation */}
             <nav className={styles.desktopNav}>
               <div className={styles.navLinks}>
                 <OnboardingLogoutButton />
-                <button className={styles.navLink}>Services</button>
+                {/* <button className={styles.navLink}>Services</button>
                 <button className={styles.navLink}>Salons</button>
-                <button className={styles.navLink}>About</button>
+                <button className={styles.navLink}>About</button> */}
               </div>
 
               <div className={styles.headerActions}>
@@ -179,9 +258,47 @@ function MyApp({ Component, pageProps }) {
                   }
                 >
                   <span className={styles.themeIcon}>
-                    {isDarkMode ? "☀️" : "🌙"}
+                    {isDarkMode ? "☀" : "🌙"}
                   </span>
                 </motion.button>
+
+                {userGender && (
+                  <div className={styles.genderToggle}>
+                    <button
+                      className={`${styles.genderOption} ${
+                        selectedGender === userGender ? styles.active : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedGender(userGender);
+                        sessionStorage.setItem("selectedGender", userGender);
+                        window.dispatchEvent(
+                          new CustomEvent("genderFilterChange", {
+                            detail: userGender,
+                          })
+                        );
+                      }}
+                    >
+                      {userGender === "Male" ? "👨" : "👩 "}
+                    </button>
+
+                    <button
+                      className={`${styles.genderOption} ${
+                        selectedGender === "Unisex" ? styles.active : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedGender("Unisex");
+                        sessionStorage.setItem("selectedGender", "Unisex");
+                        window.dispatchEvent(
+                          new CustomEvent("genderFilterChange", {
+                            detail: "Unisex",
+                          })
+                        );
+                      }}
+                    >
+                      ⚥
+                    </button>
+                  </div>
+                )}
 
                 {/* ✅ SHOW DASHBOARD ONLY IF LOGGED IN */}
                 {UserDataManager.isLoggedIn() && (
@@ -288,7 +405,7 @@ function MyApp({ Component, pageProps }) {
                 }
               >
                 <span className={styles.themeIcon}>
-                  {isDarkMode ? "☀️" : "🌙"}
+                  {isDarkMode ? "☀" : "🌙"}
                 </span>
               </motion.button>
 
@@ -324,9 +441,9 @@ function MyApp({ Component, pageProps }) {
               >
                 <div className={styles.mobileNavLinks}>
                   <OnboardingLogoutButton />
-                  <button className={styles.mobileNavLink}>Services</button>
+                  {/* <button className={styles.mobileNavLink}>Services</button>
                   <button className={styles.mobileNavLink}>Salons</button>
-                  <button className={styles.mobileNavLink}>About</button>
+                  <button className={styles.mobileNavLink}>About</button> */}
                   <div className={styles.mobileNavDivider}></div>
 
                   {/* Show Dashboard if logged in */}
@@ -407,7 +524,7 @@ function MyApp({ Component, pageProps }) {
         </header>
       )}
 
-      <Component {...pageProps} />
+      <Component {...pageProps} theme={isDarkMode ? "dark" : "light"} />
     </>
   );
 }

@@ -418,6 +418,85 @@
   gap: var(--space-2);
   animation: slideIn 0.3s ease-out;
 }
+/* Salon Gender Selection */
+.genderOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.genderOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  background: var(--background-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.genderOption:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  border-color: var(--primary);
+}
+
+.genderOption.active {
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  border-color: var(--primary);
+  color: var(--black);
+  box-shadow: 0 8px 20px rgba(255, 215, 0, 0.3);
+}
+
+.genderIcon {
+  font-size: 48px;
+  line-height: 1;
+}
+
+.genderText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.genderText strong {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.genderText small {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.genderOption.active .genderText small {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .genderOptions {
+    grid-template-columns: 1fr;
+  }
+
+  .genderOption {
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .genderIcon {
+    font-size: 36px;
+  }
+}
 
 .priceSymbol {
   font-size: 0.875rem;
@@ -687,7 +766,7 @@
     rgba(255, 215, 0, 0.25),
     rgba(255, 215, 0, 0.15)
   );
-  border-color: #ffd700;
+  border-color: #c38f0a;
 }
 
 [data-theme="dark"] .modalContent {
@@ -1396,7 +1475,7 @@
     rgba(255, 215, 0, 0.25),
     rgba(255, 215, 0, 0.15)
   );
-  border-color: #ffd700;
+  border-color: #c38f0a;
 }
 
 [data-theme="dark"] .modalContent {

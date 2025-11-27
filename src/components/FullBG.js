@@ -84,7 +84,7 @@ void main() {
 }`;
 
 export const Plasma = ({
-  color = "#ffffff",
+  color = "#faf6ef",
   speed = 1,
   direction = "forward",
   scale = 1,

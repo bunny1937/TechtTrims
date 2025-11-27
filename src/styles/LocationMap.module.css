@@ -28,7 +28,7 @@
   align-items: center;
   gap: 4px;
   padding: 8px 12px;
-  background: #d4af37;
+  background: #c38f0a;
   color: white;
   border: none;
   border-radius: 8px;
@@ -87,6 +87,7 @@
 
 .mapHeader {
   padding: 20px;
+  margin-bottom: 0.7rem;
   background: var(--background-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-xl);
@@ -98,17 +99,17 @@
   margin: 0 0 8px 0;
   font-size: 20px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: (--text-primary);
 }
 
 .headerInfo p {
   margin: 4px 0;
   font-size: 14px;
-  color: #333;
+  color: (--text-primary);
 }
 
 .headerInfo .phone {
-  color: #d4af37;
+  color: #c38f0a;
   font-weight: 600;
 }
 
@@ -118,14 +119,13 @@
   margin-top: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: (--text-primary);
 }
 
 .directionsButton {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #1a1a1a;
   border: none;
   border-radius: 8px;
   font-weight: 600;
@@ -135,7 +135,7 @@
 }
 
 .directionsButton:hover {
-  background: #333;
+  background: (--text-primary);
   transform: translateY(-2px);
 }
 
@@ -171,7 +171,7 @@
 }
 
 .liveLocationBtn:hover {
-  background: #d4af37;
+  background: #c38f0a;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
 }
