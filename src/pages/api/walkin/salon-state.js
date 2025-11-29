@@ -32,8 +32,6 @@ export default async function handler(req, res) {
       }
     );
 
-    console.log(`Auto-expired ${expiredResult.modifiedCount} bookings`);
-
     // Get all barbers
     const barbers = await db
       .collection("barbers")

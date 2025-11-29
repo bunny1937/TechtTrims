@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import styles from "../styles/Feedback.module.css";
+import { showError, showSuccess, showWarning } from "@/lib/toast";
 
 export default function FeedbackPage() {
   const router = useRouter();
@@ -45,11 +46,11 @@ export default function FeedbackPage() {
         setBooking(bookingData);
       } else {
         console.error("Failed to fetch booking:", response.status);
-        alert("Failed to load booking details");
+        showError("Failed to load booking details");
       }
     } catch (error) {
       console.error("Error fetching booking:", error);
-      alert("Error loading booking: " + error.message);
+      showError("Error loading booking: " + error.message);
     }
   }, [bookingId]);
 
@@ -114,7 +115,7 @@ export default function FeedbackPage() {
   // Add validation before submission
   const submitFeedback = async () => {
     if (!bookingId) {
-      alert("Invalid booking ID");
+      showError("Invalid booking ID");
       return;
     }
 
@@ -124,7 +125,7 @@ export default function FeedbackPage() {
       .map(([key]) => key.replace(/([A-Z])/g, " $1").toLowerCase());
 
     if (unratedFields.length > 0) {
-      alert(`Please rate: ${unratedFields.join(", ")}`);
+      showWarning(`Please rate: ${unratedFields.join(", ")}`);
       return;
     }
 
@@ -153,7 +154,7 @@ export default function FeedbackPage() {
       });
 
       if (response.ok) {
-        alert("Thank you for your feedback!");
+        showSuccess("Thank you for your feedback!");
 
         // ✅ Check sessionStorage for existing user
         const userData = sessionStorage.getItem("userData");
@@ -194,14 +195,20 @@ export default function FeedbackPage() {
               JSON.stringify(prefillData)
             );
           }
-          router.push("/auth/user/register");
+          // After successful feedback
+          if (UserDataManager.isLoggedIn()) {
+            showSuccess("Thank you for your feedback!");
+            router.push("/user/dashboard");
+          } else {
+            router.push("/auth/user/register");
+          }
         }
       } else {
-        alert("Failed to submit feedback");
+        showError("Failed to submit feedback");
       }
     } catch (error) {
       console.error("Feedback submission error:", error);
-      alert("Error submitting feedback");
+      showError("Error submitting feedback");
     } finally {
       setSubmitting(false);
     }

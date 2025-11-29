@@ -5,6 +5,7 @@ import axios from "axios";
 import OwnerSidebar from "../../../components/OwnerSidebar";
 import styles from "../../../styles/salon/SalonBarbers.module.css";
 import dashboardStyles from "../../../styles/SalonDashboard.module.css";
+import { showError, showSuccess, showWarning } from "@/lib/toast";
 
 export default function SalonBarbersPage() {
   const router = useRouter();
@@ -65,13 +66,13 @@ export default function SalonBarbersPage() {
           if (id) {
             setSalonId(id);
           } else {
-            setError("Invalid salon session data");
+            showWarning("Invalid salon session data");
           }
         } catch (err) {
-          setError("Failed to parse salon session");
+          showError("Failed to parse salon session");
         }
       } else {
-        setError("No salon session found. Please login first.");
+        showError("No salon session found. Please login first.");
         setTimeout(() => router.push("/auth/salon/login"), 2000);
       }
     }
@@ -98,8 +99,8 @@ export default function SalonBarbersPage() {
   }, [salonId]);
 
   const handleCreate = async () => {
-    if (!newBarber.name) return alert("Name is required");
-    if (!salonId) return alert("No salon session found");
+    if (!newBarber.name) return showWarning("Name is required");
+    if (!salonId) return showError("No salon session found");
 
     try {
       const res = await axios.post("/api/salons/barbers", {
@@ -137,20 +138,25 @@ export default function SalonBarbersPage() {
 
   const toggleAvailability = async (barberId, currentStatus) => {
     try {
-      const res = await axios.put(`/api/salons/barbers/${barberId}`, {
+      const res = await axios.put(`/api/salons/barbers/toggle-availability`, {
+        barberId: barberId,
         isAvailable: !currentStatus,
       });
 
+      // Update local state
       setBarbers(
         barbers.map((b) =>
           b._id === barberId ? { ...b, isAvailable: !currentStatus } : b
         )
       );
+
+      console.log("✅ Availability updated:", res.data);
     } catch (err) {
-      console.error("Toggle availability error:", err);
+      console.error("❌ Toggle availability error:", err);
       alert(
-        "Failed to update barber status: " +
-          (err.response?.data?.error || err.message)
+        `Failed to update barber status: ${
+          err.response?.data?.message || err.message
+        }`
       );
     }
   };
@@ -164,7 +170,7 @@ export default function SalonBarbersPage() {
   };
 
   const saveBarber = async () => {
-    if (!editingBarber.name) return alert("Name is required");
+    if (!editingBarber.name) return showWarning("Name is required");
 
     try {
       const res = await axios.put(`/api/salons/barbers/${editingBarber._id}`, {
@@ -178,9 +184,9 @@ export default function SalonBarbersPage() {
         barbers.map((b) => (b._id === editingBarber._id ? res.data : b))
       );
       setEditingBarber(null);
-      alert("Barber updated successfully!");
+      showSuccess("Barber updated successfully!");
     } catch (err) {
-      alert(
+      showError(
         "Failed to update barber: " + (err.response?.data?.error || err.message)
       );
     }

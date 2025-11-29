@@ -45,7 +45,6 @@ export default async function handler(req, res) {
           },
         }
       );
-      console.log("🗑️ Auto-expired bookings:", expireResult.modifiedCount);
     } catch (expireErr) {
       console.error("⚠️ Error auto-expiring bookings:", expireErr.message);
     }
@@ -62,8 +61,6 @@ export default async function handler(req, res) {
         })
         .sort({ createdAt: -1 })
         .toArray();
-
-      console.log("✅ Found", bookings.length, "active bookings");
     } catch (findErr) {
       console.error("❌ Error finding bookings:", findErr.message);
       return res.status(500).json({
@@ -110,12 +107,6 @@ export default async function handler(req, res) {
         }
       })
       .filter((b) => b !== null); // Remove any null entries
-
-    console.log(
-      "📦 Formatted",
-      formattedBookings.length,
-      "bookings for frontend"
-    );
 
     res.status(200).json({
       success: true,

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../components/Admin/AdminLayout";
 import styles from "../../styles/Admin/AdminAnalytics.module.css";
+import { showError } from "@/lib/toast";
 
 export default function AuditLogsPage() {
   const router = useRouter();
@@ -45,7 +46,7 @@ export default function AuditLogsPage() {
       setPagination((prev) => ({ ...prev, ...data.pagination }));
     } catch (error) {
       console.error("Error fetching audit logs:", error);
-      alert("Failed to load audit logs");
+      showError("Failed to load audit logs");
     } finally {
       setLoading(false);
     }

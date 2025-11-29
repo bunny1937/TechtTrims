@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import styles from "../../../styles/Auth/UserAuth.module.css";
 import { UserDataManager } from "../../../lib/userData";
 import { setAuthToken, setUserData } from "../../../lib/cookieAuth";
+import { showSuccess } from "@/lib/toast";
 
 export default function UserLoginPage() {
   const router = useRouter();
@@ -45,7 +46,7 @@ export default function UserLoginPage() {
       if (response.status === 429) {
         setError(`Too many attempts. ${data.message}`);
       } else if (response.ok) {
-        alert(
+        showSuccess(
           "✅ Password reset link sent! Please check your email (including spam folder)."
         );
         setShowForgotPassword(false);
@@ -93,7 +94,7 @@ export default function UserLoginPage() {
         // Store non-sensitive data in sessionStorage
         await UserDataManager.fetchAndStoreUserData();
 
-        alert(`Welcome back, ${result.user.name}!`);
+        showSuccess(`Welcome back, ${result.user.name}!`);
         router.push("/user/dashboard");
       } else {
         const error = await response.json();

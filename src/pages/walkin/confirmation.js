@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import styles from "../../styles/WalkinConfirmation.module.css";
 import feedbackStyles from "../../styles/Feedback.module.css";
 import { motion } from "framer-motion";
+import { showError, showWarning } from "@/lib/toast";
 // Format time ago
 const formatTimeAgo = (date) => {
   if (!date) return "N/A";
@@ -247,7 +248,7 @@ export default function WalkinConfirmation() {
       .map(([key]) => key.replace(/([A-Z])/g, " $1").toLowerCase());
 
     if (unratedFields.length > 0) {
-      alert(`Please rate: ${unratedFields.join(", ")}`);
+      showWarning(`Please rate: ${unratedFields.join(", ")}`);
       return;
     }
 
@@ -292,11 +293,11 @@ export default function WalkinConfirmation() {
           router.push("/auth/user/register");
         }
       } else {
-        alert("Failed to submit feedback");
+        showError("Failed to submit feedback");
       }
     } catch (error) {
       console.error("Feedback submission error:", error);
-      alert("Error submitting feedback");
+      showError("Error submitting feedback");
     } finally {
       setSubmitting(false);
     }
@@ -859,34 +860,80 @@ export default function WalkinConfirmation() {
               {/* <div className={styles.queueArrow}>→</div> */}
 
               <div className={styles.horizontalQueue}>
-                {/* Priority Queue (Golden) */}
+                {/* Priority Queue Golden */}
                 {barberQueueData.queue
                   ?.filter((c) => c.queueStatus === "ORANGE")
                   .map((customer, idx) => {
-                    const isYou = customer._id === booking._id;
+                    const isYou = customer.id === booking.id;
+                    const createdAtDate = customer.createdAt
+                      ? new Date(customer.createdAt)
+                      : null;
+
+                    const pos = customer.queuePosition || idx + 1;
+                    const posLabel =
+                      pos === 1
+                        ? "1st"
+                        : pos === 2
+                        ? "2nd"
+                        : pos === 3
+                        ? "3rd"
+                        : `${pos}th`;
+
                     return (
                       <motion.div
-                        key={customer._id}
-                        className={styles.modernQueueItem}
+                        key={customer.id}
+                        className={`${styles.modernQueueItem} ${
+                          styles.orangeCard || ""
+                        }`}
                         initial={{ opacity: 0, x: -50 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.1 }}
                         whileHover={{ scale: 1.1, zIndex: 10 }}
                         style={{
                           background:
-                            "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                            "linear-gradient(135deg, #fbbf24 0, #f59e0b 100)",
                           border: "3px solid #000",
                           boxShadow: isYou
                             ? "0 0 30px rgba(251, 191, 36, 0.8), 0 8px 20px rgba(0,0,0,0.2)"
                             : "0 4px 15px rgba(0,0,0,0.15)",
+                          position: "relative",
                         }}
                       >
-                        <div className={styles.positionBadge}>#{idx + 1}</div>
+                        {/* Position label top-right */}
+                        <div className={styles.positionLabel}>
+                          <span className={styles.positionNumber}>
+                            {posLabel}
+                          </span>
+                          <span className={styles.positionType}>Priority</span>
+                        </div>
+
+                        {/* Booking created time top-left */}
+                        {createdAtDate && (
+                          <div className={styles.bookingTime}>
+                            <div className={styles.timeSmall}>
+                              {createdAtDate.toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </div>
+                            <div className={styles.timeBig}>
+                              {createdAtDate.toLocaleTimeString("en-US", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                                hour12: true,
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className={styles.positionBadge}>{pos}</div>
                         <div className={styles.customerAvatar}>
-                          {customer.customerName.charAt(0)}
+                          {customer.customerName
+                            ? customer.customerName.charAt(0)
+                            : "?"}
                         </div>
                         <div className={styles.customerName}>
-                          {customer.customerName}
+                          {customer.customerName || "Guest"}
                         </div>
                         <div className={styles.queueTime}>
                           {formatTimeAgo(customer.arrivedAt)}
@@ -944,11 +991,14 @@ export default function WalkinConfirmation() {
                           className={styles.customerAvatar}
                           style={{ opacity: 0.7 }}
                         >
-                          {customer.customerName.charAt(0)}
+                          {customer.customerName
+                            ? customer.customerName.charAt(0).toUpperCase()
+                            : "?"}
                         </div>
                         <div className={styles.customerName}>
-                          {customer.customerName}
+                          {customer.customerName || "Unknown Customer"}
                         </div>
+
                         <div
                           className={styles.queueTime}
                           style={{ color: "#dc2626" }}

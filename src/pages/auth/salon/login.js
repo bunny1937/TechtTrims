@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../../styles/Auth/SalonAuth.module.css";
+import { showSuccess, showError } from "@/lib/toast";
 
 export default function SalonLogin() {
   const router = useRouter();
@@ -37,16 +38,16 @@ export default function SalonLogin() {
         localStorage.setItem("salonToken", data.token);
         localStorage.setItem("salonSession", JSON.stringify(data.salon));
 
-        alert(`Welcome back, ${data.salon.salonName}!`);
+        showSuccess(`Welcome back, ${data.salon.salonName}!`);
 
         // Force redirect to salon dashboard
         window.location.href = "/salons/dashboard";
       } else {
         const error = await response.json();
-        alert(error.message || "Login failed");
+        showError(error.message || "Login failed");
       }
     } catch (error) {
-      alert("Login error: " + error.message);
+      showError("Login error: " + error.message);
     } finally {
       setIsLoading(false);
     }

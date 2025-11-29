@@ -2,6 +2,7 @@
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 import styles from "../../styles/Booking.module.css";
+import { showError, showSuccess, showWarning } from "@/lib/toast";
 
 export default function BookingPage() {
   const router = useRouter();
@@ -80,7 +81,7 @@ export default function BookingPage() {
 
   const handleBooking = async () => {
     if (!mobile || !selectedBarber || !selectedDate || !selectedSlot) {
-      alert("Please fill all required fields");
+      showWarning("Please fill all required fields");
       return;
     }
 
@@ -107,16 +108,16 @@ export default function BookingPage() {
       if (response.ok) {
         const result = await response.json();
         // Show success and redirect to confirmation
-        alert("Booking Confirmed!");
+        showSuccess("Booking Confirmed!");
         const bookingId = result?.booking?.id || result?.bookingId;
         if (bookingId) router.push(`/bookings?id=${bookingId}`);
         else router.push("/bookings");
       } else {
-        alert("Booking failed. Please try again.");
+        showError("Booking failed. Please try again.");
       }
     } catch (error) {
       console.error("Booking error:", error);
-      alert("Something went wrong. Please try again.");
+      showWarning("Something went wrong. Please try again.");
     }
   };
 

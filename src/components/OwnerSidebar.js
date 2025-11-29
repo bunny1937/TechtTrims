@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import styles from "../styles/OwnerSidebar.module.css";
+import { showSuccess, showConfirm } from "@/lib/toast";
 
 export default function OwnerSidebar({ closeSidebar }) {
   const router = useRouter();
@@ -18,7 +19,7 @@ export default function OwnerSidebar({ closeSidebar }) {
   ];
 
   const handleLogout = () => {
-    if (window.confirm("Are you sure you want to logout?")) {
+    showConfirm("Are you sure you want to logout?", () => {
       // Clear all salon/owner authentication data
       localStorage.removeItem("ownerToken");
       localStorage.removeItem("salonToken");
@@ -26,13 +27,13 @@ export default function OwnerSidebar({ closeSidebar }) {
       localStorage.removeItem("adminToken");
       localStorage.removeItem("adminData");
 
-      alert("Logged out successfully!");
+      showSuccess("Logged out successfully!");
 
       // Redirect to HOME page (/)
       router.push("/").then(() => {
         window.location.href = "/";
       });
-    }
+    });
   };
 
   return (

@@ -88,7 +88,7 @@ export default async function handler(req, res) {
       },
       process.env.JWT_SECRET,
       {
-        expiresIn: rememberMe ? "30d" : "1d", // ✅ 30 days if remember me, else 1 day
+        expiresIn: rememberMe ? "7d" : "3d",
         issuer: "techtrims-api",
         audience: "techtrims-app",
       }
@@ -112,7 +112,7 @@ export default async function handler(req, res) {
     }
 
     // Always set 30-day expiration
-    const maxAge = `Max-Age=${30 * 24 * 60 * 60}`;
+    const maxAge = `Max-Age=${(rememberMe ? 7 : 3) * 24 * 60 * 60}`;
     cookieOptions.push(maxAge);
     clientCookieOptions.push(maxAge);
 

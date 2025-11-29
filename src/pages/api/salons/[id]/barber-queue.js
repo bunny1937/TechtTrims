@@ -49,7 +49,6 @@ export default async function handler(req, res) {
           { expiresAt: { $gt: bufferTime } },
         ],
       })
-
       .sort([
         ["queueStatus", -1], // GREEN first
         ["arrivedAt", 1], // Then by arrival
@@ -62,14 +61,14 @@ export default async function handler(req, res) {
     const orangeBookings = bookings.filter((b) => b.queueStatus === "ORANGE");
     const redBookings = bookings.filter((b) => b.queueStatus === "RED");
 
-    // Format queue data
+    // Format queue data with SAFE customerName
     const queue = bookings.map((booking, index) => ({
       _id: booking._id.toString(),
-      customerName: booking.customerName,
+      customerName: booking.customerName || "Guest", // ✅ SAFE DEFAULT
       queueStatus: booking.queueStatus,
       queuePosition:
         booking.queueStatus === "ORANGE"
-          ? orangeBookings.findIndex((b) => b._id === booking._id) + 1
+          ? orangeBookings.findIndex((b) => b._id.equals(booking._id)) + 1
           : null,
       arrivedAt: booking.arrivedAt ? booking.arrivedAt.toISOString() : null,
       expiresAt: booking.expiresAt ? booking.expiresAt.toISOString() : null,
@@ -91,11 +90,11 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       success: true,
-      chairNumber: barber.chairNumber,
+      chairNumber: barber.chairNumber || 1,
       queue: queue,
       serving: serving
         ? {
-            customerName: serving.customerName,
+            customerName: serving.customerName || "Guest", // ✅ SAFE DEFAULT
             expectedCompletionTime:
               serving.expectedCompletionTime?.toISOString(),
           }

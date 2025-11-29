@@ -1,3 +1,4 @@
+// src/pages/api/walkin/create-booking.js
 import clientPromise from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
 
@@ -19,15 +20,26 @@ export default async function handler(req, res) {
       estimatedDuration,
     } = req.body;
 
+    // ✅ STRICT VALIDATION - customerName is required and must not be empty
+    if (!customerName || !customerName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer name is required",
+      });
+    }
+
     // Validation
-    if (!salonId || !barberId || !service || !customerName) {
+    if (!salonId || !barberId || !service) {
       console.error("Missing fields:", {
         salonId,
         barberId,
         service,
         customerName,
       });
-      return res.status(400).json({ message: "Missing required fields" });
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
     }
 
     const client = await clientPromise;
@@ -65,14 +77,14 @@ export default async function handler(req, res) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 45 * 60 * 1000);
 
-    // Lines with barber assignment
+    // Barber assignment
     let barberObjectId = null;
     let barberName = "Unassigned";
     let assignmentStatus = "pending";
 
     if (barberId && barberId !== "ANY") {
       try {
-        barberObjectId = new ObjectId(barberId); // Convert to ObjectId
+        barberObjectId = new ObjectId(barberId);
         const barberDoc = await db
           .collection("barbers")
           .findOne({ _id: barberObjectId });
@@ -84,38 +96,29 @@ export default async function handler(req, res) {
       }
     }
 
-    // CRITICAL: Ensure barberId in document is ObjectId
-
-    // NEW LOGIC: Queue position ONLY assigned when user ARRIVES (queueStatus = ORANGE)
-    // At booking time, queuePosition = null (not yet arrived)
-    let queuePosition = null; // Position assigned later on arrival
+    // Queue position assigned on arrival
+    let queuePosition = null;
 
     console.log("Booking created with RED status - no queue position yet", {
       barber: barberName,
       bookingCode,
+      customerName: customerName.trim(), // ✅ Log trimmed name
     });
 
-    console.log("✅ Queue position calculated:", {
-      barber: barberName,
-      existingOrangeCustomers:
-        queuePosition === "Pending" ? 0 : queuePosition - 1,
-      newPosition: queuePosition,
-      bookingCode,
-    });
-
-    // ✅ CHANGED: Add queuePosition to document
+    // Create booking document
     const bookingDoc = {
       salonId: new ObjectId(salonId),
       barberId: barberObjectId,
       barber: barberName,
       assignmentStatus: assignmentStatus,
-      queuePosition: queuePosition, // ✅ Store in DB
-      customerName,
+      queuePosition: null,
+      bookedAt: now,
+      customerName: customerName.trim(), // ✅ TRIM AND SAVE
       customerPhone: customerPhone || "",
       customerEmail: customerEmail || "",
       userId: userId || null,
       service,
-      price: Number(price),
+      price: Number(price) || 0,
       bookingCode,
       queueStatus: "RED",
       status: "confirmed",
@@ -126,53 +129,32 @@ export default async function handler(req, res) {
       createdAt: now,
       updatedAt: now,
     };
-    console.log("✅ Booking created:", {
+
+    console.log("✅ Booking document created:", {
       bookingCode,
+      customerName: bookingDoc.customerName,
       barber: barberName,
       barberId: barberObjectId?.toString(),
-      salonId,
     });
+
     const result = await db.collection("bookings").insertOne(bookingDoc);
 
-    // ✅ UPDATE BARBER STATS WHEN BOOKING IS CREATED
-    if (bookingDoc.barber) {
+    // Update barber stats
+    if (barberObjectId) {
       try {
-        // Find barber by name and salonId
-        const barber = await db.collection("barbers").findOne({
-          name: bookingDoc.barber,
-          salonId: bookingDoc.salonId,
-        });
-
-        if (barber) {
-          // Increment total bookings
-          await db.collection("barbers").updateOne(
-            { _id: barber._id },
-            {
-              $inc: { totalBookings: 1 },
-            }
-          );
-          console.log(
-            `✅ Updated barber ${barber.name} - totalBookings incremented`
-          );
-        } else {
-          console.log(`⚠️ Barber not found: ${bookingDoc.barber}`);
-        }
+        await db.collection("barbers").updateOne(
+          { _id: barberObjectId },
+          {
+            $inc: {
+              totalBookings: 1,
+              queueLength: 1,
+            },
+          }
+        );
+        console.log(`✅ Updated barber ${barberName} stats`);
       } catch (barberError) {
-        console.error(
-          "❌ Error updating barber stats on booking creation:",
-          barberError
-        );
+        console.error("❌ Error updating barber stats:", barberError);
       }
-    }
-
-    // Update barber queue count
-    if (barberId && barberId !== "ANY") {
-      await db
-        .collection("barbers")
-        .updateOne(
-          { _id: new ObjectId(barberId) },
-          { $inc: { queueLength: 1 } }
-        );
     }
 
     res.status(201).json({
@@ -180,15 +162,18 @@ export default async function handler(req, res) {
       booking: {
         bookingId: result.insertedId.toString(),
         bookingCode,
+        customerName: bookingDoc.customerName, // ✅ Return saved name
         expiresAt: expiresAt.toISOString(),
         queuePosition,
         barber: barberName,
       },
     });
   } catch (error) {
-    console.error("Create walk-in booking error:", error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    console.error("❌ Create walk-in booking error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 }

@@ -2,6 +2,7 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { showConfirm, showSuccess } from "@/lib/toast";
 
 export default function ServicePage() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export default function ServicePage() {
       const res = await axios.put(`/api/salons/services/${id}`, service);
       setService(res.data);
       setError("");
-      alert("Service updated successfully!");
+      showSuccess("Service updated successfully!");
     } catch (err) {
       console.error(err);
       setError("Failed to update service");
@@ -56,11 +57,10 @@ export default function ServicePage() {
 
   // Delete service
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this service?"))
-      return;
+    if (!showConfirm("Are you sure you want to delete this service?")) return;
     try {
       await axios.delete(`/api/salons/services/${id}`);
-      alert("Service deleted successfully!");
+      showSuccess("Service deleted successfully!");
       router.push("/salons/services"); // Redirect after deletion
     } catch (err) {
       console.error(err);

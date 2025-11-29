@@ -8,6 +8,8 @@ import styles from "../styles/Home.module.css";
 import { UserDataManager } from "../lib/userData";
 import NetworkStatus from "../components/NetworkStatus";
 import OnboardingLogoutButton from "../components/OnBoardingLogout";
+import { Toaster } from "react-hot-toast";
+import { showConfirm, showSuccess } from "@/lib/toast";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -208,6 +210,35 @@ function MyApp({ Component, pageProps }) {
 
   return (
     <>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: isDarkMode ? "#faf6ef" : "#1a0f00", // Opposite!
+            color: isDarkMode ? "#1a0f00" : "#faf6ef", // Opposite!
+            padding: "16px",
+            borderRadius: "12px",
+            border: `1px solid ${isDarkMode ? "#c9a961" : "#d4af37"}`,
+            boxShadow: isDarkMode
+              ? "0 4px 12px rgba(212, 175, 55, 0.2)"
+              : "0 4px 12px rgba(212, 175, 55, 0.4)",
+          },
+          success: {
+            iconTheme: {
+              primary: "#10b981",
+              secondary: isDarkMode ? "#faf6ef" : "#1a0f00", // Icon bg opposite
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: "#ef4444",
+              secondary: isDarkMode ? "#faf6ef" : "#1a0f00", // Icon bg opposite
+            },
+          },
+        }}
+      />
+
       <NetworkStatus />
       {mounted && !hideHeader && (
         <header className={styles.header}>
@@ -319,7 +350,7 @@ function MyApp({ Component, pageProps }) {
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => {
-                      if (window.confirm("Are you sure you want to logout?")) {
+                      showConfirm("Are you sure you want to logout?", () => {
                         // Call UserDataManager logout (synchronous, no await needed)
                         UserDataManager.clearUserData();
 
@@ -329,11 +360,11 @@ function MyApp({ Component, pageProps }) {
                           localStorage.removeItem("ownerToken");
                         }
 
-                        alert("Logged out successfully!");
+                        showSuccess("Logged out successfully!");
 
                         // Force redirect to home page
                         window.location.href = "/";
-                      }
+                      });
                     }}
                   >
                     Logout
@@ -497,9 +528,7 @@ function MyApp({ Component, pageProps }) {
                     <button
                       className={styles.mobileNavLink}
                       onClick={() => {
-                        if (
-                          window.confirm("Are you sure you want to logout?")
-                        ) {
+                        showConfirm("Are you sure you want to logout?", () => {
                           // Call UserDataManager logout (synchronous)
                           UserDataManager.clearUserData();
 
@@ -509,9 +538,9 @@ function MyApp({ Component, pageProps }) {
                             localStorage.removeItem("ownerToken");
                           }
 
-                          alert("Logged out successfully!");
+                          showSuccess("Logged out successfully!");
                           window.location.href = "/";
-                        }
+                        });
                       }}
                     >
                       Logout

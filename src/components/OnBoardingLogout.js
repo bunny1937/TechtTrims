@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { UserDataManager } from "../lib/userData";
+import { showConfirm, showSuccess } from "../lib/toast";
 
 export default function OnboardingLogoutButton() {
   const [showButton, setShowButton] = useState(false);
@@ -48,13 +48,13 @@ export default function OnboardingLogoutButton() {
       ? `Clear data for "${onboardingData.name}" and start fresh?`
       : "Clear onboarding data and start fresh?";
 
-    if (window.confirm(message)) {
+    if (showConfirm(message)) {
       // Clear onboarding specific data
       localStorage.removeItem("hasOnboarded");
       localStorage.removeItem("userOnboardingData");
       localStorage.removeItem("userPrefillData");
 
-      alert("✅ Onboarding data cleared! You can now start fresh.");
+      showSuccess("Onboarding data cleared! You can now start fresh.");
       router.push("/onboarding");
     }
   };

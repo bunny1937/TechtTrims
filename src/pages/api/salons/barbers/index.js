@@ -45,9 +45,6 @@ export default async function handler(req, res) {
         .sort({ name: 1 })
         .toArray();
 
-      console.log("Found barbers:", barbers.length);
-      console.log("Barbers data:", barbers);
-
       return res.status(200).json(barbers);
     }
 

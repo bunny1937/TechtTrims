@@ -12,6 +12,7 @@ import ImageCarousel from "@/components/ImageCarousel";
 import LocationMap from "../../components/Maps/LocationMap";
 import { useLocation } from "../../hooks/useLocation";
 import QueueDisplay from "@/components/Walkin/QueueDisplay";
+import { showError, showSuccess, showWarning } from "@/lib/toast";
 
 // Dynamic map import to avoid SSR issues
 const MapContainer = dynamic(
@@ -211,6 +212,58 @@ export default function SalonDetail({ initialSalon }) {
     };
   }, [salon, checkSalonStatus]);
 
+  // NEW: Poll services to catch enabled/disabled changes (ONLY when page visible)
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchServices = async () => {
+      try {
+        const res = await fetch(`/api/salons/${id}`);
+        if (res.ok) {
+          const data = await res.json();
+
+          // Update salon state with fresh services
+          setSalon((prevSalon) => ({
+            ...prevSalon,
+            services: data.salon.services,
+          }));
+
+          console.log(
+            "✅ Services refreshed at",
+            new Date().toLocaleTimeString()
+          );
+        }
+      } catch (error) {
+        console.error("Error polling services:", error);
+      }
+    };
+
+    // Initial fetch
+    fetchServices();
+
+    // Visibility-aware polling - refresh when user comes back to page
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log("📍 Page visible - refreshing services");
+        fetchServices();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Poll every 10 seconds ONLY when page is visible
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        fetchServices();
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [id]);
+
   // Real-time closing countdown
   useEffect(() => {
     if (!pauseInfo?.closingTime) return;
@@ -244,33 +297,56 @@ export default function SalonDetail({ initialSalon }) {
     return () => clearInterval(interval);
   }, [pauseInfo?.closingTime, checkSalonStatus]);
 
+  // NEW: Poll barbers list to catch isAvailable changes in real-time
   useEffect(() => {
-    if (bookingMode !== "walkin" || !id) return;
+    if (!id) return;
 
-    const fetchSalonStats = async () => {
+    const fetchBarbers = async () => {
       try {
-        const res = await fetch(`/api/walkin/salon-state?salonId=${id}`);
-        const data = await res.json();
+        const res = await fetch(`/api/salons/barbers?salonId=${id}`);
+        if (res.ok) {
+          const barbersData = await res.json();
 
-        setSalonStats({
-          availableNow: data.availableNow || 0,
-          totalWaiting: data.totalWaiting || 0,
-          totalBooked: data.totalBooked || 0,
-          totalServing: data.totalServing || 0,
-          avgWaitTime: data.avgWaitTime || 0,
-        });
+          setSalon((prevSalon) => ({
+            ...prevSalon,
+            barbers: barbersData,
+          }));
 
-        // ✅ Store barber states with time left
-        setBarberStates(data.barbers || []);
+          setAvailableBarbers(barbersData);
+
+          console.log(
+            "✅ Barbers refreshed at",
+            new Date().toLocaleTimeString()
+          );
+        }
       } catch (error) {
-        console.error("Error fetching salon stats:", error);
+        console.error("Error polling barbers:", error);
       }
     };
 
-    fetchSalonStats();
-    const interval = setInterval(fetchSalonStats, 15000); // Update every 10 seconds
-    return () => clearInterval(interval);
-  }, [bookingMode, id]);
+    fetchBarbers();
+
+    // Visibility-aware polling - only poll when page is visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchBarbers(); // Refresh immediately when user returns
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Poll every 5 seconds when page is visible
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        fetchBarbers();
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [id]);
 
   useEffect(() => {
     console.log(
@@ -498,7 +574,7 @@ export default function SalonDetail({ initialSalon }) {
     const barberState = barberStates?.find((b) => b.barberId === barberId);
 
     if (barberState?.isPaused) {
-      alert(
+      showWarning(
         "This barber is temporarily unavailable. Please select another barber."
       );
       return;
@@ -531,7 +607,7 @@ export default function SalonDetail({ initialSalon }) {
       // ✅ Handle 409 conflict INSIDE makeBookingRequest
       if (response.status === 409) {
         const errorData = await response.json();
-        alert(
+        showWarning(
           "Sorry! This time slot was just booked by another customer. Please select a different time."
         );
         window.location.reload();
@@ -556,19 +632,19 @@ export default function SalonDetail({ initialSalon }) {
     setIsWalkinBooking(true);
     // ✅ Basic service validation (required for both modes)
     if (selectedServices.length === 0) {
-      alert("Please select at least one service");
+      showWarning("Please select at least one service");
       return;
     }
 
     // ✅ Pre-book mode: require date & time
     if (bookingMode === "prebook" && (!selectedDate || !selectedSlot)) {
-      alert("Please select date and time");
+      showWarning("Please select date and time");
       return;
     }
 
     // ✅ Walk-in mode: NO date/time needed, just barber selection
     if (!selectedBarber) {
-      alert("Please select a barber");
+      showWarning("Please select a barber");
       return;
     }
 
@@ -680,7 +756,7 @@ export default function SalonDetail({ initialSalon }) {
             // Handle 409 conflict
             if (response.status === 409) {
               const errorData = await response.json();
-              alert(
+              showWarning(
                 "Sorry! This time slot was just booked by another customer. Please select a different time."
               );
               window.location.reload();
@@ -720,7 +796,7 @@ export default function SalonDetail({ initialSalon }) {
       }
     } catch (error) {
       console.error("❌ Booking error:", error);
-      alert(`Booking failed: ${error.message}`);
+      showError(`Booking failed: ${error.message}`);
     } finally {
       setIsWalkinBooking(false);
       setIsBooking(false);
@@ -729,7 +805,8 @@ export default function SalonDetail({ initialSalon }) {
 
   const handleRegisterAndLink = async () => {
     // call registration API
-    if (!regName || !regMobile) return alert("Please enter name and mobile");
+    if (!regName || !regMobile)
+      return showWarning("Please enter name and mobile");
     try {
       const res = await fetch("/api/users/register", {
         method: "POST",
@@ -743,17 +820,17 @@ export default function SalonDetail({ initialSalon }) {
       const data = await res.json();
       if (!res.ok) {
         setIsBooking(false);
-        return alert(
+        return showError(
           "Registration failed: " + (data.message || res.statusText)
         );
       }
       // set onboarding and close modal
       setUserOnboarding({ name: regName, mobile: regMobile, email: regEmail });
       setShowRegistrationModal(false);
-      alert("Account created! You are now registered.");
+      showSuccess("Account created! You are now registered.");
     } catch (e) {
       console.error(e);
-      alert("Registration failed: " + e.message);
+      showError("Registration failed: " + e.message);
     }
   };
 
@@ -1071,25 +1148,52 @@ export default function SalonDetail({ initialSalon }) {
             >
               <h3 className={styles.cardTitle}>Select Services</h3>
               <div className={styles.servicesGrid}>
-                {getFilteredServices().map((service, index) => (
-                  <motion.div
-                    key={index}
-                    className={`${styles.serviceCard} ${
-                      selectedServices.find((s) => s.name === service.name)
-                        ? styles.selected
-                        : ""
-                    }`}
-                    onClick={() => handleServiceClick(service)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <h4 className={styles.serviceName}>{service.name}</h4>
-                    <p className={styles.servicePrice}>₹{service.price}</p>
-                    <p className={styles.serviceDuration}>
-                      {service.duration} min
-                    </p>
-                  </motion.div>
-                ))}
+                {getFilteredServices().map((service, index) => {
+                  // Check if service is disabled (handle undefined as enabled by default)
+                  const isDisabled = service.enabled === false;
+
+                  return (
+                    <motion.div
+                      key={index}
+                      className={`${styles.serviceCard} ${
+                        selectedServices.find((s) => s.name === service.name)
+                          ? styles.selected
+                          : ""
+                      } ${isDisabled ? styles.disabledService : ""}`}
+                      onClick={() => {
+                        if (isDisabled) {
+                          alert(
+                            `${service.name} is currently unavailable. Please select another service.`
+                          );
+                          return;
+                        }
+                        handleServiceClick(service);
+                      }}
+                      whileHover={isDisabled ? {} : { scale: 1.02 }}
+                      whileTap={isDisabled ? {} : { scale: 0.98 }}
+                      style={{
+                        opacity: isDisabled ? 0.5 : 1,
+                        cursor: isDisabled ? "not-allowed" : "pointer",
+                        pointerEvents: isDisabled ? "none" : "auto",
+                      }}
+                    >
+                      {/* Disabled Overlay */}
+                      {isDisabled && (
+                        <div className={styles.disabledOverlay}>
+                          <span className={styles.disabledBadge}>
+                            ❌ DISABLED
+                          </span>
+                        </div>
+                      )}
+
+                      <h4 className={styles.serviceName}>{service.name}</h4>
+                      <p className={styles.servicePrice}>₹{service.price}</p>
+                      <p className={styles.serviceDuration}>
+                        {service.duration} min
+                      </p>
+                    </motion.div>
+                  );
+                })}
               </div>
               {/* <div className={styles.cardActions}>
               <button
@@ -1169,38 +1273,73 @@ export default function SalonDetail({ initialSalon }) {
                         key={barber._id}
                         className={`${styles.barberCard} ${
                           selectedBarber === barber._id ? styles.selected : ""
+                        } ${
+                          barber.isAvailable === false
+                            ? styles.unavailableCard
+                            : ""
                         }`}
-                        onClick={() => handleBarberClick(barber._id)}
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          if (barber.isAvailable === false) {
+                            alert(
+                              `${barber.name} is currently unavailable. Please select another barber.`
+                            );
+                            return;
+                          }
+                          handleBarberClick(barber._id);
+                        }}
+                        whileHover={
+                          barber.isAvailable === false ? {} : { scale: 1.03 }
+                        }
+                        whileTap={
+                          barber.isAvailable === false ? {} : { scale: 0.98 }
+                        }
+                        style={{
+                          opacity: barber.isAvailable === false ? 0.5 : 1,
+                          cursor:
+                            barber.isAvailable === false
+                              ? "not-allowed"
+                              : "pointer",
+                        }}
                       >
-                        {bookingMode === "walkin" && barberState && (
-                          <div className={styles.walkInStatusBadge}>
-                            {barberState.isPaused ? (
-                              <span className={styles.pausedBadge}>
-                                ⏸ Queue Paused
-                              </span>
-                            ) : (
-                              <>
-                                {barberState.status === "AVAILABLE" && (
-                                  <span className={styles.availableNow}>
-                                    ✅ Available Now
-                                  </span>
-                                )}
-                                {barberState.status === "OCCUPIED" && (
-                                  <span className={styles.occupiedNow}>
-                                    🟢 Busy ({barberState.timeLeft}m left)
-                                  </span>
-                                )}
-                                {orangeBookings.length > 0 && (
-                                  <span className={styles.queueBadge}>
-                                    {orangeBookings.length} in priority queue
-                                  </span>
-                                )}
-                              </>
-                            )}
+                        {/* Unavailable Overlay */}
+                        {barber.isAvailable === false && (
+                          <div className={styles.unavailableOverlay}>
+                            <span className={styles.unavailableText}>
+                              ❌ UNAVAILABLE
+                            </span>
                           </div>
                         )}
+
+                        {/* Walk-in Status Badge */}
+                        {bookingMode === "walkin" &&
+                          barberState &&
+                          barber.isAvailable !== false && (
+                            <div className={styles.walkInStatusBadge}>
+                              {barberState.isPaused ? (
+                                <span className={styles.pausedBadge}>
+                                  ⏸ Queue Paused
+                                </span>
+                              ) : (
+                                <>
+                                  {barberState.status === "AVAILABLE" && (
+                                    <span className={styles.availableNow}>
+                                      ✅ Available Now
+                                    </span>
+                                  )}
+                                  {barberState.status === "OCCUPIED" && (
+                                    <span className={styles.occupiedNow}>
+                                      🟢 Busy ({barberState.timeLeft}m left)
+                                    </span>
+                                  )}
+                                  {orangeBookings.length > 0 && (
+                                    <span className={styles.queueBadge}>
+                                      {orangeBookings.length} in priority queue
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
 
                         <div className={styles.barberPhoto}>
                           <img
@@ -1222,43 +1361,46 @@ export default function SalonDetail({ initialSalon }) {
                         )}
 
                         {/* Walk-in: Show wait time estimate at bottom */}
-                        {bookingMode === "walkin" && barberState && (
-                          <div className={styles.waitEstimate}>
-                            {barberState.isPaused ? (
-                              <span className={styles.pausedWait}>
-                                Temporarily Unavailable
-                              </span>
-                            ) : barberState.status === "AVAILABLE" ? (
-                              <span className={styles.noWait}>No Wait</span>
-                            ) : (
-                              <span className={styles.waitTime}>
-                                ~
-                                {barberState.timeLeft +
-                                  orangeBookings.length * 45}{" "}
-                                mins
-                              </span>
-                            )}
-                          </div>
-                        )}
+                        {bookingMode === "walkin" &&
+                          barberState &&
+                          barber.isAvailable !== false && (
+                            <div className={styles.waitEstimate}>
+                              {barberState.isPaused ? (
+                                <span className={styles.pausedWait}>
+                                  Temporarily Unavailable
+                                </span>
+                              ) : barberState.status === "AVAILABLE" ? (
+                                <span className={styles.noWait}>No Wait</span>
+                              ) : (
+                                <span className={styles.waitTime}>
+                                  ~
+                                  {barberState.timeLeft +
+                                    orangeBookings.length * 45}{" "}
+                                  mins
+                                </span>
+                              )}
+                            </div>
+                          )}
 
-                        {/* NEW: Per-Barber Queue Summary (Walk-in only) */}
-                        {bookingMode === "walkin" && (
-                          <div className={styles.queueSummaryMini}>
-                            {greenBookings.length > 0 && (
-                              <span className={styles.greenDot}>●</span>
-                            )}
-                            {orangeBookings.length > 0 && (
-                              <span className={styles.orangeCount}>
-                                {orangeBookings.length}
-                              </span>
-                            )}
-                            {redBookings.length > 0 && (
-                              <span className={styles.greyCount}>
-                                +{redBookings.length}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                        {/* Per-Barber Queue Summary (Walk-in only) */}
+                        {bookingMode === "walkin" &&
+                          barber.isAvailable !== false && (
+                            <div className={styles.queueSummaryMini}>
+                              {greenBookings.length > 0 && (
+                                <span className={styles.greenDot}>●</span>
+                              )}
+                              {orangeBookings.length > 0 && (
+                                <span className={styles.orangeCount}>
+                                  {orangeBookings.length}
+                                </span>
+                              )}
+                              {redBookings.length > 0 && (
+                                <span className={styles.greyCount}>
+                                  +{redBookings.length}
+                                </span>
+                              )}
+                            </div>
+                          )}
                       </motion.div>
                     );
                   })}
@@ -1880,13 +2022,13 @@ export default function SalonDetail({ initialSalon }) {
                       const err = await res
                         .json()
                         .catch(() => ({ message: "Unknown error" }));
-                      alert(
+                      showError(
                         "Booking failed: " + (err.message || res.statusText)
                       );
                       return;
                     }
                     const data = await res.json();
-                    alert(
+                    showSuccess(
                       "Booking confirmed! Booking ID: " +
                         (data.bookingId || data.id || "N/A")
                     );
@@ -1910,7 +2052,7 @@ export default function SalonDetail({ initialSalon }) {
                     );
                   } catch (e) {
                     console.error(e);
-                    alert("Booking failed: " + e.message);
+                    showError("Booking failed: " + e.message);
                   }
                 }}
               >

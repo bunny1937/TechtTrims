@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import OwnerSidebar from "../../../components/OwnerSidebar";
 import styles from "../../../styles/salon/SalonPayments.module.css";
 import dashboardStyles from "../../../styles/SalonDashboard.module.css";
+import { showError } from "@/lib/toast";
 
 export default function PaymentsPage() {
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function PaymentsPage() {
     const salonId = salonData._id || salonData.id;
 
     if (!salonId) {
-      alert("Invalid salon session");
+      showError("Invalid salon session");
       router.push("/auth/salon/login");
       return;
     }
