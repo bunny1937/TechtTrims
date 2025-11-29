@@ -1,7 +1,7 @@
 // pages/salons/bookings/[id].jsx
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { showSuccess, showError } from "../../lib/toast";
+import { showSuccess, showError } from "../../../lib/toast";
 
 export default function BookingDetailPage() {
   const router = useRouter();
