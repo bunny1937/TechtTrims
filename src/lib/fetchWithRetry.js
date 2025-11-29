@@ -1,3 +1,5 @@
+import { showError, showWarning } from "./toast";
+
 export async function fetchWithRetry(url, options = {}, maxRetries = 3) {
   let lastError;
 
@@ -54,11 +56,11 @@ export async function apiCall(endpoint, data) {
     return await response.json();
   } catch (error) {
     if (!navigator.onLine) {
-      alert(
+      showWarning(
         "📡 You are offline. Please check your internet connection and try again."
       );
     } else {
-      alert(`❌ Request failed: ${error.message}`);
+      showError(`❌ Request failed: ${error.message}`);
     }
     throw error;
   }

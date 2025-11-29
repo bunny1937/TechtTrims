@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import OwnerSidebar from "../../components/OwnerSidebar";
 import styles from "../../styles/SalonDashboard.module.css";
+import { showSuccess, showWarning } from "@/lib/toast";
 
 // Time Remaining Component
 function TimeRemaining({ endTime }) {
@@ -44,6 +45,7 @@ function TimeRemaining({ endTime }) {
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState({});
   const [salon, setSalon] = useState(null);
   const [barbers, setBarbers] = useState([]);
   const [showScanner, setShowScanner] = useState(false);
@@ -190,7 +192,7 @@ export default function DashboardPage() {
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification(title, { body, icon: "/logo.png" });
     } else {
-      alert(`${title}\n${body}`);
+      showWarning(`${title}\n${body}`);
     }
   };
 
@@ -267,10 +269,40 @@ export default function DashboardPage() {
         return true;
       });
 
+      // ✅ Sort bookings by priority queue logic PER BARBER
+      const sortedBookings = activeBookings.sort((a, b) => {
+        // Different barbers don't affect each other
+        if (a.barberId !== b.barberId) return 0;
+
+        // GREEN (serving) always first
+        if (a.queueStatus === "GREEN") return -1;
+        if (b.queueStatus === "GREEN") return 1;
+
+        // ORANGE (priority - arrived, sorted by bookedAt)
+        if (a.queueStatus === "ORANGE" && b.queueStatus === "ORANGE") {
+          return (
+            new Date(a.bookedAt || a.createdAt) -
+            new Date(b.bookedAt || b.createdAt)
+          );
+        }
+        if (a.queueStatus === "ORANGE") return -1;
+        if (b.queueStatus === "ORANGE") return 1;
+
+        // RED (waiting - not arrived, sorted by bookedAt)
+        if (a.queueStatus === "RED" && b.queueStatus === "RED") {
+          return (
+            new Date(a.bookedAt || a.createdAt) -
+            new Date(b.bookedAt || b.createdAt)
+          );
+        }
+
+        return 0;
+      });
+
       console.log(
-        `✅ Active bookings after filtering: ${activeBookings.length}`
+        `✅ Active bookings after filtering: ${sortedBookings.length}`
       );
-      setBookings(activeBookings);
+      setBookings(sortedBookings);
       setError(null); // Clear any previous errors
     } catch (err) {
       console.error("❌ Error loading bookings:", err);
@@ -464,22 +496,25 @@ export default function DashboardPage() {
           loadBookings(salon._id, selectedDate);
         }
       } else {
-        alert("Failed to update booking");
+        showError("Failed to update booking");
       }
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("Error updating booking");
+      showError("Error updating booking");
     }
   };
 
   const handleAddTime = async (bookingId, additionalMinutes) => {
+    const key = `extend-${bookingId}-${additionalMinutes}`;
+    setActionLoading((prev) => ({ ...prev, [key]: true }));
+
     try {
       const booking = bookings.find(
         (b) => b._id === bookingId || b.id === bookingId
       );
       if (!booking) {
         console.error("Booking not found:", bookingId);
-        alert("Booking not found");
+        showWarning("Booking not found");
         return;
       }
 
@@ -515,7 +550,7 @@ export default function DashboardPage() {
           )
         );
 
-        alert(
+        showSuccess(
           `Added ${additionalMinutes} minutes. New duration: ${newEstimatedDuration} mins`
         );
 
@@ -524,11 +559,17 @@ export default function DashboardPage() {
           await loadBookings(salon.id, selectedDate);
         }
       } else {
-        alert("Failed to add time");
+        showError("Failed to add time");
       }
     } catch (error) {
       console.error("Error adding time:", error);
-      alert("Error adding time");
+      showError("Error adding time");
+    } finally {
+      setActionLoading((prev) => {
+        const copy = { ...prev };
+        delete copy[key];
+        return copy;
+      });
     }
   };
 
@@ -556,7 +597,7 @@ export default function DashboardPage() {
           pauseReason: reason,
           pauseUntil: until ? until.toISOString() : null,
         }));
-        alert(`Salon ${!salonStatus.isPaused ? "paused" : "resumed"}`);
+        showWarning(`Salon ${!salonStatus.isPaused ? "paused" : "resumed"}`);
       }
     } catch (error) {
       console.error("Error toggling salon:", error);
@@ -575,7 +616,7 @@ export default function DashboardPage() {
       });
 
       if (response.ok) {
-        alert(`Opening time set to ${time}`);
+        showSuccess(`Opening time set to ${time}`);
       }
     } catch (error) {
       console.error("Error setting opening time:", error);
@@ -596,7 +637,7 @@ export default function DashboardPage() {
 
       if (response.ok) {
         setSalonStatus((prev) => ({ ...prev, closingTime: time }));
-        alert(`Closing time set to ${time}`);
+        showSuccess(`Closing time set to ${time}`);
       }
     } catch (error) {
       console.error("Error setting closing time:", error);
@@ -623,7 +664,7 @@ export default function DashboardPage() {
           ...prev,
           [barberId]: { type, until: until.toISOString() },
         }));
-        alert(`Break set for ${type}`);
+        showSuccess(`Break set for ${type}`);
         setShowBreakModal(false);
       }
     } catch (error) {
@@ -649,10 +690,10 @@ export default function DashboardPage() {
           const newSet = new Set(prev);
           if (isPaused) {
             newSet.delete(barberId);
-            alert(`${barberName}'s queue resumed`);
+            showSuccess(`${barberName}'s queue resumed`);
           } else {
             newSet.add(barberId);
-            alert(`${barberName}'s queue paused`);
+            showSuccess(`${barberName}'s queue paused`);
           }
           return newSet;
         });
@@ -662,11 +703,11 @@ export default function DashboardPage() {
           await loadBookings(salon.id, selectedDate);
         }
       } else {
-        alert("Failed to toggle pause");
+        showError("Failed to toggle pause");
       }
     } catch (error) {
       console.error("Error toggling pause:", error);
-      alert("Error toggling pause");
+      showError("Error toggling pause");
     }
   };
 
@@ -674,7 +715,7 @@ export default function DashboardPage() {
     const bookingCode = assignmentInputs[barberId];
 
     if (!bookingCode) {
-      alert("Please enter a booking code");
+      showWarning("Please enter a booking code");
       return;
     }
 
@@ -690,17 +731,17 @@ export default function DashboardPage() {
       const data = await response.json();
 
       if (response.ok) {
-        alert(`✅ ${data.message}`);
+        showWarning(`✅ ${data.message}`);
         setAssignmentInputs({ ...assignmentInputs, [barberId]: "" });
         if (salon?._id) {
           await loadBookings(salon._id, selectedDate);
         }
       } else {
-        alert(`❌ ${data.message}`);
+        showError(`❌ ${data.message}`);
       }
     } catch (error) {
       console.error("Error assigning booking:", error);
-      alert("Failed to assign booking. Please try again.");
+      showError("Failed to assign booking. Please try again.");
     } finally {
       setAssigningBarber(null);
     }
@@ -1154,27 +1195,67 @@ export default function DashboardPage() {
                               </div>
                             )}
 
-                            {orangeBookings.map((b, idx) => (
-                              <div
-                                key={b.id}
-                                className={`${styles.queueCard} ${styles.orange}`}
-                              >
-                                <span>#{idx + 1}</span>
-                                <span>{b.customerName}</span>
-                                <span className={styles.status}>Arrived</span>
-                              </div>
-                            ))}
+                            {orangeBookings
+                              .sort(
+                                (a, b) =>
+                                  new Date(a.bookedAt || a.createdAt) -
+                                  new Date(b.bookedAt || b.createdAt)
+                              )
+                              .map((b, idx) => (
+                                <div
+                                  key={b.id}
+                                  className={`${styles.queueCard} ${styles.orange}`}
+                                  style={{
+                                    background: "#f59e0b",
+                                    color: "#000",
+                                    fontWeight: "600",
+                                    border: "2px solid #d97706",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: "16px",
+                                      fontWeight: "700",
+                                    }}
+                                  >
+                                    #{idx + 1}
+                                  </span>
+                                  <span>{b.customerName}</span>
+                                  <span className={styles.status}>
+                                    Priority
+                                  </span>
+                                </div>
+                              ))}
 
-                            {redBookings.map((b) => (
-                              <div
-                                key={b.id}
-                                className={`${styles.queueCard} ${styles.red}`}
-                              >
-                                <span>⚫</span>
-                                <span>{b.customerName}</span>
-                                <span className={styles.status}>Booked</span>
-                              </div>
-                            ))}
+                            {redBookings
+                              .sort(
+                                (a, b) =>
+                                  new Date(a.bookedAt || a.createdAt) -
+                                  new Date(b.bookedAt || b.createdAt)
+                              )
+                              .map((b, idx) => (
+                                <div
+                                  key={b.id}
+                                  className={`${styles.queueCard} ${styles.red}`}
+                                  style={{
+                                    background: "#fef3c7",
+                                    color: "#000",
+                                    fontWeight: "500",
+                                    border: "2px dashed #d97706",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: "14px",
+                                      fontWeight: "600",
+                                    }}
+                                  >
+                                    #{idx + 1}
+                                  </span>
+                                  <span>{b.customerName}</span>
+                                  <span className={styles.status}>Booked</span>
+                                </div>
+                              ))}
                           </div>
                         </div>
                       );
@@ -1298,6 +1379,10 @@ export default function DashboardPage() {
                     const barberBookings = bookings.filter((b) => {
                       // Filter expired
                       if (b.isExpired) return false;
+
+                      // EXCLUDE COMPLETED bookings
+                      if (b.queueStatus === "COMPLETED") return false;
+
                       if (
                         b.queueStatus === "RED" &&
                         new Date(b.expiresAt) < bufferTime
@@ -1409,25 +1494,75 @@ export default function DashboardPage() {
                                       )
                                     </div>
                                     <div className={styles.queueItems}>
-                                      {orangeBookings.map((b, idx) => (
-                                        <div
-                                          key={b.id}
-                                          className={styles.queueItem}
-                                        >
-                                          <span>#{idx + 1}</span>
-                                          <span>{b.customerName}</span>
-                                          <span>🟠</span>
-                                        </div>
-                                      ))}
-                                      {redBookings.map((b) => (
-                                        <div
-                                          key={b.id}
-                                          className={styles.queueItem}
-                                        >
-                                          <span>⚫</span>
-                                          <span>{b.customerName}</span>
-                                        </div>
-                                      ))}
+                                      {orangeBookings
+                                        .sort(
+                                          (a, b) =>
+                                            new Date(
+                                              a.bookedAt || a.createdAt
+                                            ) -
+                                            new Date(b.bookedAt || b.createdAt)
+                                        )
+                                        .map((b, idx) => (
+                                          <div
+                                            key={b.id}
+                                            className={styles.queueItem}
+                                            style={{
+                                              background: "#f59e0b",
+                                              padding: "8px 12px",
+                                              borderRadius: "6px",
+                                              color: "#000",
+                                              fontWeight: "600",
+                                              border: "2px solid #d97706",
+                                              marginBottom: "4px",
+                                            }}
+                                          >
+                                            <span
+                                              style={{
+                                                fontSize: "16px",
+                                                fontWeight: "700",
+                                              }}
+                                            >
+                                              #{idx + 1}
+                                            </span>
+                                            <span>{b.customerName}</span>
+                                            <span>🟠</span>
+                                          </div>
+                                        ))}
+
+                                      {redBookings
+                                        .sort(
+                                          (a, b) =>
+                                            new Date(
+                                              a.bookedAt || a.createdAt
+                                            ) -
+                                            new Date(b.bookedAt || b.createdAt)
+                                        )
+                                        .map((b, idx) => (
+                                          <div
+                                            key={b.id}
+                                            className={styles.queueItem}
+                                            style={{
+                                              background: "#fef3c7",
+                                              padding: "8px 12px",
+                                              borderRadius: "6px",
+                                              color: "#000",
+                                              fontWeight: "500",
+                                              border: "2px dashed #d97706",
+                                              marginBottom: "4px",
+                                            }}
+                                          >
+                                            <span
+                                              style={{
+                                                fontSize: "14px",
+                                                fontWeight: "600",
+                                              }}
+                                            >
+                                              #{idx + 1}
+                                            </span>
+                                            <span>{b.customerName}</span>
+                                            <span>⚫</span>
+                                          </div>
+                                        ))}
                                     </div>
                                   </div>
                                 )}
@@ -1482,14 +1617,88 @@ export default function DashboardPage() {
 
                               return (
                                 <div
-                                  key={b._id || b.id}
-                                  className={styles.bookingCard}
+                                  key={b._id}
+                                  className={`${styles.bookingCard} ${
+                                    b.queueStatus === "GREEN"
+                                      ? styles.greenCard
+                                      : b.queueStatus === "ORANGE"
+                                      ? styles.orangeCard
+                                      : b.queueStatus === "COMPLETED"
+                                      ? styles.completedCard
+                                      : ""
+                                  }`}
                                   style={{
                                     background: statusColor,
                                     border: borderStyle,
-                                    opacity: b.isExpired ? 0.5 : 1,
+                                    position: "relative",
                                   }}
                                 >
+                                  {/* Card loading overlay */}
+                                  {Object.keys(actionLoading).some((key) =>
+                                    key.includes(b._id)
+                                  ) && (
+                                    <div className={styles.cardLoadingOverlay}>
+                                      <div className={styles.spinner} />
+                                      <p>Processing...</p>
+                                    </div>
+                                  )}
+
+                                  {/* Position label - top right */}
+                                  {/* Position label - top right - ALWAYS show for ORANGE */}
+                                  {/* Position label - only show if position > 1 OR chair is busy */}
+                                  {/* Position label - show for ORANGE, hide if #1 and chair empty */}
+                                  {/* Position label - ALWAYS show for ORANGE at top right */}
+                                  {b.queueStatus === "ORANGE" && (
+                                    <div className={styles.positionLabel}>
+                                      <span className={styles.positionNumber}>
+                                        {!b.queuePosition ||
+                                        b.queuePosition === 1
+                                          ? "1st"
+                                          : b.queuePosition === 2
+                                          ? "2nd"
+                                          : b.queuePosition === 3
+                                          ? "3rd"
+                                          : `${b.queuePosition}th`}
+                                      </span>
+                                      <span className={styles.positionType}>
+                                        {(() => {
+                                          const hasActiveService =
+                                            barberBookings.some(
+                                              (booking) =>
+                                                booking.queueStatus === "GREEN"
+                                            );
+                                          return hasActiveService
+                                            ? "Waiting"
+                                            : "Queue";
+                                        })()}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Booking created time - top left */}
+                                  {/* Booking created time - bottom left to avoid overlap */}
+                                  {b.createdAt && (
+                                    <div className={styles.bookingTime}>
+                                      <div className={styles.timeBig}>
+                                        {new Date(
+                                          b.createdAt
+                                        ).toLocaleTimeString("en-IN", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                          hour12: false,
+                                        })}
+                                      </div>
+                                      <div className={styles.timeSmall}>
+                                        {new Date(b.createdAt)
+                                          .toLocaleDateString("en-IN", {
+                                            day: "2-digit",
+                                            month: "short",
+                                          })
+                                          .toUpperCase()}
+                                      </div>
+                                    </div>
+                                  )}
+
                                   <div className={styles.bookingDetails}>
                                     <h3 className={styles.customerName}>
                                       {b.customerName}
@@ -1559,7 +1768,6 @@ export default function DashboardPage() {
                                       </p>
                                     )}
                                   </div>
-
                                   <div className={styles.barberActions}>
                                     {b.status === "confirmed" &&
                                       (() => {
@@ -1602,99 +1810,219 @@ export default function DashboardPage() {
                                       })()}
 
                                     {b.status === "arrived" &&
-                                      b.queueStatus === "ORANGE" && (
-                                        <>
-                                          {/* DEBUG - REMOVE AFTER TESTING */}
-                                          {console.log("🔍 Booking:", {
-                                            name: b.customerName,
-                                            status: b.status,
-                                            queueStatus: b.queueStatus,
-                                            position: b.queuePosition,
-                                            barberId: b.barberId,
-                                          })}
+                                      b.queueStatus === "ORANGE" &&
+                                      (() => {
+                                        // Check if barber already has someone being served (GREEN)
+                                        const hasActiveService =
+                                          barberBookings.some(
+                                            (booking) =>
+                                              booking.queueStatus === "GREEN"
+                                          );
 
-                                          {/* Only Position 1 can start service */}
-                                          {b.queuePosition === 1 ? (
-                                            <button
-                                              onClick={() => {
-                                                console.log(
-                                                  "🚀 Starting service for:",
-                                                  b.customerName
-                                                );
-                                                setBookingToStart(b);
-                                                setTimeEstimate(
-                                                  b.estimatedDuration || 30
-                                                );
-                                                setShowTimeModal(true);
-                                              }}
-                                              className={styles.startBtn}
-                                            >
-                                              ✅ Start Service (Pos{" "}
-                                              {b.queuePosition})
-                                            </button>
-                                          ) : (
-                                            <button
-                                              className={styles.disabledBtn}
-                                              disabled
-                                              title={`Position ${b.queuePosition} - Must wait for position 1 to complete`}
-                                            >
-                                              🔒 Waiting (Pos {b.queuePosition})
-                                            </button>
-                                          )}
-                                        </>
-                                      )}
-
-                                    <button
-                                      className={styles.timeBtn}
-                                      onClick={() =>
-                                        handleAddTime(b._id || b.id, 5)
-                                      }
-                                    >
-                                      +5min
-                                    </button>
-                                    <button
-                                      className={styles.timeBtn}
-                                      onClick={() =>
-                                        handleAddTime(b._id || b.id, 10)
-                                      }
-                                    >
-                                      +10min
-                                    </button>
-
-                                    <button
-                                      className={`${styles.pauseBtn} ${
-                                        pausedBarbers.has(
-                                          barber._id || barber.id
-                                        )
-                                          ? styles.pausedBtn
-                                          : ""
-                                      }`}
-                                      onClick={() =>
-                                        handleTogglePause(
-                                          barber._id || barber.id,
-                                          barber.name
-                                        )
-                                      }
-                                    >
-                                      {pausedBarbers.has(
-                                        barber._id || barber.id
-                                      )
-                                        ? "▶ Resume"
-                                        : "⏸ Pause"}
-                                    </button>
-
-                                    {b.status === "started" && (
-                                      <button
-                                        onClick={() =>
-                                          updateBookingStatus(
-                                            b._id,
-                                            "completed"
+                                        // Calculate actual position by counting ORANGE bookings sorted by bookedAt
+                                        const orangeForBarber = barberBookings
+                                          .filter(
+                                            (booking) =>
+                                              booking.queueStatus === "ORANGE"
                                           )
-                                        }
-                                        className={styles.doneBtn}
-                                      >
-                                        Done
-                                      </button>
+                                          .sort(
+                                            (a, b) =>
+                                              new Date(
+                                                a.bookedAt || a.createdAt
+                                              ) -
+                                              new Date(
+                                                b.bookedAt || b.createdAt
+                                              )
+                                          );
+
+                                        const actualPosition =
+                                          orangeForBarber.findIndex(
+                                            (booking) =>
+                                              (booking._id || booking.id) ===
+                                              (b._id || b.id)
+                                          ) + 1;
+
+                                        // Can start if: no active service AND is position 1
+                                        const canStart =
+                                          !hasActiveService &&
+                                          actualPosition === 1;
+
+                                        return (
+                                          <>
+                                            {canStart ? (
+                                              <button
+                                                onClick={() => {
+                                                  setBookingToStart(b);
+                                                  setTimeEstimate(
+                                                    b.estimatedDuration || 30
+                                                  );
+                                                  setShowTimeModal(true);
+                                                }}
+                                                disabled={
+                                                  !!actionLoading[
+                                                    `start-${b._id}`
+                                                  ]
+                                                }
+                                                className={styles.startBtn}
+                                                style={{
+                                                  background: actionLoading[
+                                                    `start-${b._id}`
+                                                  ]
+                                                    ? "#9ca3af"
+                                                    : "#10b981",
+                                                  color: "#fff",
+                                                  fontWeight: "700",
+                                                  padding: "10px 16px",
+                                                  borderRadius: "8px",
+                                                  border: "none",
+                                                  cursor: actionLoading[
+                                                    `start-${b._id}`
+                                                  ]
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                                }}
+                                              >
+                                                {actionLoading[`start-${b._id}`]
+                                                  ? "Starting..."
+                                                  : "✅ Start Service"}
+                                              </button>
+                                            ) : (
+                                              // : `✅ Start Service (Priority #${actualPosition})`}
+
+                                              <button
+                                                className={styles.disabledBtn}
+                                                disabled
+                                                title={
+                                                  hasActiveService
+                                                    ? "Chair occupied - wait for current service to complete"
+                                                    : `Priority position #${actualPosition} - wait for #1 to complete`
+                                                }
+                                                style={{
+                                                  background: "#d1d5db",
+                                                  color: "#6b7280",
+                                                  fontWeight: "600",
+                                                  padding: "10px 16px",
+                                                  borderRadius: "8px",
+                                                  border: "2px solid #9ca3af",
+                                                  cursor: "not-allowed",
+                                                }}
+                                              >
+                                                {hasActiveService
+                                                  ? `🔒 Chair Busy (You're #${actualPosition})`
+                                                  : `⏳ Waiting (Priority #${actualPosition})`}
+                                              </button>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
+
+                                    {/* Time control buttons - ONLY for GREEN (in-service) */}
+                                    {b.queueStatus === "GREEN" && (
+                                      <>
+                                        <button
+                                          className={styles.timeBtn}
+                                          onClick={() =>
+                                            handleAddTime(b._id || b.id, 5)
+                                          }
+                                          disabled={
+                                            !!actionLoading[`extend-${b._id}-5`]
+                                          }
+                                        >
+                                          {actionLoading[`extend-${b._id}-5`]
+                                            ? "..."
+                                            : "+5min"}
+                                        </button>
+
+                                        <button
+                                          className={styles.timeBtn}
+                                          onClick={() =>
+                                            handleAddTime(b._id || b.id, 10)
+                                          }
+                                          disabled={
+                                            !!actionLoading[
+                                              `extend-${b._id}-10`
+                                            ]
+                                          }
+                                        >
+                                          {actionLoading[`extend-${b._id}-10`]
+                                            ? "..."
+                                            : "+10min"}
+                                        </button>
+
+                                        <button
+                                          className={`${styles.pauseBtn} ${
+                                            pausedBarbers.has(
+                                              barber._id || barber.id
+                                            )
+                                              ? styles.pausedBtn
+                                              : ""
+                                          }`}
+                                          onClick={() =>
+                                            handleTogglePause(
+                                              barber._id || barber.id,
+                                              barber.name
+                                            )
+                                          }
+                                        >
+                                          {pausedBarbers.has(
+                                            barber._id || barber.id
+                                          )
+                                            ? "▶ Resume"
+                                            : "⏸ Pause"}
+                                        </button>
+
+                                        <button
+                                          onClick={async () => {
+                                            const key = `end-${b._id}`;
+                                            setActionLoading((prev) => ({
+                                              ...prev,
+                                              [key]: true,
+                                            }));
+
+                                            try {
+                                              const response = await fetch(
+                                                "/api/barber/service-control",
+                                                {
+                                                  method: "POST",
+                                                  headers: {
+                                                    "Content-Type":
+                                                      "application/json",
+                                                  },
+                                                  body: JSON.stringify({
+                                                    action: "END",
+                                                    bookingId: b._id,
+                                                    barberId: b.barberId,
+                                                  }),
+                                                }
+                                              );
+                                              if (response.ok) {
+                                                await loadBookings(
+                                                  salon._id || salon.id
+                                                );
+                                              }
+                                            } catch (error) {
+                                              console.error(
+                                                "Error ending service:",
+                                                error
+                                              );
+                                            } finally {
+                                              setActionLoading((prev) => {
+                                                const copy = { ...prev };
+                                                delete copy[key];
+                                                return copy;
+                                              });
+                                            }
+                                          }}
+                                          disabled={
+                                            !!actionLoading[`end-${b._id}`]
+                                          }
+                                          className={styles.doneBtn}
+                                        >
+                                          {actionLoading[`end-${b._id}`]
+                                            ? "Ending..."
+                                            : "Done"}
+                                        </button>
+                                      </>
                                     )}
                                   </div>
                                 </div>
@@ -1903,7 +2231,18 @@ export default function DashboardPage() {
       {/* Time Estimate Modal */}
       {showTimeModal && (
         <div className={styles.scannerModal}>
-          <div className={styles.scannerContent}>
+          <div
+            className={styles.scannerContent}
+            style={{ position: "relative" }}
+          >
+            {/* Loading overlay */}
+            {actionLoading[`modal-start-${bookingToStart?._id}`] && (
+              <div className={styles.modalLoadingOverlay}>
+                <div className={styles.spinner} />
+                <p>Starting service...</p>
+              </div>
+            )}
+
             <button
               onClick={() => {
                 setShowTimeModal(false);
@@ -1911,6 +2250,7 @@ export default function DashboardPage() {
                 setTimeEstimate(30);
               }}
               className={styles.closeModal}
+              disabled={!!actionLoading[`modal-start-${bookingToStart?._id}`]}
             >
               ✕
             </button>
@@ -1930,6 +2270,9 @@ export default function DashboardPage() {
                     className={`${styles.timeOption} ${
                       timeEstimate === mins ? styles.selected : ""
                     }`}
+                    disabled={
+                      !!actionLoading[`modal-start-${bookingToStart?._id}`]
+                    }
                   >
                     {mins} mins
                   </button>
@@ -1946,6 +2289,9 @@ export default function DashboardPage() {
                   min="5"
                   max="120"
                   className={styles.timeNumberInput}
+                  disabled={
+                    !!actionLoading[`modal-start-${bookingToStart?._id}`]
+                  }
                 />
                 <span>minutes</span>
               </div>
@@ -1953,22 +2299,50 @@ export default function DashboardPage() {
 
             <button
               onClick={async () => {
-                await updateBookingStatus(
-                  bookingToStart._id,
-                  "started",
-                  timeEstimate
-                );
-                setShowTimeModal(false);
-                setBookingToStart(null);
-                setTimeEstimate(30);
+                const key = `modal-start-${bookingToStart._id}`;
+                setActionLoading((prev) => ({ ...prev, [key]: true }));
+
+                try {
+                  await updateBookingStatus(
+                    bookingToStart._id,
+                    "started",
+                    timeEstimate
+                  );
+                  setShowTimeModal(false);
+                  setBookingToStart(null);
+                  setTimeEstimate(30);
+                } catch (error) {
+                  console.error("Error starting service:", error);
+                } finally {
+                  setActionLoading((prev) => {
+                    const copy = { ...prev };
+                    delete copy[key];
+                    return copy;
+                  });
+                }
               }}
+              disabled={
+                !bookingToStart ||
+                !!actionLoading[`modal-start-${bookingToStart?._id}`]
+              }
               className={styles.verifyBtn}
+              style={{
+                opacity: actionLoading[`modal-start-${bookingToStart?._id}`]
+                  ? 0.6
+                  : 1,
+                cursor: actionLoading[`modal-start-${bookingToStart?._id}`]
+                  ? "not-allowed"
+                  : "pointer",
+              }}
             >
-              Start Service ({timeEstimate} mins)
+              {actionLoading[`modal-start-${bookingToStart?._id}`]
+                ? "Starting..."
+                : `Start Service (${timeEstimate} mins)`}
             </button>
           </div>
         </div>
       )}
+
       {/* Pause Banner */}
       {salonStatus.isPaused && (
         <div className={styles.pauseBanner}>

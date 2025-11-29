@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "../../components/Admin/AdminLayout";
 import styles from "../../styles/Admin/AdminReports.module.css";
+import { showSuccess, showError } from "../../lib/toast";
 
 export default function AdminReports() {
   const router = useRouter();
@@ -39,10 +40,10 @@ export default function AdminReports() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      alert("Report generated successfully!");
+      showSuccess("Report generated successfully!");
     } catch (error) {
       console.error("Error generating report:", error);
-      alert("Failed to generate report");
+      showError("Failed to generate report");
     } finally {
       setLoading(false);
     }

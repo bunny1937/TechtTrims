@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import OwnerSidebar from "../../components/OwnerSidebar";
 import styles from "../../styles/salon/SalonProfile.module.css";
 import dashboardStyles from "../../styles/SalonDashboard.module.css";
+import { showSuccess, showError } from "../../lib/toast";
 
 export default function SalonProfilePage() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function SalonProfilePage() {
     const salonId = salonData._id || salonData.id;
 
     if (!salonId) {
-      alert("Invalid salon session");
+      showError("Invalid salon session");
       router.push("/auth/salon/login");
       return;
     }
@@ -62,7 +63,7 @@ export default function SalonProfilePage() {
       setFormData(data);
     } catch (error) {
       console.error("Error loading salon:", error);
-      alert("Failed to load salon profile");
+      showError("Failed to load salon profile");
     } finally {
       setLoading(false);
     }
@@ -79,7 +80,7 @@ export default function SalonProfilePage() {
 
       if (res.ok) {
         const result = await res.json();
-        alert("Profile updated successfully");
+        showSuccess("Profile updated successfully");
         setIsEditing(false);
         setSalon(result.salon);
         setFormData(result.salon);
@@ -91,7 +92,7 @@ export default function SalonProfilePage() {
       }
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Failed to update profile");
+      showError("Failed to update profile");
     }
   };
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import styles from "../styles/Onboarding.module.css";
+import { showError, showSuccess, showWarning } from "@/lib/toast";
 
 export default function Onboarding() {
   const router = useRouter();
@@ -59,7 +60,7 @@ export default function Onboarding() {
 
     if (!navigator.geolocation) {
       setLocationStatus("error");
-      alert(
+      showWarning(
         "Geolocation is not supported. You can skip this step and use manual location."
       );
       // Allow skipping location
@@ -141,7 +142,7 @@ export default function Onboarding() {
         setLocationStatus("error");
 
         // Don't block user - allow them to continue without location
-        alert(
+        showWarning(
           "Unable to get your location. You can update it later from settings or skip for now."
         );
 
@@ -194,14 +195,14 @@ export default function Onboarding() {
     };
     localStorage.setItem("tempOtp", JSON.stringify(otpData));
 
-    alert(`OTP sent! (Development mode - OTP: ${generated})`);
+    showSuccess(`OTP sent! (Development mode - OTP: ${generated})`);
   };
 
   const handleVerifyOtp = () => {
     const storedData = JSON.parse(localStorage.getItem("tempOtp"));
 
     if (!storedData || Date.now() > storedData.expiresAt) {
-      alert("OTP expired! Please request a new one.");
+      showWarning("OTP expired! Please request a new one.");
       setOtpSent(false);
       setOtp("");
       return;
@@ -210,31 +211,31 @@ export default function Onboarding() {
     if (otp === storedData.otp && formData.phoneNumber === storedData.phone) {
       handleInputChange("isPhoneVerified", true);
       localStorage.removeItem("tempOtp");
-      alert("Phone verified successfully!");
+      showSuccess("Phone verified successfully!");
       setCurrentStep((prev) => prev + 1);
     } else {
-      alert("Invalid OTP! Please try again.");
+      showError("Invalid OTP! Please try again.");
     }
   };
 
   const nextStep = () => {
     if (currentStep === 1 && formData.name.trim().length < 2) {
-      alert("Please enter a valid name");
+      showWarning("Please enter a valid name");
       return;
     }
 
     if (currentStep === 2 && !formData.gender) {
-      alert("Please select your gender");
+      showWarning("Please select your gender");
       return;
     }
 
     if (currentStep === 3 && (!formData.age || formData.age < 13)) {
-      alert("You must be at least 13 years old");
+      showWarning("You must be at least 13 years old");
       return;
     }
 
     if (currentStep === 4 && !formData.isPhoneVerified) {
-      alert("Please verify your phone number");
+      showWarning("Please verify your phone number");
       return;
     }
 

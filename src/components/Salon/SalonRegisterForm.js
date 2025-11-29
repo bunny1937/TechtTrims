@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { MapPin, Clock, Store, Scissors, Star } from "lucide-react";
+import { MapPin, Clock, Store, Scissors, Star, ShowerHead } from "lucide-react";
 import Image from "next/image";
 import styles from "../../styles/SalonRegister.module.css";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import UploadImageButton from "../Upload/UploadImageButton";
+import { showError, showSuccess } from "@/lib/toast";
 
 // Dynamically import LocationPicker to avoid SSR issues with Leaflet
 const LocationPicker = dynamic(() => import("../Maps/LocationPicker"), {
@@ -271,7 +272,7 @@ const SalonRegisterForm = () => {
 
         localStorage.setItem("salonSession", JSON.stringify(salonSession));
         localStorage.setItem("salonToken", result.token);
-        alert(
+        showSuccess(
           `Salon registered successfully! ${
             result.barbersCreated || 0
           } barbers added. Welcome!`
@@ -280,11 +281,11 @@ const SalonRegisterForm = () => {
         window.location.href = "/auth/salon/login";
       } else {
         const error = await response.json();
-        alert(`Registration failed: ${error.message}`);
+        showError(`Registration failed: ${error.message}`);
       }
     } catch (error) {
       console.error("Registration error:", error);
-      alert("Registration failed. Please try again.");
+      showError("Registration failed. Please try again.");
     }
   };
 

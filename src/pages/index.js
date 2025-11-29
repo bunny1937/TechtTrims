@@ -14,7 +14,7 @@ export default function Home(theme) {
   const [salons, setSalons] = useState([]);
   const [userOnboarding, setUserOnboarding] = useState(null);
   const [nearbySalons, setNearbySalons] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isLoadingSalons, setIsLoadingSalons] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
   const [selectedSalon, setSelectedSalon] = useState(null);
@@ -34,6 +34,30 @@ export default function Home(theme) {
 
   const [salonLoadError, setSalonLoadError] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null);
+  const [error, setError] = useState(null);
+  const [showLocationCheck, setShowLocationCheck] = useState(() => {
+    // Only show location check if NO location in storage
+    if (typeof window === "undefined") return false;
+
+    const sessionLoc = sessionStorage.getItem("liveUserLocation");
+    const cachedLoc = localStorage.getItem("cachedUserLocation");
+
+    // If we have location already, skip location check
+    if (sessionLoc || cachedLoc) {
+      console.log("✅ Location already cached, skipping location check");
+      return false;
+    }
+
+    console.log("❌ No cached location, showing location check");
+    return true;
+  });
+  const [locationCheckStatus, setLocationCheckStatus] = useState({
+    deviceLocation: false,
+    locationAccuracy: false,
+    hasCoordinates: false,
+    coordinates: null,
+  }); // NEW: Track location status
+
   // ADD: Track if salons were loaded
   const salonsLoadedRef = useRef(false);
   const initialLocationRef = useRef(null);
@@ -117,6 +141,42 @@ export default function Home(theme) {
             console.error("❌ Error parsing onboarding data:", error);
           }
         }
+      }
+      // Check if we already have location in storage
+      const sessionLoc = sessionStorage.getItem("liveUserLocation");
+      const cachedLoc = localStorage.getItem("cachedUserLocation");
+
+      if (sessionLoc || cachedLoc) {
+        console.log("✅ Using cached location, loading salons...");
+
+        try {
+          const location = JSON.parse(sessionLoc || cachedLoc);
+          const lat = location.lat || location.latitude;
+          const lng = location.lng || location.longitude;
+
+          if (lat && lng && !salonsLoadedRef.current) {
+            console.log("🚀 Loading salons from cached location");
+            salonsLoadedRef.current = true; // Mark as loaded
+            setShowLocationCheck(false);
+            setIsLoading(true);
+            await loadNearbySalons(lat, lng, userOnboarding?.gender || "all");
+            setIsLoading(false);
+          } else if (salonsLoadedRef.current) {
+            console.log("⏭️ Salons already loaded, skipping");
+            setShowLocationCheck(false);
+            setIsLoading(false);
+          } else {
+            // Location exists but invalid, do check
+            await checkLocationStatus();
+          }
+        } catch (error) {
+          console.error("Error parsing cached location:", error);
+          await checkLocationStatus();
+        }
+      } else {
+        // No cached location, do initial check
+        console.log("❌ No cached location, checking status...");
+        await checkLocationStatus();
       }
 
       // Get location from session storage (persistent location)
@@ -265,7 +325,7 @@ export default function Home(theme) {
 
     // Run initialization
     initializeUser();
-  }, [liveUserLocation, router]);
+  }, [router]);
 
   // Update location in session storage whenever it changes
   useEffect(() => {
@@ -364,6 +424,77 @@ export default function Home(theme) {
   //     }
   //   }
   // }, []);
+
+  // NEW: Check device location status
+  // NEW: Check device location status
+  const checkLocationStatus = async () => {
+    try {
+      if (!navigator.geolocation) {
+        setLocationCheckStatus({
+          deviceLocation: false,
+          locationAccuracy: false,
+          hasCoordinates: false,
+          coordinates: null,
+        });
+        return null;
+      }
+
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        });
+      });
+
+      const coords = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      };
+
+      setLocationCheckStatus({
+        deviceLocation: true,
+        locationAccuracy: true,
+        hasCoordinates: true,
+        coordinates: coords,
+      });
+
+      // Save to storage
+      sessionStorage.setItem("liveUserLocation", JSON.stringify(coords));
+      localStorage.setItem("cachedUserLocation", JSON.stringify(coords));
+
+      return coords;
+    } catch (error) {
+      console.error("Location check error:", error);
+      setLocationCheckStatus({
+        deviceLocation: false,
+        locationAccuracy: false,
+        hasCoordinates: false,
+        coordinates: null,
+      });
+      return null;
+    }
+  };
+
+  // NEW: Handle "Get Location" button
+  const handleGetLocation = async () => {
+    const coords = await checkLocationStatus();
+    if (coords) {
+      setShowLocationCheck(false);
+      setIsLoading(true);
+      await loadNearbySalons(
+        coords.lat,
+        coords.lng,
+        userOnboarding?.gender || "all"
+      );
+      setIsLoading(false);
+    }
+  };
+
+  // NEW: Handle retry
+  const handleRetry = () => {
+    checkLocationStatus();
+  };
 
   const loadNearbySalons = async (
     lat,
@@ -852,6 +983,110 @@ export default function Home(theme) {
     router.push(`/salons/${salonId}?mode=${mode}`);
   };
 
+  // Location Check Screen - Shows FIRST
+  if (showLocationCheck) {
+    return (
+      <div className={styles.locationCheckOverlay}>
+        <div className={styles.locationCheckBox}>
+          <h2 className={styles.locationCheckTitle}>📍 Location Required</h2>
+          <p className={styles.locationCheckSubtitle}>
+            We need your location to find nearby salons
+          </p>
+
+          <div className={styles.statusList}>
+            <div
+              className={`${styles.statusItem} ${
+                locationCheckStatus.deviceLocation
+                  ? styles.statusSuccess
+                  : styles.statusPending
+              }`}
+            >
+              <span className={styles.statusIcon}>
+                {locationCheckStatus.deviceLocation ? "✅" : "⏳"}
+              </span>
+              <span className={styles.statusText}>Device Location</span>
+            </div>
+
+            <div
+              className={`${styles.statusItem} ${
+                locationCheckStatus.locationAccuracy
+                  ? styles.statusSuccess
+                  : styles.statusPending
+              }`}
+            >
+              <span className={styles.statusIcon}>
+                {locationCheckStatus.locationAccuracy ? "✅" : "⏳"}
+              </span>
+              <span className={styles.statusText}>Location Accuracy</span>
+            </div>
+
+            <div
+              className={`${styles.statusItem} ${
+                locationCheckStatus.hasCoordinates
+                  ? styles.statusSuccess
+                  : styles.statusPending
+              }`}
+            >
+              <span className={styles.statusIcon}>
+                {locationCheckStatus.hasCoordinates ? "✅" : "⏳"}
+              </span>
+              <span className={styles.statusText}>Location Data Received</span>
+            </div>
+          </div>
+
+          {locationCheckStatus.coordinates && (
+            <div className={styles.coordsDisplay}>
+              <p>📌 Lat: {locationCheckStatus.coordinates.lat.toFixed(6)}</p>
+              <p>📌 Lng: {locationCheckStatus.coordinates.lng.toFixed(6)}</p>
+            </div>
+          )}
+
+          <div className={styles.locationCheckActions}>
+            {!locationCheckStatus.hasCoordinates ? (
+              <>
+                <button
+                  onClick={handleGetLocation}
+                  className={styles.getLocationBtn}
+                >
+                  📍 Get My Location
+                </button>
+                <button onClick={handleRetry} className={styles.retryBtn}>
+                  🔄 Retry
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  setShowLocationCheck(false);
+                  setIsLoading(true);
+                  loadNearbySalons(
+                    locationCheckStatus.coordinates.lat,
+                    locationCheckStatus.coordinates.lng,
+                    userOnboarding?.gender || "all"
+                  ).finally(() => setIsLoading(false));
+                }}
+                className={styles.continueBtn}
+              >
+                ✨ Continue to Salons
+              </button>
+            )}
+          </div>
+
+          {!locationCheckStatus.deviceLocation && (
+            <div className={styles.helpText}>
+              <p>⚠️ Location is turned off</p>
+              <p className={styles.helpSubtext}>
+                Please enable location in your device settings, then tap
+                &quot;Get My Location&quot;
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Main Loading Screen - Shows AFTER location check
   if (isLoading) {
     return (
       <div className={styles.loadingContainer}>

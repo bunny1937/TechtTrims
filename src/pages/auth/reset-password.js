@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../styles/Auth/UserAuth.module.css";
+import { showSuccess, showError, showWarning } from "../../lib/toast";
 
 export default function ResetPassword() {
   const router = useRouter();
@@ -14,17 +15,17 @@ export default function ResetPassword() {
     e.preventDefault();
 
     if (!token) {
-      alert("Invalid reset link");
+      showError("Invalid reset link");
       return;
     }
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match");
+      showError("Passwords do not match");
       return;
     }
 
     if (password.length < 8) {
-      alert("Password must be at least 8 characters long");
+      showError("Password must be at least 8 characters long");
       return;
     }
 
@@ -39,13 +40,13 @@ export default function ResetPassword() {
       const data = await response.json();
 
       if (response.ok) {
-        alert("✅ Password reset successfully! Redirecting to login...");
+        showSuccess("Password reset successfully! Redirecting to login...");
         setTimeout(() => router.push("/auth/user/login"), 2000);
       } else {
-        alert(data.message || "Failed to reset password");
+        showError(data.message || "Failed to reset password");
       }
     } catch (error) {
-      alert("Network error. Please try again.");
+      showError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { UserDataManager } from "../../lib/userData";
 import { removeAuthToken } from "../../lib/cookieAuth";
 import { getAuthToken } from "../../lib/cookieAuth";
+import { showConfirm, showSuccess } from "@/lib/toast";
 
 export default function UserDashboard() {
   const router = useRouter();
@@ -113,7 +114,7 @@ export default function UserDashboard() {
 
   const handleLogout = () => {
     // Confirm logout
-    if (window.confirm("Are you sure you want to logout?")) {
+    showConfirm("Are you sure you want to logout?", () => {
       // ✅ Clear ALL authentication data
       UserDataManager.clearUserData(); // Clears HttpOnly cookie + session EXCEPT location
 
@@ -123,10 +124,10 @@ export default function UserDashboard() {
         localStorage.removeItem("ownerToken");
       }
 
-      alert("Logged out successfully!");
+      showSuccess("Logged out successfully!");
       // Force redirect to home page
       window.location.href = "/";
-    }
+    });
   };
 
   if (isLoading) {

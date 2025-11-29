@@ -25,8 +25,6 @@ export default async function handler(req, res) {
       }
     );
 
-    console.log(`✅ Marked ${result.modifiedCount} bookings as expired`);
-
     res.status(200).json({
       success: true,
       expired: result.modifiedCount,

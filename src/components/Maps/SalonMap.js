@@ -12,6 +12,7 @@ import { Navigation, Search, MapPin, Crosshair } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import styles from "../../styles/SalonMap.module.css";
+import { showError, showWarning } from "@/lib/toast";
 
 // Fix for default markers in react-leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -902,7 +903,7 @@ const SalonMap = ({
     console.log("❌ No location found - requesting from browser");
 
     if (!navigator.geolocation) {
-      alert(
+      showWarning(
         "⚠️ Geolocation Not Supported\n\nYour browser doesn't support location services. Please use the 'Search Location' button to set your location manually."
       );
       return;
@@ -949,10 +950,10 @@ const SalonMap = ({
       console.error("❌ Location error:", error);
       setLoadingLocation(false);
 
-      // Show user-friendly alerts based on error type
+      // Show user-friendly showWarnings based on error type
       if (error.code === 1) {
         // PERMISSION_DENIED
-        alert(
+        showWarning(
           "🔒 Location Permission Denied\n\n" +
             "To see live nearby salons:\n\n" +
             "1. Click the lock icon (🔒) in your browser's address bar\n" +
@@ -962,7 +963,7 @@ const SalonMap = ({
         );
       } else if (error.code === 2) {
         // POSITION_UNAVAILABLE
-        alert(
+        showWarning(
           "📍 Location Unavailable\n\n" +
             "Unable to determine your location.\n\n" +
             "Please check:\n" +
@@ -972,13 +973,13 @@ const SalonMap = ({
         );
       } else if (error.code === 3) {
         // TIMEOUT
-        alert(
+        showWarning(
           "⏱️ Location Request Timeout\n\n" +
             "Taking too long to get your location.\n\n" +
             "Please try again or use the 'Search Location' button."
         );
       } else {
-        alert(
+        showError(
           "❌ Unable to Get Location\n\n" +
             "Something went wrong while getting your location.\n\n" +
             "Please use the 'Search Location' button to set manually."

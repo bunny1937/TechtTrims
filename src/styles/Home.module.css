@@ -53,6 +53,172 @@
   left: 0;
 }
 
+/* Location Check Overlay */
+.locationCheckOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.locationCheckBox {
+  background: white;
+  border-radius: 24px;
+  padding: 40px 30px;
+  max-width: 450px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.locationCheckTitle {
+  font-size: 28px;
+  font-weight: 800;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.locationCheckSubtitle {
+  font-size: 16px;
+  color: #6b7280;
+  margin-bottom: 30px;
+}
+
+/* Status List */
+.statusList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.statusItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #f3f4f6;
+  transition: all 0.3s;
+}
+
+.statusSuccess {
+  background: #d1fae5;
+  border: 2px solid #10b981;
+}
+
+.statusPending {
+  background: #fef3c7;
+  border: 2px solid #f59e0b;
+}
+
+.statusIcon {
+  font-size: 24px;
+}
+
+.statusText {
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* Coordinates Display */
+.coordsDisplay {
+  background: #f9fafb;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  border: 2px dashed #10b981;
+}
+
+.coordsDisplay p {
+  font-size: 14px;
+  font-weight: 600;
+  color: #059669;
+  margin: 4px 0;
+  font-family: "Courier New", monospace;
+}
+
+/* Action Buttons */
+.locationCheckActions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.getLocationBtn,
+.retryBtn,
+.continueBtn {
+  padding: 16px 24px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.getLocationBtn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.getLocationBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+}
+
+.retryBtn {
+  background: #f3f4f6;
+  color: #374151;
+  border: 2px solid #d1d5db;
+}
+
+.retryBtn:hover {
+  background: #e5e7eb;
+}
+
+.continueBtn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.continueBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+/* Help Text */
+.helpText {
+  background: #fef2f2;
+  padding: 16px;
+  border-radius: 12px;
+  border: 2px solid #fca5a5;
+}
+
+.helpText p {
+  font-size: 14px;
+  font-weight: 700;
+  color: #dc2626;
+  margin: 4px 0;
+}
+
+.helpSubtext {
+  font-size: 13px;
+  font-weight: 500;
+  color: #991b1b;
+}
+
 .locationRequired {
   position: fixed;
   top: 0;

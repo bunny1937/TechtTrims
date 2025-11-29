@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import axios from "axios";
 import Link from "next/link";
+import { showWarning } from "@/lib/toast";
 
 export default function SalonStaffPage() {
   const router = useRouter();
@@ -47,7 +48,7 @@ export default function SalonStaffPage() {
 
   // Create new staff
   const handleCreate = async () => {
-    if (!newStaff.name) return alert("Name is required");
+    if (!newStaff.name) return showWarning("Name is required");
     setCreating(true);
     try {
       const res = await axios.post("/api/salons/staff", {

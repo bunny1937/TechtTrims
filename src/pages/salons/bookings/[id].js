@@ -1,6 +1,7 @@
 // pages/salons/bookings/[id].jsx
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
+import { showSuccess, showError } from "../../lib/toast";
 
 export default function BookingDetailPage() {
   const router = useRouter();
@@ -65,7 +66,7 @@ export default function BookingDetailPage() {
       }
       const updated = await res.json();
       setBooking(updated);
-      alert("Booking updated successfully!");
+      showSuccess("Booking updated successfully!");
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -84,7 +85,7 @@ export default function BookingDetailPage() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Delete failed");
-      alert("Booking deleted successfully!");
+      showError("Booking deleted successfully!");
       router.push("/salons/bookings"); // redirect to booking list
     } catch (err) {
       console.error(err);

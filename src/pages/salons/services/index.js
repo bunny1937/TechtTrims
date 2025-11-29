@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import OwnerSidebar from "../../../components/OwnerSidebar";
 import styles from "../../../styles/salon/SalonServices.module.css";
 import dashboardStyles from "../../../styles/SalonDashboard.module.css";
+import { showSuccess, showError, showWarning } from "../../../lib/toast";
 
 export default function ServicesPage() {
   const router = useRouter();
@@ -56,7 +57,7 @@ export default function ServicesPage() {
       setSalon(data);
     } catch (error) {
       console.error("Error loading services:", error);
-      alert("Failed to load services");
+      showError("Failed to load services");
     } finally {
       setLoading(false);
     }
@@ -64,7 +65,7 @@ export default function ServicesPage() {
 
   const handleAddService = async () => {
     if (!newService.name || !newService.price) {
-      alert("Name and price are required");
+      showWarning("Name and price are required");
       return;
     }
 
@@ -93,7 +94,7 @@ export default function ServicesPage() {
       });
 
       if (res.ok) {
-        alert("Service added successfully!");
+        showSuccess("Service added successfully!");
         setShowAddForm(false);
         setNewService({
           name: "",
@@ -108,7 +109,7 @@ export default function ServicesPage() {
       }
     } catch (error) {
       console.error("Error adding service:", error);
-      alert("Failed to add service");
+      showError("Failed to add service");
     }
   };
 
@@ -122,7 +123,7 @@ export default function ServicesPage() {
 
   const saveService = async () => {
     if (!editingService.name || !editingService.price) {
-      alert("Name and price are required");
+      showWarning("Name and price are required");
       return;
     }
 
@@ -155,7 +156,7 @@ export default function ServicesPage() {
       });
 
       if (res.ok) {
-        alert("Service updated successfully!");
+        showSuccess("Service updated successfully!");
         setEditingService(null);
         loadServices(salonId);
       } else {
@@ -163,7 +164,7 @@ export default function ServicesPage() {
       }
     } catch (error) {
       console.error("Error updating service:", error);
-      alert("Failed to update service");
+      showError("Failed to update service");
     }
   };
 
@@ -189,14 +190,14 @@ export default function ServicesPage() {
       });
 
       if (res.ok) {
-        alert("Service deleted successfully!");
+        showSuccess("Service deleted successfully!");
         loadServices(salonId);
       } else {
         throw new Error("Failed to delete service");
       }
     } catch (error) {
       console.error("Error deleting service:", error);
-      alert("Failed to delete service");
+      showError("Failed to delete service");
     }
   };
 
@@ -226,7 +227,7 @@ export default function ServicesPage() {
       }
     } catch (error) {
       console.error("Error toggling service:", error);
-      alert("Failed to toggle service status");
+      showError("Failed to toggle service status");
     }
   };
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Navigation, MapPin } from "lucide-react";
 import styles from "../../styles/LocationMap.module.css";
+import { showWarning } from "@/lib/toast";
 
 if (typeof window !== "undefined") {
   const loadLeafletFix = async () => {
@@ -643,7 +644,9 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
 
     // No location - request geolocation
     if (!navigator.geolocation) {
-      alert("⚠️ Geolocation not supported. Use Pin button to set manually.");
+      showWarning(
+        "⚠️ Geolocation not supported. Use Pin button to set manually."
+      );
       return;
     }
 
@@ -687,13 +690,13 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
       setLocating(false);
 
       if (error.code === 1) {
-        alert("🔒 Location Permission Denied");
+        showWarning("🔒 Location Permission Denied");
       } else if (error.code === 2) {
-        alert("📍 Location unavailable");
+        showWarning("📍 Location unavailable");
       } else if (error.code === 3) {
-        alert("⏱️ Location request timed out");
+        showWarning("⏱️ Location request timed out");
       } else {
-        alert("❌ Unable to get location");
+        showWarning("❌ Unable to get location");
       }
     }
   };

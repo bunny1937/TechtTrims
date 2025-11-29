@@ -43,20 +43,45 @@ export default async function handler(req, res) {
 
     const now = new Date();
 
-    // Mark as ORANGE
-    await db.collection("bookings").updateOne(
-      { _id: booking._id },
-      {
-        $set: {
-          queueStatus: "ORANGE",
-          status: "arrived",
-          arrivedAt: now,
-          lastUpdated: now,
-        },
-      }
-    );
+    // ✅ CHECK IF CHAIR IS EMPTY (no GREEN booking for this barber)
+    const greenBooking = await db.collection("bookings").findOne({
+      barberId: booking.barberId,
+      queueStatus: "GREEN",
+      isExpired: { $ne: true },
+    });
 
-    // Get all ORANGE bookings for same barber
+    // ✅ CHAIR EMPTY → Serve immediately
+    if (!greenBooking) {
+      await db.collection("bookings").updateOne(
+        { _id: booking._id },
+        {
+          $set: {
+            queueStatus: "GREEN",
+            status: "started",
+            arrivedAt: now,
+            serviceStartedAt: now,
+            queuePosition: null,
+            lastUpdated: now,
+          },
+        }
+      );
+
+      const updatedBooking = await db
+        .collection("bookings")
+        .findOne({ _id: booking._id });
+
+      return res.status(200).json({
+        success: true,
+        message: "Chair empty - customer seated immediately!",
+        booking: {
+          customerName: updatedBooking.customerName,
+          queueStatus: "GREEN",
+          queuePosition: null,
+        },
+      });
+    }
+
+    // ✅ CHAIR OCCUPIED → Join ORANGE priority queue sorted by bookedAt
     const orangeBookings = await db
       .collection("bookings")
       .find({
@@ -64,11 +89,44 @@ export default async function handler(req, res) {
         queueStatus: "ORANGE",
         isExpired: { $ne: true },
       })
-      .sort({ createdAt: 1 })
+      .sort({ bookedAt: 1 }) // Sort by booking time
       .toArray();
 
-    // Update positions
-    const bulkOps = orangeBookings.map((b, idx) => ({
+    // Calculate correct position for this booking
+    let priorityPosition = orangeBookings.length + 1; // Default to end
+    for (let i = 0; i < orangeBookings.length; i++) {
+      if (new Date(booking.bookedAt) < new Date(orangeBookings[i].bookedAt)) {
+        priorityPosition = i + 1;
+        break;
+      }
+    }
+
+    // Update this booking to ORANGE with correct position
+    await db.collection("bookings").updateOne(
+      { _id: booking._id },
+      {
+        $set: {
+          queueStatus: "ORANGE",
+          status: "arrived",
+          arrivedAt: now,
+          queuePosition: priorityPosition,
+          lastUpdated: now,
+        },
+      }
+    );
+
+    // Recalculate positions for all ORANGE bookings (sorted by bookedAt)
+    const allOrangeBookings = await db
+      .collection("bookings")
+      .find({
+        barberId: booking.barberId,
+        queueStatus: "ORANGE",
+        isExpired: { $ne: true },
+      })
+      .sort({ bookedAt: 1 })
+      .toArray();
+
+    const bulkOps = allOrangeBookings.map((b, idx) => ({
       updateOne: {
         filter: { _id: b._id },
         update: { $set: { queuePosition: idx + 1 } },

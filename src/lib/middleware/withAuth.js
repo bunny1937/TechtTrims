@@ -34,16 +34,19 @@ export function withAuth(handler) {
         console.log("❌ Token verification failed:", error.message);
 
         // Clear invalid cookie
-        res.setHeader(
-          "Set-Cookie",
+        res.setHeader("Set-Cookie", [
           serialize("authToken", "", {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict",
             path: "/",
-            maxAge: 0, // Expire immediately
-          })
-        );
+            maxAge: 0,
+          }),
+          serialize("userAuth", "", {
+            path: "/",
+            maxAge: 0,
+          }),
+        ]);
 
         return res.status(401).json({
           message: "Invalid or expired token",

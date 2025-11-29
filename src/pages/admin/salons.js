@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import AdminLayout from "../../components/Admin/AdminLayout";
 import SalonDetailsModal from "../../components/Admin/SalonDetailsModal";
 import styles from "../../styles/Admin/AdminSalons.module.css";
+import { showWarning } from "@/lib/toast";
 
 export default function AdminSalons() {
   const router = useRouter();
@@ -75,7 +76,7 @@ export default function AdminSalons() {
 
       if (response.ok) {
         fetchSalons();
-        alert(
+        showWarning(
           `Salon ${!currentStatus ? "activated" : "deactivated"} successfully`
         );
       }

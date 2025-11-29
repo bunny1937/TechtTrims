@@ -31,6 +31,80 @@
   color: #718096;
   margin: 0;
 }
+/* Search highlight */
+.highlight {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+/* Queue status badges */
+.queueBadge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.queueRED {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.queueORANGE {
+  background: #fed7aa;
+  color: #c2410c;
+}
+
+.queueGREEN {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.queueCOMPLETED {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.pageButton {
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pageButton:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.pageButton:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pageInfo {
+  font-weight: 600;
+  color: #374151;
+}
 
 /* Filters Card */
 .filtersCard {

@@ -9,6 +9,7 @@ import {
 } from "react-leaflet";
 import { MapPin, Search, Navigation } from "lucide-react";
 import { geocodeAddress, reverseGeocode } from "../../lib/maps";
+import { showError, showWarning } from "../../lib/toast";
 
 // Fix for Leaflet icons in Next.js
 import L from "leaflet";
@@ -83,7 +84,7 @@ const LocationPicker = ({
         mapRef.current.flyTo(newPos, 15);
       }
     } catch (error) {
-      alert("Location not found. Please try a different search term.");
+      showWarning("Location not found. Please try a different search term.");
     } finally {
       setLoading(false);
     }
@@ -114,7 +115,7 @@ const LocationPicker = ({
         },
         (error) => {
           console.error("Geolocation error:", error);
-          alert("Unable to get your location");
+          showError("Unable to get your location");
           setLoading(false);
         }
       );

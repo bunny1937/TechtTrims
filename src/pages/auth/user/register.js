@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../../styles/Auth/UserAuth.module.css";
+import { UserDataManager } from "@/lib/userData";
+import { showError, showSuccess } from "@/lib/toast";
 
 export default function UserRegisterPage() {
   const router = useRouter();
@@ -13,6 +15,13 @@ export default function UserRegisterPage() {
   });
   const [prefillData, setPrefillData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Redirect if already logged in
+    if (UserDataManager.isLoggedIn()) {
+      router.push("/user/dashboard");
+    }
+  }, [router]);
 
   useEffect(() => {
     // ✅ Check for prefill data from feedback or onboarding
@@ -164,15 +173,15 @@ export default function UserRegisterPage() {
           );
         }
 
-        alert("Registration successful! Welcome to TechTrims!");
+        showSuccess("Registration successful! Welcome to TechTrims!");
         router.push("/user/dashboard");
       } else {
         const error = await response.json();
-        alert("Registration failed: " + error.message);
+        showError("Registration failed: " + error.message);
       }
     } catch (error) {
       console.error("Registration error:", error);
-      alert("Registration failed. Please try again.");
+      showError("Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
