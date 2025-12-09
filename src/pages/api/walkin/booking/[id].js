@@ -58,21 +58,6 @@ export default async function handler(req, res) {
       queuePosition = "Pending";
     }
 
-    console.log("📊 Real-time position:", {
-      code: booking.bookingCode,
-      customer: booking.customerName,
-      status: booking.queueStatus,
-      position: queuePosition,
-      barber: barber?.name,
-    });
-
-    console.log("📊 Queue:", {
-      code: booking.bookingCode,
-      barber: barber?.name,
-      position: queuePosition,
-      status: booking.queueStatus,
-    });
-
     res.status(200).json({
       booking: {
         ...booking,

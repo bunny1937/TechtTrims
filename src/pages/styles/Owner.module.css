@@ -133,7 +133,7 @@
 
 .actionButton {
   padding: 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--accent);
   color: white;
   border-radius: 10px;
   font-size: 1rem;

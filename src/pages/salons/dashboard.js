@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import OwnerSidebar from "../../components/OwnerSidebar";
 import styles from "../../styles/SalonDashboard.module.css";
-import { showSuccess, showWarning } from "@/lib/toast";
+import { showError, showSuccess, showWarning } from "@/lib/toast";
 
 // Time Remaining Component
 function TimeRemaining({ endTime }) {
@@ -319,22 +319,63 @@ export default function DashboardPage() {
     loadBookings(salon.id, selectedDate);
   }, [salon?.id, selectedDate, loadBookings]);
 
-  // Auto-refresh bookings every 5 seconds
+  // Auto-refresh bookings every 5 seconds with notifications
   useEffect(() => {
     if (!salon?.id) return;
 
     console.log("🔄 Auto-refresh started");
 
-    const interval = setInterval(() => {
-      console.log("🔄 Refreshing bookings...");
-      loadBookings(salon.id, selectedDate);
-    }, 5000); // Refresh every 5 seconds
+    let previousBookingIds = new Set();
+
+    const refreshWithNotification = async () => {
+      try {
+        console.log("🔄 Refreshing bookings...");
+
+        // Fetch fresh bookings
+        const res = await fetch(
+          `/api/salons/bookings?salonId=${salon.id}&date=${selectedDate}`,
+          { cache: "no-store" }
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          const newBookings = data.bookings || [];
+
+          // Check for new bookings (only if we have previous data)
+          if (previousBookingIds.size > 0) {
+            const addedBookings = newBookings.filter(
+              (b) =>
+                !previousBookingIds.has(b._id?.toString() || b.id?.toString())
+            );
+
+            // Show toast for each new booking
+            addedBookings.forEach((booking) => {
+              showSuccess(
+                `🔔 New Booking: ${booking.customerName} booked with ${booking.barber}`
+              );
+            });
+          }
+
+          // Update tracking
+          previousBookingIds = new Set(
+            newBookings.map((b) => b._id?.toString() || b.id?.toString())
+          );
+
+          // Update state
+          setBookings(newBookings);
+        }
+      } catch (error) {
+        console.error("Auto-refresh error:", error);
+      }
+    };
+
+    const interval = setInterval(refreshWithNotification, 5000);
 
     return () => {
       console.log("🛑 Auto-refresh stopped");
       clearInterval(interval);
     };
-  }, [salon?.id, selectedDate, loadBookings]);
+  }, [salon?.id, selectedDate, showSuccess]);
 
   const loadBarbers = useCallback(async (salonId) => {
     try {
@@ -410,40 +451,40 @@ export default function DashboardPage() {
       day: "numeric",
     });
   };
+
   const handleVerifyArrival = async (bookingCode) => {
     try {
       const res = await fetch("/api/walkin/verify-arrival", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingCode,
-          salonId: salon._id,
-        }),
+        body: JSON.stringify({ bookingCode, salonId: salon._id }),
       });
-
       const data = await res.json();
 
       if (data.success) {
+        const bookingData = data.booking;
+
+        // Show position dialog with actual position number
+        showSuccess(
+          `${bookingData.customerName} checked in!\nQueue Position: #${bookingData.queuePosition}`
+        );
+
         setScanResult({
           success: true,
-          message: `${data.booking.customerName} checked in!`,
-          queuePosition: data.booking.queuePosition,
+          message: `${bookingData.customerName} checked in!`,
+          queuePosition: bookingData.queuePosition,
         });
-        // Refresh bookings with proper parameters
-        if (salon && salon.id) {
-          await loadBookings(salon.id, selectedDate);
-        }
+
+        // Refresh bookings
+        if (salon?._id) await loadBookings(salon._id, selectedDate);
       } else {
-        setScanResult({
-          success: false,
-          message: data.message,
-        });
+        setScanResult({ success: false, message: data.message });
+        showError(data.message);
       }
     } catch (error) {
-      setScanResult({
-        success: false,
-        message: "Error verifying booking",
-      });
+      console.error("Verify arrival error:", error);
+      setScanResult({ success: false, message: "Error verifying booking" });
+      showError("Error checking in customer");
     }
   };
 
@@ -1329,14 +1370,89 @@ export default function DashboardPage() {
                                 </span>
                               </p>
                               <p className={styles.bookingInfo}>
-                                📞 {b.customerPhone}
+                                {b.customerPhone}
                               </p>
                               <p className={styles.bookingInfo}>{b.service}</p>
-                              {b.status === "started" && b.serviceEndTime && (
-                                <p className={styles.timeRemaining}>
-                                  ⏱ <TimeRemaining endTime={b.serviceEndTime} />
-                                </p>
-                              )}
+
+                              {/* Show service time for GREEN bookings */}
+                              {b.queueStatus === "GREEN" &&
+                                b.serviceStartedAt && (
+                                  <p
+                                    className={styles.serviceTime}
+                                    style={{
+                                      fontWeight: "700",
+                                      fontSize: "1.1rem",
+                                      marginTop: "8px",
+                                    }}
+                                  >
+                                    {(() => {
+                                      const now = new Date();
+                                      const started = new Date(
+                                        b.serviceStartedAt
+                                      );
+                                      const duration =
+                                        b.estimatedDuration || 30;
+                                      const elapsed = Math.floor(
+                                        (now - started) / 1000 / 60
+                                      );
+                                      const isOvertime = elapsed > duration;
+
+                                      return (
+                                        <span
+                                          style={{
+                                            color: isOvertime
+                                              ? "#ef4444"
+                                              : "#10b981",
+                                            fontSize: isOvertime
+                                              ? "1.3rem"
+                                              : "1.1rem",
+                                          }}
+                                        >
+                                          ⏱️ {elapsed}m/{duration}m
+                                          {isOvertime && " ⚠️"}
+                                        </span>
+                                      );
+                                    })()}
+                                  </p>
+                                )}
+
+                              {/* Show service time progress for GREEN bookings */}
+                              {b.queueStatus === "GREEN" &&
+                                b.serviceStartedAt && (
+                                  <p className={styles.timeRemaining}>
+                                    {(() => {
+                                      const now = new Date();
+                                      const started = new Date(
+                                        b.serviceStartedAt
+                                      );
+                                      const duration =
+                                        b.estimatedDuration || 30;
+                                      const elapsed = Math.floor(
+                                        (now - started) / 1000 / 60
+                                      );
+                                      const isOvertime = elapsed > duration;
+
+                                      return (
+                                        <span
+                                          style={{
+                                            color: isOvertime
+                                              ? "#ef4444"
+                                              : "#10b981",
+                                            fontSize: isOvertime
+                                              ? "1.1rem"
+                                              : "0.95rem",
+                                            fontWeight: isOvertime
+                                              ? "700"
+                                              : "600",
+                                          }}
+                                        >
+                                          {elapsed}m/{duration}m
+                                          {isOvertime && " ⚠️"}
+                                        </span>
+                                      );
+                                    })()}
+                                  </p>
+                                )}
 
                               <p className={styles.bookingInfo}>
                                 📅 {b.date || "Walk-in"}{" "}
@@ -1700,6 +1816,83 @@ export default function DashboardPage() {
                                   )}
 
                                   <div className={styles.bookingDetails}>
+                                    {/* ⏱️ SERVICE TIME DISPLAY */}
+                                    {b.queueStatus === "GREEN" &&
+                                      b.serviceStartedAt && (
+                                        <div
+                                          style={{
+                                            marginTop: "12px",
+                                            padding: "14px",
+                                            background:
+                                              "linear-gradient(135deg, #f0fdf4, #dcfce7)",
+                                            border: "2px solid #10b981",
+                                            borderRadius: "10px",
+                                            textAlign: "center",
+                                            boxShadow:
+                                              "0 2px 8px rgba(16, 185, 129, 0.15)",
+                                          }}
+                                        >
+                                          {(() => {
+                                            const now = new Date();
+                                            const started = new Date(
+                                              b.serviceStartedAt
+                                            );
+                                            const duration =
+                                              b.estimatedDuration ||
+                                              b.selectedDuration ||
+                                              30;
+                                            const elapsed = Math.floor(
+                                              (now - started) / 1000 / 60
+                                            );
+                                            const isOvertime =
+                                              elapsed > duration;
+
+                                            return (
+                                              <>
+                                                <div
+                                                  style={{
+                                                    fontSize: "0.7rem",
+                                                    color: "#6b7280",
+                                                    marginBottom: "6px",
+                                                    fontWeight: "600",
+                                                    letterSpacing: "0.5px",
+                                                  }}
+                                                >
+                                                  ⏱️ SERVICE TIME
+                                                </div>
+                                                <div
+                                                  style={{
+                                                    fontSize: isOvertime
+                                                      ? "1.8rem"
+                                                      : "1.5rem",
+                                                    fontWeight: "900",
+                                                    color: isOvertime
+                                                      ? "#ef4444"
+                                                      : "#10b981",
+                                                    letterSpacing: "-1px",
+                                                  }}
+                                                >
+                                                  {elapsed}m / {duration}m
+                                                  {isOvertime && " ⚠️"}
+                                                </div>
+                                                {isOvertime && (
+                                                  <div
+                                                    style={{
+                                                      fontSize: "0.7rem",
+                                                      color: "#ef4444",
+                                                      marginTop: "4px",
+                                                      fontWeight: "bold",
+                                                    }}
+                                                  >
+                                                    OVERTIME!
+                                                  </div>
+                                                )}
+                                              </>
+                                            );
+                                          })()}
+                                        </div>
+                                      )}
+
                                     <h3 className={styles.customerName}>
                                       {b.customerName}
                                       {b.customerAge && (

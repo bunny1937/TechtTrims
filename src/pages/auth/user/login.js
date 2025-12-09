@@ -2,30 +2,25 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../../styles/Auth/UserAuth.module.css";
 import { UserDataManager } from "../../../lib/userData";
-import { setAuthToken, setUserData } from "../../../lib/cookieAuth";
-import { showSuccess } from "@/lib/toast";
+import { setUserData } from "../../../lib/cookieAuth";
+import { showSuccess, showError } from "../../../lib/toast";
+import { Eye, EyeOff } from "lucide-react"; // Or use simple emoji
 
 export default function UserLoginPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [rememberMe, setRememberMe] = useState(false); // ✅ Add state
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // NEW
 
-  // ✅ FIX: Wait for client-side mount
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
 
   const handleForgotPassword = async (e) => {
     e.preventDefault();
-
     if (!forgotEmail || !forgotEmail.includes("@")) {
       setError("Please enter a valid email address");
       return;
@@ -47,7 +42,7 @@ export default function UserLoginPage() {
         setError(`Too many attempts. ${data.message}`);
       } else if (response.ok) {
         showSuccess(
-          "✅ Password reset link sent! Please check your email (including spam folder)."
+          "Password reset link sent! Please check your email (including spam folder)."
         );
         setShowForgotPassword(false);
         setForgotEmail("");
@@ -70,28 +65,19 @@ export default function UserLoginPage() {
       const response = await fetch("/api/auth/user/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // ✅ Include cookies
+        credentials: "include",
         body: JSON.stringify({ ...formData, rememberMe }),
       });
 
       if (response.ok) {
         const result = await response.json();
-
-        // ✅ Ensure gender is included in userData
         const userWithGender = {
           ...result.user,
           gender: result.user.gender || "other",
         };
 
-        console.log("✅ Login successful with gender:", userWithGender.gender);
-
-        // ✅ Store user data with gender
         setUserData(userWithGender);
-
-        // ✅ Mark as onboarded
         sessionStorage.setItem("hasOnboarded", "true");
-
-        // Store non-sensitive data in sessionStorage
         await UserDataManager.fetchAndStoreUserData();
 
         showSuccess(`Welcome back, ${result.user.name}!`);
@@ -108,7 +94,6 @@ export default function UserLoginPage() {
     }
   };
 
-  // ✅ FIX: Don't render until mounted on client
   if (!mounted) {
     return (
       <div className={styles.container}>
@@ -142,7 +127,7 @@ export default function UserLoginPage() {
 
             {error && (
               <div className={styles.error}>
-                <span>⚠ {error}</span>
+                <span>⚠️ {error}</span>
               </div>
             )}
 
@@ -163,22 +148,38 @@ export default function UserLoginPage() {
                 />
               </div>
 
+              {/* PASSWORD WITH TOGGLE */}
               <div className={styles.formGroup}>
                 <label htmlFor="password">Password</label>
-                <input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  required
-                  disabled={isLoading}
-                  autoComplete="current-password"
-                />
+                <div className={styles.passwordInputWrapper}>
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    required
+                    disabled={isLoading}
+                    autoComplete="current-password"
+                    className={styles.passwordInput}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className={styles.passwordToggle}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showPassword ? "👁️" : "👁️‍🗨️"}
+                    {/* Or use: {showPassword ? <EyeOff size={20} /> : <Eye size={20} />} */}
+                  </button>
+                </div>
               </div>
-              <label>
+
+              <label className={styles.checkbox}>
                 <input
                   type="checkbox"
                   checked={rememberMe}
@@ -186,6 +187,7 @@ export default function UserLoginPage() {
                 />
                 Keep me logged in for 30 days
               </label>
+
               <button
                 type="submit"
                 className={styles.submitButton}
@@ -193,8 +195,7 @@ export default function UserLoginPage() {
               >
                 {isLoading ? (
                   <>
-                    <span className={styles.spinner}></span>
-                    Logging in...
+                    <span className={styles.spinner}></span> Logging in...
                   </>
                 ) : (
                   "Login"
@@ -220,7 +221,7 @@ export default function UserLoginPage() {
 
             <div className={styles.authLinks}>
               <div className={styles.authLink}>
-                Don&#39;t have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <button
                   type="button"
                   onClick={() => router.push("/auth/user/register")}
@@ -255,7 +256,7 @@ export default function UserLoginPage() {
 
             {error && (
               <div className={styles.error}>
-                <span>⚠ {error}</span>
+                <span>⚠️ {error}</span>
               </div>
             )}
 
@@ -282,8 +283,7 @@ export default function UserLoginPage() {
               >
                 {isLoading ? (
                   <>
-                    <span className={styles.spinner}></span>
-                    Sending...
+                    <span className={styles.spinner}></span> Sending...
                   </>
                 ) : (
                   "Send Reset Link"

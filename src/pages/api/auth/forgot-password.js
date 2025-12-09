@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
       <div style="max-width: 600px; margin: 20px auto; background: white; border: 1px solid #ddd;">
         <!-- Header -->
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+        <div style="background: var(--accent); padding: 30px; text-align: center;">
           <h1 style="color: white; margin: 0; font-size: 24px;">TechTrims</h1>
         </div>
         

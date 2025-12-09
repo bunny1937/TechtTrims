@@ -177,7 +177,6 @@ export default function ReviewsSection({ salonId }) {
               </div>
             </div>
           </div>
-
           <div className={styles.controls}>
             {/* Category Filter Pills */}
             <div className={styles.filterPills}>
@@ -217,19 +216,27 @@ export default function ReviewsSection({ salonId }) {
 
             {/* Sort Dropdown */}
             <div className={styles.sortDropdown}>
-              <label htmlFor="sort">Sort by:</label>
-              <select
-                id="sort"
-                value={sortBy}
-                onChange={(e) => handleSortChange(e.target.value)}
-              >
-                <option value="relevant">Most Relevant</option>
-                <option value="recent">Most Recent</option>
-              </select>
+              <div className={styles.sortLabel}>
+                <label htmlFor="sort">Sort by:</label>
+                <select
+                  id="sort"
+                  value={sortBy}
+                  onChange={(e) => handleSortChange(e.target.value)}
+                >
+                  <option value="relevant">Most Relevant</option>
+                  <option value="recent">Most Recent</option>
+                </select>
+                {/* Show More */}
+              </div>
+              {hasMore && (
+                <div className={styles.showMore}>
+                  <button onClick={handleShowMore}>
+                    More ({filteredReviews.length - displayCount} )
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-        <div className={styles.reviewsContainerright}>
           {/* Reviews Grid - 3 Columns */}
           <div className={styles.reviewsGrid}>
             {displayedReviews.map((review) => (
@@ -262,16 +269,8 @@ export default function ReviewsSection({ salonId }) {
               </div>
             ))}
           </div>
-
-          {/* Show More */}
-          {hasMore && (
-            <div className={styles.showMore}>
-              <button onClick={handleShowMore}>
-                Show More ({filteredReviews.length - displayCount} remaining)
-              </button>
-            </div>
-          )}
         </div>
+        <div className={styles.reviewsContainerright}></div>
 
         {displayedReviews.length === 0 && (
           <div className={styles.noResults}>
