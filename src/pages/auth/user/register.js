@@ -1,8 +1,8 @@
+// src/pages/auth/user/register.js
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../../styles/Auth/UserAuth.module.css";
-import { UserDataManager } from "@/lib/userData";
-import { showError, showSuccess } from "@/lib/toast";
+import { showError, showSuccess } from "../../../lib/toast";
 
 export default function UserRegisterPage() {
   const router = useRouter();
@@ -12,74 +12,42 @@ export default function UserRegisterPage() {
     phone: "",
     gender: "",
     password: "",
+    confirmPassword: "",
   });
   const [prefillData, setPrefillData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // PASSWORD VALIDATION STATE
+  const [passwordRequirements, setPasswordRequirements] = useState({
+    minLength: false,
+    uppercase: false,
+    lowercase: false,
+    number: false,
+    specialChar: false,
+  });
+
+  const [passwordsMatch, setPasswordsMatch] = useState(null);
 
   useEffect(() => {
-    // Redirect if already logged in
-    if (UserDataManager.isLoggedIn()) {
-      router.push("/user/dashboard");
-    }
-  }, [router]);
-
-  useEffect(() => {
-    // ✅ Check for prefill data from feedback or onboarding
-    const onboardingData = sessionStorage.getItem("userOnboardingData");
+    // Prefill logic from previous code
     const savedPrefillData = localStorage.getItem("userPrefillData");
-
-    console.log("Checking localStorage data:");
-    console.log("onboardingData:", onboardingData);
-    console.log("savedPrefillData:", savedPrefillData);
-
-    let prefillInfo = null;
-
     if (savedPrefillData) {
       try {
         const data = JSON.parse(savedPrefillData);
-        console.log("Parsed prefill data:", data); // Debug log
-
-        prefillInfo = {
+        const prefillInfo = {
           name: data.name || data.customerName,
           phone: data.phone || data.phoneNumber || data.customerPhone,
-          phoneNumber: data.phoneNumber || data.phone || data.customerPhone,
           gender: data.gender || data.customerGender,
-          age: data.age || data.customerAge || null,
-          lastBooking: data.lastBookings,
           source: "feedback",
         };
         setPrefillData(prefillInfo);
         setFormData((prev) => ({
           ...prev,
           name: prefillInfo.name || prev.name,
-          phone: prefillInfo.phoneNumber || prev.phone,
-          age: prefillInfo.age || prev.age,
+          phone: prefillInfo.phone || prev.phone,
           gender: prefillInfo.gender || prev.gender,
-        }));
-
-        console.log("Form data after prefill:", {
-          name: prefillInfo.name,
-          phone: prefillInfo.phoneNumber,
-          gender: prefillInfo.gender,
-        });
-      } catch (error) {
-        console.error("Error parsing prefill data:", error);
-      }
-    } else if (onboardingData) {
-      try {
-        const data = JSON.parse(onboardingData);
-        prefillInfo = {
-          name: data.name || "",
-          gender: data.gender || "",
-          location: data.location || null,
-          source: "onboarding",
-        };
-        setPrefillData(prefillInfo);
-        setFormData((prev) => ({
-          ...prev,
-          name: data.name || prev.name,
-          phone: data.phone || prev.phone,
-          gender: data.gender || prev.gender,
         }));
       } catch (error) {
         console.error("Error parsing prefill data:", error);
@@ -87,33 +55,54 @@ export default function UserRegisterPage() {
     }
   }, []);
 
+  // CHECK PASSWORD REQUIREMENTS IN REAL-TIME
+  useEffect(() => {
+    const password = formData.password;
+    setPasswordRequirements({
+      minLength: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
+      specialChar: /[!@#$%^&*]/.test(password),
+    });
+  }, [formData.password]);
+
+  // CHECK IF PASSWORDS MATCH
+  useEffect(() => {
+    if (formData.confirmPassword === "") {
+      setPasswordsMatch(null);
+    } else if (formData.password === formData.confirmPassword) {
+      setPasswordsMatch(true);
+    } else {
+      setPasswordsMatch(false);
+    }
+  }, [formData.password, formData.confirmPassword]);
+
+  const allRequirementsMet = Object.values(passwordRequirements).every(Boolean);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Final validation
+    if (!allRequirementsMet) {
+      showError("Password does not meet all requirements");
+      return;
+    }
+
+    if (passwordsMatch !== true) {
+      showError("Passwords do not match");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Include location data from onboarding if available
-      const onboardingData = localStorage.getItem("userOnboardingData");
-      let locationData = null;
-      if (onboardingData) {
-        try {
-          const data = JSON.parse(onboardingData);
-          locationData = data.location;
-        } catch (e) {
-          console.error("Error parsing onboarding location:", e);
-        }
-      }
-
       const registrationData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        phoneNumber: formData.phone,
+        name: formData.name.trim(),
+        email: formData.email.toLowerCase().trim(),
+        phone: formData.phone.trim(),
         gender: formData.gender,
         password: formData.password,
-        age: formData.age || null,
-        dateOfBirth: formData.dateOfBirth || null,
-        location: locationData,
       };
 
       const response = await fetch("/api/auth/user/register", {
@@ -124,60 +113,12 @@ export default function UserRegisterPage() {
 
       if (response.ok) {
         const result = await response.json();
-
-        // Ensure user data includes gender
-        const userWithGender = {
-          ...result.user,
-          gender: result.user.gender || formData.gender || "other",
-        };
-
-        console.log("✅ Storing user data with gender:", userWithGender.gender);
-
-        // Store authentication data using cookie helper
-        setAuthToken(result.token, true);
-        setUserData(userWithGender);
-
-        // Mark as onboarded
-        sessionStorage.setItem("hasOnboarded", "true");
-
-        // Clean up temporary data
         localStorage.removeItem("userPrefillData");
-
-        // Keep onboarding data in session for preferences - UPDATE WITH GENDER
-        const onboardingData = sessionStorage.getItem("userOnboardingData");
-        if (onboardingData) {
-          try {
-            const preferences = JSON.parse(onboardingData);
-            // Merge with registered user data
-            const mergedData = {
-              ...preferences,
-              ...userWithGender,
-              gender: userWithGender.gender, // Ensure gender persists
-            };
-            sessionStorage.setItem(
-              "userOnboardingData",
-              JSON.stringify(mergedData)
-            );
-            sessionStorage.setItem(
-              "userPreferences",
-              JSON.stringify(preferences)
-            );
-          } catch (e) {
-            console.error("Error parsing onboarding data:", e);
-          }
-        } else {
-          // If no onboarding data, create it with user data
-          sessionStorage.setItem(
-            "userOnboardingData",
-            JSON.stringify(userWithGender)
-          );
-        }
-
         showSuccess("Registration successful! Welcome to TechTrims!");
         router.push("/user/dashboard");
       } else {
         const error = await response.json();
-        showError("Registration failed: " + error.message);
+        showError(error.message || "Registration failed");
       }
     } catch (error) {
       console.error("Registration error:", error);
@@ -190,67 +131,92 @@ export default function UserRegisterPage() {
   return (
     <div className={styles.container}>
       <div className={styles.authCard}>
+        <div className={styles.header}>
+          <button
+            onClick={() => router.push("/")}
+            className={styles.backButton}
+          >
+            ← Back to Home
+          </button>
+        </div>
+
         <h1 className={styles.title}>Create Account</h1>
 
         {prefillData && (
           <div className={styles.prefillInfo}>
-            <h3>Complete your registration</h3>
+            <h3>✨ Complete your registration</h3>
             <p>
               {prefillData.source === "onboarding"
                 ? "Based on your preferences"
-                : `From your recent booking${
-                    prefillData.lastBooking
-                      ? ` on ${prefillData.lastBooking}`
-                      : ""
-                  }`}
+                : "From your recent booking"}
             </p>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className={styles.form}>
+          {/* NAME */}
           <div className={styles.formGroup}>
+            <label htmlFor="name">Full Name *</label>
             <input
+              id="name"
               type="text"
-              placeholder="Full Name"
+              placeholder="Enter your full name"
               value={formData.name}
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
               required
+              disabled={isLoading}
+              minLength={3}
             />
           </div>
 
+          {/* EMAIL */}
           <div className={styles.formGroup}>
+            <label htmlFor="email">Email Address *</label>
             <input
+              id="email"
               type="email"
-              placeholder="Email Address"
+              placeholder="your@email.com"
               value={formData.email}
               onChange={(e) =>
                 setFormData({ ...formData, email: e.target.value })
               }
               required
+              disabled={isLoading}
+              autoComplete="email"
             />
           </div>
 
+          {/* PHONE */}
           <div className={styles.formGroup}>
+            <label htmlFor="phone">Phone Number *</label>
             <input
+              id="phone"
               type="tel"
-              placeholder="Phone Number"
+              placeholder="10-digit mobile number"
               value={formData.phone}
               onChange={(e) =>
                 setFormData({ ...formData, phone: e.target.value })
               }
               required
+              disabled={isLoading}
+              maxLength={10}
+              pattern="[6-9][0-9]{9}"
             />
           </div>
 
+          {/* GENDER */}
           <div className={styles.formGroup}>
+            <label htmlFor="gender">Gender *</label>
             <select
+              id="gender"
               value={formData.gender}
               onChange={(e) =>
                 setFormData({ ...formData, gender: e.target.value })
               }
               required
+              disabled={isLoading}
             >
               <option value="">Select Gender</option>
               <option value="male">Male</option>
@@ -259,24 +225,151 @@ export default function UserRegisterPage() {
             </select>
           </div>
 
+          {/* PASSWORD WITH REQUIREMENTS */}
           <div className={styles.formGroup}>
-            <input
-              type="password"
-              placeholder="Password (min 6 characters)"
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
-              required
-            />
+            <label htmlFor="password">Password *</label>
+            <div className={styles.passwordInputWrapper}>
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Create a strong password"
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+                required
+                disabled={isLoading}
+                className={`${styles.passwordInput} ${
+                  allRequirementsMet && formData.password
+                    ? styles.inputValid
+                    : ""
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className={styles.passwordToggle}
+                aria-label="Toggle password visibility"
+                tabIndex={-1}
+              >
+                {showPassword ? "👁️" : "👁️‍🗨️"}
+              </button>
+            </div>
+
+            {/* PASSWORD REQUIREMENTS - SHOW/HIDE DYNAMICALLY */}
+            {formData.password && (
+              <div className={styles.passwordRequirements}>
+                <div
+                  className={`${styles.requirement} ${
+                    passwordRequirements.minLength ? styles.requirementMet : ""
+                  }`}
+                >
+                  {passwordRequirements.minLength ? "✓" : "○"} At least 8
+                  characters
+                </div>
+                <div
+                  className={`${styles.requirement} ${
+                    passwordRequirements.uppercase ? styles.requirementMet : ""
+                  }`}
+                >
+                  {passwordRequirements.uppercase ? "✓" : "○"} One uppercase
+                  letter (A-Z)
+                </div>
+                <div
+                  className={`${styles.requirement} ${
+                    passwordRequirements.lowercase ? styles.requirementMet : ""
+                  }`}
+                >
+                  {passwordRequirements.lowercase ? "✓" : "○"} One lowercase
+                  letter (a-z)
+                </div>
+                <div
+                  className={`${styles.requirement} ${
+                    passwordRequirements.number ? styles.requirementMet : ""
+                  }`}
+                >
+                  {passwordRequirements.number ? "✓" : "○"} One number (0-9)
+                </div>
+                <div
+                  className={`${styles.requirement} ${
+                    passwordRequirements.specialChar
+                      ? styles.requirementMet
+                      : ""
+                  }`}
+                >
+                  {passwordRequirements.specialChar ? "✓" : "○"} One special
+                  character (!@#$%^&*)
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CONFIRM PASSWORD */}
+          <div className={styles.formGroup}>
+            <label htmlFor="confirmPassword">Confirm Password *</label>
+            <div className={styles.passwordInputWrapper}>
+              <input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Re-enter your password"
+                value={formData.confirmPassword}
+                onChange={(e) =>
+                  setFormData({ ...formData, confirmPassword: e.target.value })
+                }
+                required
+                disabled={isLoading}
+                className={`${styles.passwordInput} ${
+                  passwordsMatch === true ? styles.inputValid : ""
+                } ${passwordsMatch === false ? styles.inputInvalid : ""}`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className={styles.passwordToggle}
+                aria-label="Toggle confirm password visibility"
+                tabIndex={-1}
+              >
+                {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
+              </button>
+            </div>
+
+            {/* PASSWORD MATCH INDICATOR */}
+            {formData.confirmPassword && (
+              <div
+                className={`${styles.passwordMatch} ${
+                  passwordsMatch === true
+                    ? styles.passwordMatchSuccess
+                    : styles.passwordMatchError
+                }`}
+              >
+                {passwordsMatch === true ? (
+                  <>
+                    <span className={styles.matchIcon}>✓</span> Passwords match!
+                  </>
+                ) : (
+                  <>
+                    <span className={styles.matchIcon}>✗</span> Passwords
+                    don&apos;t match
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <button
             type="submit"
             className={styles.submitButton}
-            disabled={isLoading}
+            disabled={
+              isLoading || !allRequirementsMet || passwordsMatch !== true
+            }
           >
-            {isLoading ? "Creating Account..." : "Create Account"}
+            {isLoading ? (
+              <>
+                <span className={styles.spinner}></span> Creating Account...
+              </>
+            ) : (
+              "Create Account"
+            )}
           </button>
         </form>
 

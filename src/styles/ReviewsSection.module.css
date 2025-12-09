@@ -20,13 +20,10 @@
   color: var(--text-secondary);
 }
 .reviewsContainer {
-  display: flex;
   gap: 24px;
   margin-bottom: 24px;
 }
-.reviewsContainerright {
-  width: 70%;
-}
+
 .statsHeader {
   display: flex;
   gap: 32px;
@@ -130,11 +127,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 24px;
-  gap: 20px;
   flex-wrap: wrap;
-  flex-direction: column;
-  align-content: center;
+  flex-direction: row;
 }
 .filterPills {
   display: flex;
@@ -230,7 +224,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  margin-bottom: 24px;
+  margin: 44px 0 24px 0;
 }
 
 .reviewCard {
@@ -381,5 +375,16 @@
 
   .label {
     font-size: 0.8125rem;
+  }
+}
+@media (max-width: 440px) {
+  .showMore > button {
+    padding: 10px;
+  }
+  .statsHeader {
+    flex-direction: column;
+  }
+  .reviewsGrid {
+    grid-template-columns: repeat(1, 1fr);
   }
 }

@@ -1,14 +1,11 @@
-import clientPromise from "../../../../lib/mongodb";
-import { hashPassword, generateToken } from "../../../../lib/auth";
-
+// Enhanced validation
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const { name, email, phone, gender, password, age, dateOfBirth, location } =
-      req.body;
+    const { name, email, phone, gender, password } = req.body;
 
     // Validate required fields
     if (!name || !email || !phone || !gender || !password) {
@@ -18,25 +15,68 @@ export default async function handler(req, res) {
       });
     }
 
+    // Sanitize inputs
+    const sanitizedName = name.trim();
+    const sanitizedEmail = email.toLowerCase().trim();
+    const sanitizedPhone = phone.trim();
+
+    // Validate name
+    if (sanitizedName.length < 3) {
+      return res
+        .status(400)
+        .json({ message: "Name must be at least 3 characters long" });
+    }
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(sanitizedEmail)) {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
     // Validate phone format (Indian format)
     const phoneRegex = /^[6-9]\d{9}$/;
-    if (!phoneRegex.test(phone)) {
-      return res
-        .status(400)
-        .json({ message: "Invalid phone number. Use 10-digit Indian format" });
+    if (!phoneRegex.test(sanitizedPhone)) {
+      return res.status(400).json({
+        message:
+          "Invalid phone number. Use 10-digit Indian format (starting with 6-9)",
+      });
     }
 
     // Validate password strength
-    if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters long" });
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters long",
+      });
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      return res.status(400).json({
+        message: "Password must contain at least one uppercase letter",
+      });
+    }
+
+    if (!/[a-z]/.test(password)) {
+      return res.status(400).json({
+        message: "Password must contain at least one lowercase letter",
+      });
+    }
+
+    if (!/[0-9]/.test(password)) {
+      return res.status(400).json({
+        message: "Password must contain at least one number",
+      });
+    }
+
+    if (!/[!@#$%^&*]/.test(password)) {
+      return res.status(400).json({
+        message:
+          "Password must contain at least one special character (!@#$%^&*)",
+      });
+    }
+
+    // Validate gender
+    if (!["male", "female", "other"].includes(gender.toLowerCase())) {
+      return res.status(400).json({ message: "Invalid gender value" });
     }
 
     const client = await clientPromise;
@@ -45,7 +85,7 @@ export default async function handler(req, res) {
 
     // Check if user already exists
     const existingUser = await users.findOne({
-      $or: [{ email: email.toLowerCase() }, { phone: phone }],
+      $or: [{ email: sanitizedEmail }, { phone: sanitizedPhone }],
     });
 
     if (existingUser) {
@@ -58,25 +98,11 @@ export default async function handler(req, res) {
     const hashedPassword = await hashPassword(password);
 
     // Create new user
-    // Check for existing bookings by phone/name before creating user
-    const existingBookings = await db
-      .collection("bookings")
-      .find({
-        $or: [
-          { customerPhone: phone },
-          { customerName: { $regex: name, $options: "i" } },
-        ],
-      })
-      .toArray();
-
     const newUser = {
-      name,
-      email,
-      phone,
-      gender,
-      age: age || null,
-      dateOfBirth: dateOfBirth || null,
-      location: location || null,
+      name: sanitizedName,
+      email: sanitizedEmail,
+      phone: sanitizedPhone,
+      gender: gender.toLowerCase(),
       role: "user",
       hashedPassword,
       bookingHistory: [],
@@ -87,34 +113,19 @@ export default async function handler(req, res) {
       updatedAt: new Date(),
       isActive: true,
     };
+
     const result = await db.collection("users").insertOne(newUser);
 
-    // Update existing bookings with userId
-    if (existingBookings.length > 0) {
-      await db
-        .collection("bookings")
-        .updateMany(
-          { _id: { $in: existingBookings.map((b) => b._id) } },
-          { $set: { userId: result.insertedId } }
-        );
-    }
-
     // Generate JWT token
-    const token = generateToken(result.insertedId, "user", email);
+    const token = generateToken(result.insertedId, "user", sanitizedEmail);
 
     // Remove password from response
     const { hashedPassword: _, ...userResponse } = newUser;
-    userResponse.id = result.insertedId;
-
-    // Ensure gender is in the response
-    console.log("✅ User registered with gender:", userResponse.gender);
+    userResponse._id = result.insertedId;
 
     res.status(201).json({
       message: "User registered successfully",
-      user: {
-        ...userResponse,
-        gender: userResponse.gender || "other", // Ensure gender is always present
-      },
+      user: userResponse,
       token,
     });
   } catch (error) {

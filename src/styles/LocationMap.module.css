@@ -71,6 +71,30 @@
 .searchResultItem:hover {
   background: #f9f9f9;
 }
+.recenterButton {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  transition: all 0.3s;
+  margin-bottom: 12px;
+}
+
+.recenterButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+}
+
+.mapControls {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
 .spinning {
   animation: spin 1s linear infinite;

@@ -25,27 +25,27 @@ export default async function handler(req, res) {
     console.log("Database connected successfully");
 
     if (method === "GET") {
-      // Get all barbers for salon
       console.log("Fetching barbers for salon:", salonId);
 
-      // Convert salonId to ObjectId - ADD VALIDATION
       let salonObjectId;
       try {
         salonObjectId = new ObjectId(salonId);
-        console.log("Converted to ObjectId:", salonObjectId);
       } catch (objIdError) {
-        console.error("Invalid ObjectId:", salonId, objIdError);
         return res.status(400).json({ error: "Invalid salonId format" });
       }
 
       const barbers = await barbersCollection
-        .find({
-          salonId: salonObjectId,
-        })
+        .find({ salonId: salonObjectId })
         .sort({ name: 1 })
         .toArray();
 
-      return res.status(200).json(barbers);
+      // ✅ FIX: Ensure isAvailable defaults to true if undefined/null
+      const barbersWithDefaults = barbers.map((barber) => ({
+        ...barber,
+        isAvailable: barber.isAvailable === false ? false : true,
+      }));
+
+      return res.status(200).json(barbersWithDefaults);
     }
 
     if (method === "POST") {
@@ -62,7 +62,7 @@ export default async function handler(req, res) {
         salonId: salonObjectId,
         totalBookings: 0,
         rating: 5.0,
-        isAvailable: req.body.isAvailable !== false,
+        isAvailable: req.body.isAvailable === false ? false : true, // ✅ EXPLICIT DEFAULT
         workingHours: {
           start: "09:00",
           end: "21:00",

@@ -85,7 +85,14 @@ export default function SalonBarbersPage() {
       setLoading(true);
       try {
         const res = await axios.get(`/api/salons/barbers?salonId=${salonId}`);
-        setBarbers(res.data);
+
+        // ✅ TEMPORARY FIX: Ensure all barbers default to available
+        const barbersWithDefaults = res.data.map((barber) => ({
+          ...barber,
+          isAvailable: barber.isAvailable === false ? false : true,
+        }));
+
+        setBarbers(barbersWithDefaults);
         setError("");
       } catch (err) {
         setError(

@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import styles from "../../styles/WalkinConfirmation.module.css";
 import feedbackStyles from "../../styles/Feedback.module.css";
 import { motion } from "framer-motion";
+import { isAuthenticated } from "@/lib/cookieAuth";
 import { showError, showWarning } from "@/lib/toast";
 // Format time ago
 const formatTimeAgo = (date) => {
@@ -23,14 +24,30 @@ const formatExpiry = (expiryDate) => {
   return `${remaining}m`;
 };
 
-// Format time left in service
-const formatTimeLeft = (completionTime) => {
-  if (!completionTime) return "N/A";
-  const remaining = Math.ceil(
-    (new Date(completionTime) - new Date()) / 1000 / 60
-  );
-  if (remaining < 0) return "Done";
-  return `${remaining}m left`;
+// Format time left/elapsed in service
+const formatTimeLeft = (serviceStartedAt, estimatedDuration) => {
+  if (!serviceStartedAt || !estimatedDuration) return "N/A";
+
+  const now = new Date();
+  const started = new Date(serviceStartedAt);
+  const elapsedMinutes = Math.floor((now - started) / 1000 / 60);
+  const remainingMinutes = estimatedDuration - elapsedMinutes;
+
+  if (remainingMinutes <= 0) {
+    // Service exceeded time - show in red
+    const overtime = Math.abs(remainingMinutes);
+    return {
+      display: `${elapsedMinutes}m/${estimatedDuration}m`,
+      overtime: overtime,
+      isUrgent: true,
+    };
+  }
+
+  return {
+    display: `${elapsedMinutes}m/${estimatedDuration}m`,
+    overtime: 0,
+    isUrgent: remainingMinutes <= 5, // Urgent if less than 5 mins left
+  };
 };
 
 export default function WalkinConfirmation() {
@@ -42,6 +59,11 @@ export default function WalkinConfirmation() {
   const [loading, setLoading] = useState(true);
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
+  const [serviceTimer, setServiceTimer] = useState({
+    elapsed: 0,
+    remaining: 0,
+    isOvertime: false,
+  });
 
   // Feedback state
   const [ratings, setRatings] = useState({
@@ -167,12 +189,16 @@ export default function WalkinConfirmation() {
         const data = await res.json();
         const updatedBooking = data.booking;
 
-        // Update relevant fields only
+        // ✅ UPDATE ALL CRITICAL FIELDS INCLUDING SERVICE DATA
         setBooking((prev) => ({
           ...prev,
           queueStatus: updatedBooking.queueStatus,
           queuePosition: updatedBooking.queuePosition,
           status: updatedBooking.status,
+          serviceStartedAt: updatedBooking.serviceStartedAt, // ✅ ADDED
+          estimatedDuration: updatedBooking.estimatedDuration, // ✅ ADDED
+          selectedDuration: updatedBooking.selectedDuration, // ✅ ADDED
+          expectedCompletionTime: updatedBooking.expectedCompletionTime, // ✅ ADDED
         }));
 
         // Auto-show feedback when COMPLETED
@@ -198,7 +224,44 @@ export default function WalkinConfirmation() {
     const interval = setInterval(pollStatus, 5000);
     return () => clearInterval(interval);
   }, [bookingId, showFeedback]);
-  // NEW: Fetch barber's specific queue every 5 seconds
+
+  // 4. Live service timer - updates every second
+  useEffect(() => {
+    if (!booking?.serviceStartedAt || booking?.queueStatus !== "GREEN") {
+      return;
+    }
+
+    const updateServiceTimer = () => {
+      const now = new Date();
+      const started = new Date(booking.serviceStartedAt);
+      const duration =
+        booking.estimatedDuration || booking.selectedDuration || 30;
+      const elapsed = Math.floor((now - started) / 1000 / 60);
+      const remaining = duration - elapsed;
+      const isOvertime = remaining < 0;
+
+      setServiceTimer({
+        elapsed,
+        duration,
+        remaining,
+        isOvertime,
+      });
+    };
+
+    // Update immediately
+    updateServiceTimer();
+
+    // Then update every second for live countdown
+    const interval = setInterval(updateServiceTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [
+    booking?.serviceStartedAt,
+    booking?.estimatedDuration,
+    booking?.selectedDuration,
+    booking?.queueStatus,
+  ]);
+
   // NEW: Fetch barber's specific queue every 5 seconds
   useEffect(() => {
     if (!booking?.barberId || !booking?.salonId) return;
@@ -272,12 +335,8 @@ export default function WalkinConfirmation() {
       });
 
       if (response.ok) {
-        const userToken = localStorage.getItem("userToken");
-        const authenticatedUserData = localStorage.getItem(
-          "authenticatedUserData"
-        );
-
-        if (userToken || authenticatedUserData) {
+        if (isAuthenticated()) {
+          // Uses your existing helper
           router.push("/user/dashboard");
         } else {
           const prefillData = {
@@ -606,19 +665,47 @@ export default function WalkinConfirmation() {
                   (Expires in {timeLeft})
                 </span>
               </div>
-            ) : booking.queueStatus === "ORANGE" ? (
-              <div className={styles.goldenStatus}>
-                <span className={styles.statusDot}>🟠</span>
-                <span>
-                  In Priority Queue - Position #{booking.queuePosition} with{" "}
-                  {booking.barber}
-                </span>
-              </div>
             ) : booking.queueStatus === "GREEN" ? (
-              <div className={styles.greenStatus}>
-                <span className={styles.statusDot}>🟢</span>
-                <span>Now Being Served by {booking.barber}</span>
-              </div>
+              <>
+                <div className={styles.greenStatus}>
+                  <span className={styles.statusDot}>🟢</span>
+                  <span>Now Being Served by {booking.barber}</span>
+                </div>
+
+                {booking.serviceStartedAt && (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      marginTop: "16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: serviceTimer.isOvertime ? "2.5rem" : "2rem",
+                        fontWeight: "900",
+                        color: serviceTimer.isOvertime ? "#ef4444" : "#10b981",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      {serviceTimer.elapsed}m / {serviceTimer.duration}m
+                      {serviceTimer.isOvertime && " ⚠️"}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "0.875rem",
+                        color: serviceTimer.isOvertime ? "#ef4444" : "#6b7280",
+                        fontWeight: "600",
+                      }}
+                    >
+                      {serviceTimer.isOvertime
+                        ? `Overtime by ${Math.abs(
+                            serviceTimer.remaining
+                          )} minutes!`
+                        : `${serviceTimer.remaining} minutes remaining`}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : booking.queueStatus === "COMPLETED" ? (
               <div className={styles.completedStatus}>
                 <span className={styles.statusDot}>✅</span>
@@ -647,6 +734,23 @@ export default function WalkinConfirmation() {
         {queueInfo && (
           <div style={styles.queueVisualizationContainer}>
             <h3>📍 Your Queue Position</h3>
+            <div
+              style={{
+                padding: "10px",
+                background: "#fff3cd",
+                marginBottom: "10px",
+                fontSize: "0.8rem",
+              }}
+            >
+              <div>
+                <strong>DEBUG:</strong>
+              </div>
+              <div>queueStatus: {booking.queueStatus}</div>
+              <div>serviceStartedAt: {booking.serviceStartedAt || "NULL"}</div>
+              <div>
+                estimatedDuration: {booking.estimatedDuration || "NULL"}
+              </div>
+            </div>
 
             <div style={styles.queueStatsRow}>
               <div style={{ ...styles.statBox, background: "#86efac" }}>
@@ -664,18 +768,53 @@ export default function WalkinConfirmation() {
             </div>
 
             <div style={styles.queueVisualItems}>
-              {queueInfo.queueList.map((item) => {
-                const isYou = item.id === bookingId;
+              {queueInfo.queueList.map((item, idx) => {
+                console.log(
+                  "🔍 QUEUE ITEM:",
+                  item.name,
+                  "position:",
+                  item.position,
+                  "id:",
+                  item.id,
+                  "_id:",
+                  item._id
+                );
+                // FIX: Compare using booking ID, not position
+                const bookingIdStr = (booking._id || booking.id)?.toString();
+                const itemIdStr = (
+                  item._id ||
+                  item.bookingId ||
+                  item.id
+                )?.toString();
+
+                // DEBUG - Check first card
+                const isYou = bookingIdStr === itemIdStr;
+
+                // DEBUG
+                console.log(
+                  "🔍",
+                  item.name,
+                  "| isYou:",
+                  isYou,
+                  "| cardId:",
+                  itemIdStr
+                );
+
                 const bgColor =
                   item.status === "SERVING"
-                    ? "#86efac"
+                    ? "rgba(16, 185, 129, 0.25)" // GREEN - 25% opacity fill
                     : item.status === "ARRIVED"
-                    ? "#fbbf24"
-                    : "#d1d5db";
+                    ? "rgba(245, 158, 11, 0.25)" // ORANGE - 25% opacity fill
+                    : "rgba(156, 163, 175, 0.25)"; // GRAY - 25% opacity fill
+
                 const borderStyle =
                   item.status === "BOOKED"
-                    ? "2px dotted #000"
-                    : "2px solid #000";
+                    ? "3px dotted #10b981" // GREEN border for booked
+                    : item.status === "SERVING"
+                    ? "3px solid #10b981" // GREEN border for serving
+                    : item.status === "ARRIVED"
+                    ? "3px solid #f59e0b" // ORANGE border for arrived
+                    : "3px solid #9ca3af"; // GRAY border for waiting
 
                 return (
                   <div
@@ -685,9 +824,9 @@ export default function WalkinConfirmation() {
                       background: bgColor,
                       border: borderStyle,
                       opacity: isYou ? 1 : 0.7,
-                      boxShadow: isYou
-                        ? "0 0 12px rgba(132, 204, 22, 0.8)"
-                        : "none",
+                      boxShadow: "none", // Removed glow, fill does the job
+                      border: isYou ? "3px solid #000" : borderStyle, // Bold black border for YOU
+
                       transform: isYou ? "scale(1.05)" : "scale(1)",
                     }}
                   >
@@ -739,6 +878,7 @@ export default function WalkinConfirmation() {
             </div>
           </div>
         )}
+
         {barberQueueData && (
           <div className={styles.modernQueueContainer}>
             <motion.div
@@ -762,9 +902,11 @@ export default function WalkinConfirmation() {
                 }}
                 whileHover={{ scale: 1.05 }}
               >
-                <div className={styles.statIcon}>🟢</div>
-                <div className={styles.statNumber}>
-                  {barberQueueData.serving ? "1" : "0"}
+                <div className={styles.statsRow}>
+                  <div className={styles.statIcon}>🟢</div>
+                  <div className={styles.statNumber}>
+                    {barberQueueData.serving ? "1" : "0"}
+                  </div>
                 </div>
                 <div className={styles.statLabel}>Now Serving</div>
               </motion.div>
@@ -777,9 +919,12 @@ export default function WalkinConfirmation() {
                 }}
                 whileHover={{ scale: 1.05 }}
               >
-                <div className={styles.statIcon}>👥</div>
-                <div className={styles.statNumber}>
-                  {barberQueueData.priorityQueueCount || 0}
+                {" "}
+                <div className={styles.statsRow}>
+                  <div className={styles.statIcon}>👥</div>
+                  <div className={styles.statNumber}>
+                    {barberQueueData.priorityQueueCount || 0}
+                  </div>
                 </div>
                 <div className={styles.statLabel}>Priority Queue</div>
               </motion.div>
@@ -792,9 +937,12 @@ export default function WalkinConfirmation() {
                 }}
                 whileHover={{ scale: 1.05 }}
               >
-                <div className={styles.statIcon}>⏳</div>
-                <div className={styles.statNumber}>
-                  {barberQueueData.bookedCount || 0}
+                {" "}
+                <div className={styles.statsRow}>
+                  <div className={styles.statIcon}>⏳</div>
+                  <div className={styles.statNumber}>
+                    {barberQueueData.bookedCount || 0}
+                  </div>
                 </div>
                 <div className={styles.statLabel}>Temporary Queue</div>
               </motion.div>
@@ -864,12 +1012,23 @@ export default function WalkinConfirmation() {
                 {barberQueueData.queue
                   ?.filter((c) => c.queueStatus === "ORANGE")
                   .map((customer, idx) => {
-                    const isYou = customer.id === booking.id;
+                    // Use strict comparison wi th both _id and id
+                    const bookingIdStr =
+                      booking._id?.toString() || booking.id?.toString();
+                    const customerIdStr =
+                      customer._id?.toString() || customer.id?.toString();
+                    const isYou = bookingIdStr === customerIdStr;
+                    console.log("🔍 BARBER QUEUE:", customer.customerName, {
+                      myId: bookingIdStr,
+                      customerId: customerIdStr,
+                      isYou: isYou,
+                    });
                     const createdAtDate = customer.createdAt
                       ? new Date(customer.createdAt)
                       : null;
+                    const pos = idx + 1;
+                    // ... rest of code
 
-                    const pos = customer.queuePosition || idx + 1;
                     const posLabel =
                       pos === 1
                         ? "1st"
@@ -890,9 +1049,10 @@ export default function WalkinConfirmation() {
                         transition={{ delay: idx * 0.1 }}
                         whileHover={{ scale: 1.1, zIndex: 10 }}
                         style={{
-                          background:
-                            "linear-gradient(135deg, #fbbf24 0, #f59e0b 100)",
-                          border: "3px solid #000",
+                          background: "rgba(245, 158, 11, 0.75)", // 25% orange fill instead of gradient
+                          border: isYou
+                            ? "3px solid #000"
+                            : "3px solid #f59e0b", // Bold border for YOU
                           boxShadow: isYou
                             ? "0 0 30px rgba(251, 191, 36, 0.8), 0 8px 20px rgba(0,0,0,0.2)"
                             : "0 4px 15px rgba(0,0,0,0.15)",
@@ -959,7 +1119,13 @@ export default function WalkinConfirmation() {
                 {barberQueueData.queue
                   ?.filter((c) => c.queueStatus === "RED")
                   .map((customer, idx) => {
-                    const isYou = customer._id === booking._id;
+                    // Use strict comparison with both _id and id
+                    const bookingIdStr =
+                      booking._id?.toString() || booking.id?.toString();
+                    const customerIdStr =
+                      customer._id?.toString() || customer.id?.toString();
+                    const isYou = bookingIdStr === customerIdStr;
+
                     const priorityCount = barberQueueData.queue.filter(
                       (c) => c.queueStatus === "ORANGE"
                     ).length;

@@ -7,12 +7,25 @@ import styles from "../styles/Home.module.css";
 import { useLocation } from "../hooks/useLocation";
 import { UserDataManager } from "../lib/userData";
 import { getAuthToken, getUserData } from "../lib/cookieAuth";
-import DarkVeil from "@/components/Backgrounds/DarkVeil";
 
 export default function Home(theme) {
   const router = useRouter();
   const [salons, setSalons] = useState([]);
-  const [userOnboarding, setUserOnboarding] = useState(null);
+  const [userOnboarding, setUserOnboarding] = useState(() => {
+    // Load user data IMMEDIATELY from sessionStorage on mount
+    if (typeof window === "undefined") return null;
+
+    const onboardingData = sessionStorage.getItem("userOnboardingData");
+    if (onboardingData) {
+      try {
+        return JSON.parse(onboardingData);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+  const [isUserDataReady, setIsUserDataReady] = useState(false);
   const [nearbySalons, setNearbySalons] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingSalons, setIsLoadingSalons] = useState(false);
@@ -30,27 +43,38 @@ export default function Home(theme) {
     requestLocationPermission,
   } = useLocation();
   const [mapKey, setMapKey] = useState(0);
-  const [searchRadius, setSearchRadius] = useState(10000); // Default 30km
-
+  // Radius marks for non-linear slider
+  const [searchRadius, setSearchRadius] = useState(10000);
+  const radiusMarks = [
+    1, 3, 5, 10, 20, 30, 50, 75, 100, 125, 150, 200, 300, 400, 500, 600, 700,
+    800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600,
+  ]; // 1600 = 1500+
   const [salonLoadError, setSalonLoadError] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null);
   const [error, setError] = useState(null);
   const [showLocationCheck, setShowLocationCheck] = useState(() => {
-    // Only show location check if NO location in storage
     if (typeof window === "undefined") return false;
 
-    const sessionLoc = sessionStorage.getItem("liveUserLocation");
-    const cachedLoc = localStorage.getItem("cachedUserLocation");
+    // Check if we have valid cached location
+    const cached =
+      sessionStorage.getItem("liveUserLocation") ||
+      localStorage.getItem("cachedUserLocation");
 
-    // If we have location already, skip location check
-    if (sessionLoc || cachedLoc) {
-      console.log("✅ Location already cached, skipping location check");
-      return false;
+    if (cached) {
+      try {
+        const loc = JSON.parse(cached);
+        // If we have coordinates, skip location check
+        if (loc.lat && loc.lng) {
+          console.log("✅ Valid cached location found, skipping check");
+          return false;
+        }
+      } catch (e) {}
     }
 
-    console.log("❌ No cached location, showing location check");
+    console.log("❌ No valid cached location, showing check");
     return true;
   });
+
   const [locationCheckStatus, setLocationCheckStatus] = useState({
     deviceLocation: false,
     locationAccuracy: false,
@@ -60,6 +84,7 @@ export default function Home(theme) {
 
   // ADD: Track if salons were loaded
   const salonsLoadedRef = useRef(false);
+  const initializedRef = useRef(false);
   const initialLocationRef = useRef(null);
   const PLACEHOLDER_IMAGE = process.env.NEXT_PUBLIC_PLACEHOLDER_SALON_IMAGE;
 
@@ -96,31 +121,35 @@ export default function Home(theme) {
 
   useEffect(() => {
     const initializeUser = async () => {
+      // Prevent double initialization
+      if (initializedRef.current) {
+        console.log("⏭️ Already initialized, skipping");
+        return;
+      }
+
+      initializedRef.current = true;
       console.log("🔍 INITIALIZING USER - START");
 
       if (typeof window === "undefined") {
         console.log("❌ Window undefined, skipping");
+        initializedRef.current = false;
         return;
       }
 
-      // Check if user has completed onboarding
+      // Check onboarding
       const hasOnboarded = sessionStorage.getItem("hasOnboarded");
       console.log("📋 Onboarding status:", hasOnboarded);
 
-      // If not onboarded, redirect to onboarding
       if (!hasOnboarded) {
         console.log("❌ Not onboarded, redirecting...");
         router.push("/onboarding");
         return;
       }
 
-      // USE COOKIE INSTEAD OF LOCALSTORAGE for auth
+      // Load user data from API
       const userToken = getAuthToken();
-      console.log("🔑 Auth token:", userToken ? "EXISTS" : "MISSING");
-
       if (userToken) {
         try {
-          // Fetch fresh user data from API
           const userData = await UserDataManager.fetchAndStoreUserData();
           if (userData) {
             console.log("✅ User data loaded:", userData.name);
@@ -129,203 +158,61 @@ export default function Home(theme) {
         } catch (error) {
           console.error("❌ Error loading user data:", error);
         }
-      } else {
-        // Check session onboarding data for guest users
-        const onboardingData = sessionStorage.getItem("userOnboardingData");
-        if (onboardingData) {
-          try {
-            const userData = JSON.parse(onboardingData);
-            console.log("✅ Guest onboarding data loaded");
-            setUserOnboarding(userData);
-          } catch (error) {
-            console.error("❌ Error parsing onboarding data:", error);
-          }
-        }
       }
-      // Check if we already have location in storage
-      const sessionLoc = sessionStorage.getItem("liveUserLocation");
-      const cachedLoc = localStorage.getItem("cachedUserLocation");
 
-      if (sessionLoc || cachedLoc) {
-        console.log("✅ Using cached location, loading salons...");
+      // Mark user data as ready
+      setIsUserDataReady(true);
 
+      // Check for cached location (SINGLE CHECK - no duplicates)
+      const cached =
+        sessionStorage.getItem("liveUserLocation") ||
+        sessionStorage.getItem("userLocation") ||
+        localStorage.getItem("cachedUserLocation");
+
+      if (cached && !salonsLoadedRef.current) {
         try {
-          const location = JSON.parse(sessionLoc || cachedLoc);
-          const lat = location.lat || location.latitude;
-          const lng = location.lng || location.longitude;
+          const coords = JSON.parse(cached);
+          const lat = coords.lat || coords.latitude;
+          const lng = coords.lng || coords.longitude;
 
-          if (lat && lng && !salonsLoadedRef.current) {
-            console.log("🚀 Loading salons from cached location");
-            salonsLoadedRef.current = true; // Mark as loaded
+          // Reject bad accuracy
+          if (coords.accuracy && coords.accuracy > 50000) {
+            console.warn(
+              `⚠️ Bad accuracy: ${coords.accuracy}m - clearing cache`
+            );
+            sessionStorage.removeItem("liveUserLocation");
+            sessionStorage.removeItem("userLocation");
+            localStorage.removeItem("cachedUserLocation");
+            setShowLocationCheck(true);
+            return;
+          }
+
+          if (lat && lng) {
+            console.log("✅ Using cached location:", { lat, lng });
+            salonsLoadedRef.current = true;
             setShowLocationCheck(false);
             setIsLoading(true);
             await loadNearbySalons(lat, lng, userOnboarding?.gender || "all");
             setIsLoading(false);
-          } else if (salonsLoadedRef.current) {
-            console.log("⏭️ Salons already loaded, skipping");
-            setShowLocationCheck(false);
-            setIsLoading(false);
           } else {
-            // Location exists but invalid, do check
-            await checkLocationStatus();
+            console.warn("❌ Invalid cached coords");
+            setShowLocationCheck(true);
           }
-        } catch (error) {
-          console.error("Error parsing cached location:", error);
-          await checkLocationStatus();
+        } catch (e) {
+          console.error("❌ Error parsing cached location:", e);
+          setShowLocationCheck(true);
         }
-      } else {
-        // No cached location, do initial check
-        console.log("❌ No cached location, checking status...");
-        await checkLocationStatus();
+      } else if (!cached) {
+        console.log("❌ No cached location - showing location check");
+        setShowLocationCheck(true);
       }
 
-      // Get location from session storage (persistent location)
-      const storedLocation = sessionStorage.getItem("userLocation");
-      console.log("📦 Stored location RAW:", storedLocation);
-
-      if (storedLocation) {
-        try {
-          const locationData = JSON.parse(storedLocation);
-          console.log("✅ Parsed stored location:", locationData);
-
-          // Normalize coordinates
-          const lat = locationData.latitude || locationData.lat;
-          const lng = locationData.longitude || locationData.lng;
-
-          console.log("📍 Normalized coords from storage:", { lat, lng });
-          console.log(
-            "📍 salonsLoadedRef.current BEFORE check:",
-            salonsLoadedRef.current
-          );
-
-          // Use stored location to load salons
-          if (lat && lng && !salonsLoadedRef.current) {
-            console.log(
-              "✅✅✅ CONDITION MET: Will call loadNearbySalons from sessionStorage"
-            );
-            console.log(
-              "🚀 CALLING loadNearbySalons from sessionStorage:",
-              lat,
-              lng
-            );
-
-            try {
-              await loadNearbySalons(lat, lng, userOnboarding?.gender || "all");
-              console.log("✅ loadNearbySalons COMPLETED");
-              salonsLoadedRef.current = true;
-              console.log("✅ Set salonsLoadedRef.current = true");
-            } catch (err) {
-              console.error("❌ loadNearbySalons FAILED:", err);
-            }
-          } else {
-            console.warn("⚠️⚠️⚠️ SKIPPING salon load from storage:", {
-              hasLat: !!lat,
-              hasLng: !!lng,
-              alreadyLoaded: salonsLoadedRef.current,
-            });
-          }
-        } catch (error) {
-          console.error("❌ Error parsing stored location:", error);
-        }
-      } else if (liveUserLocation && !salonsLoadedRef.current) {
-        console.log("📡 Using live location:", liveUserLocation);
-
-        // Use BOTH lat/lng formats for compatibility
-        const lat = liveUserLocation.latitude || liveUserLocation.lat;
-        const lng = liveUserLocation.longitude || liveUserLocation.lng;
-
-        console.log("📍 Extracted coords from live:", { lat, lng });
-        console.log(
-          "📍 salonsLoadedRef.current BEFORE check:",
-          salonsLoadedRef.current
-        );
-
-        if (lat && lng) {
-          console.log(
-            "✅✅✅ CONDITION MET: Will call loadNearbySalons from liveUserLocation"
-          );
-          console.log(
-            "🚀 CALLING loadNearbySalons from liveUserLocation:",
-            lat,
-            lng
-          );
-
-          try {
-            await loadNearbySalons(lat, lng, userOnboarding?.gender || "all");
-            console.log("✅ loadNearbySalons COMPLETED");
-            salonsLoadedRef.current = true;
-            console.log("✅ Set salonsLoadedRef.current = true");
-          } catch (err) {
-            console.error("❌ loadNearbySalons FAILED:", err);
-          }
-        } else {
-          console.error("❌❌❌ Live location missing coordinates:", {
-            lat,
-            lng,
-            liveUserLocation,
-          });
-        }
-      } else if (!liveUserLocation && !salonsLoadedRef.current) {
-        console.log("💾 Trying cached location fallback");
-
-        // FALLBACK: Use cached location from localStorage if live location not available
-        const cachedLocation = localStorage.getItem("cachedUserLocation");
-        console.log("💾 cachedUserLocation RAW:", cachedLocation);
-
-        if (cachedLocation) {
-          try {
-            const locationData = JSON.parse(cachedLocation);
-            console.log("✅ Using cached location:", locationData);
-
-            const lat = locationData.latitude || locationData.lat;
-            const lng = locationData.longitude || locationData.lng;
-
-            if (lat && lng) {
-              console.log(
-                "✅✅✅ CONDITION MET: Will call loadNearbySalons from cache"
-              );
-              console.log("🚀 CALLING loadNearbySalons from cache:", lat, lng);
-
-              try {
-                await loadNearbySalons(
-                  lat,
-                  lng,
-                  userOnboarding?.gender || "all"
-                );
-                console.log("✅ loadNearbySalons COMPLETED");
-                salonsLoadedRef.current = true;
-                console.log("✅ Set salonsLoadedRef.current = true");
-              } catch (err) {
-                console.error("❌ loadNearbySalons FAILED:", err);
-              }
-            }
-          } catch (error) {
-            console.error("❌ Error using cached location:", error);
-          }
-        } else {
-          console.warn("❌ No cached location available");
-        }
-      } else {
-        console.log("⏭⏭⏭ SKIPPING salon load - already loaded or no location", {
-          hasLiveLocation: !!liveUserLocation,
-          salonsLoadedRef: salonsLoadedRef.current,
-        });
-      }
-
-      setIsLoading(false);
       console.log("✅ INITIALIZING USER - DONE");
     };
 
-    console.log("🔄🔄🔄 useEffect TRIGGERED:", {
-      hasLiveLocation: !!liveUserLocation,
-      salonsLoaded: salonsLoadedRef.current,
-      locationKeys: liveUserLocation ? Object.keys(liveUserLocation) : "none",
-      liveUserLocationFull: liveUserLocation,
-    });
-
-    // Run initialization
+    console.log("🔄 useEffect TRIGGERED");
     initializeUser();
-  }, [router]);
+  }, []);
 
   // Update location in session storage whenever it changes
   useEffect(() => {
@@ -426,7 +313,6 @@ export default function Home(theme) {
   // }, []);
 
   // NEW: Check device location status
-  // NEW: Check device location status
   const checkLocationStatus = async () => {
     try {
       if (!navigator.geolocation) {
@@ -439,17 +325,19 @@ export default function Home(theme) {
         return null;
       }
 
+      // IMPORTANT: Set maximumAge to 0 to force fresh location check
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
+          timeout: 15000,
+          maximumAge: 0, // Force fresh location, don't use cache
         });
       });
 
       const coords = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
+        timestamp: new Date().toISOString(),
       };
 
       setLocationCheckStatus({
@@ -463,12 +351,21 @@ export default function Home(theme) {
       sessionStorage.setItem("liveUserLocation", JSON.stringify(coords));
       localStorage.setItem("cachedUserLocation", JSON.stringify(coords));
 
+      console.log("✅ Fresh location obtained:", coords);
       return coords;
     } catch (error) {
-      console.error("Location check error:", error);
+      console.error("❌ Location check error:", error);
+
+      // Clear old cached locations if permission denied
+      if (error.code === 1) {
+        // PERMISSION_DENIED
+        sessionStorage.removeItem("liveUserLocation");
+        localStorage.removeItem("cachedUserLocation");
+      }
+
       setLocationCheckStatus({
         deviceLocation: false,
-        locationAccuracy: false,
+        locationAccuracy: error.code !== 1, // Location might be off (code 2 or 3)
         hasCoordinates: false,
         coordinates: null,
       });
@@ -983,6 +880,19 @@ export default function Home(theme) {
     router.push(`/salons/${salonId}?mode=${mode}`);
   };
 
+  // Don't show location check until user data is ready
+  if (!isUserDataReady) {
+    return (
+      <div className={styles.loadingContainer}>
+        <div className={styles.luxurySpinner}>
+          <div className={styles.spinnerRing}></div>
+          <div className={styles.spinnerCore}></div>
+        </div>
+        <p className={styles.loadingText}>Loading...</p>
+      </div>
+    );
+  }
+
   // Location Check Screen - Shows FIRST
   if (showLocationCheck) {
     return (
@@ -1489,9 +1399,24 @@ export default function Home(theme) {
                 <p>{locationError}</p>
                 <button
                   className={styles.retryButton}
-                  onClick={() => window.location.reload()}
+                  onClick={async () => {
+                    try {
+                      // Clear old cache first
+                      sessionStorage.removeItem("liveUserLocation");
+                      localStorage.removeItem("cachedUserLocation");
+
+                      // Request fresh location permission
+                      await requestLocationPermission();
+
+                      // Reload after getting permission
+                      window.location.reload();
+                    } catch (error) {
+                      console.error("Permission request failed:", error);
+                      alert("Please enable location in browser settings");
+                    }
+                  }}
                 >
-                  Refresh to Allow Location
+                  🔐 Enable Location Access
                 </button>
               </div>
             </div>
@@ -1591,32 +1516,28 @@ export default function Home(theme) {
             <label className={styles.radiusLabel}>
               📍 Search Radius:{" "}
               <strong>
-                {searchRadius >= 2000 ? "2000+ km" : `${searchRadius} km`}
+                {searchRadius >= 1600 ? "1500+ km" : `${searchRadius} km`}
               </strong>
             </label>
             <input
               type="range"
-              min="10"
-              max="2000"
-              value={searchRadius}
-              onChange={(e) => setSearchRadius(Number(e.target.value))}
-              step="50"
+              min={0}
+              max={25}
+              value={radiusMarks.indexOf(searchRadius)}
+              onChange={(e) =>
+                setSearchRadius(radiusMarks[Number(e.target.value)])
+              }
+              step={1}
               className={styles.radiusSlider}
             />
-            {/* <div className={styles.radiusMarkers}>
-                  <span>5km</span>
-                  <span>50km</span>
-                  <span>100+km</span>
-                </div> */}
+            <div className={styles.radiusMarkers}>
+              <span>1km</span>
+              <span>50km</span>
+              <span>500km</span>
+              <span>1500+km</span>
+            </div>
           </div>
-          <button
-            onClick={handleRefreshSalons}
-            className={styles.refreshButton}
-            disabled={isLoadingSalons}
-          >
-            🔄 Refresh Salons
-          </button>
-          3
+
           {/* Walk-in Instruction - ONLY show on Walk-in tab
           {!isPrebook && (
             <div className={styles.walkInInstruction}>
@@ -1627,36 +1548,45 @@ export default function Home(theme) {
               </p>
             </div>
           )} */}
-          {/* View toggle (only show for pre-book with location) */}
-          {salons.length > 0 && (
-            <div className={styles.SalonControls}>
-              <div className={styles.viewOptions}>
-                <motion.button
-                  className={`${styles.viewToggle} ${
-                    !showMapView ? styles.active : ""
-                  }`}
-                  onClick={() => setShowMapView(false)}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <span className={styles.viewIcon}>⊞</span>
-                  Grid View
-                </motion.button>
+          <div className={styles.salonsControlsBar}>
+            {/* View toggle (only show for pre-book with location) */}
+            {salons.length > 0 && (
+              <div className={styles.SalonControls}>
+                <div className={styles.viewOptions}>
+                  <motion.button
+                    className={`${styles.viewToggle} ${
+                      !showMapView ? styles.active : ""
+                    }`}
+                    onClick={() => setShowMapView(false)}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <span className={styles.viewIcon}>⊞</span>
+                    Grid View
+                  </motion.button>
 
-                <motion.button
-                  className={`${styles.viewToggle} ${
-                    showMapView ? styles.active : ""
-                  }`}
-                  onClick={() => setShowMapView(true)}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <span className={styles.viewIcon}>🗺</span>
-                  Map View
-                </motion.button>
+                  <motion.button
+                    className={`${styles.viewToggle} ${
+                      showMapView ? styles.active : ""
+                    }`}
+                    onClick={() => setShowMapView(true)}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <span className={styles.viewIcon}>🗺</span>
+                    Map View
+                  </motion.button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            <button
+              onClick={handleRefreshSalons}
+              className={styles.refreshButton}
+              disabled={isLoadingSalons}
+            >
+              🔄 Refresh
+            </button>
+          </div>
           {/* Salons Display */}
           {isLoadingSalons ? (
             <div className={styles.loadingSalons}>
@@ -1828,7 +1758,6 @@ Time: ${debugInfo.timestamp}`}
                         <div className={styles.metric}>
                           <span className={styles.metricIcon}>📍</span>
                           <span className={styles.metricValue}>
-                            📍{" "}
                             {salon.distance
                               ? salon.distance < 1
                                 ? `${Math.round(salon.distance * 10000)}m away`

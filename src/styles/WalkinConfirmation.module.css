@@ -4,7 +4,8 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: white;
+  background: var(--background-primary);
+  transition: background-color 0.4s ease;
 }
 .queueExplanation {
   background: linear-gradient(135deg, #e7f3ff 0%, #cfe7ff 100%);
@@ -15,37 +16,77 @@
 }
 
 .unassignedNote {
-  background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
-  border-left: 4px solid #ffc107;
+  background: var(--background-tertiary);
+  border-left: 4px solid var(--primary);
   padding: 16px;
   text-align: center;
+  border-radius: 8px;
+  transition: background-color 0.4s ease, border-color 0.4s ease;
 }
 
 .card {
-  background: white;
+  background: var(--background-secondary);
   border-radius: 20px;
   padding: 40px;
   max-width: 1200px;
   width: 100%;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.4s ease, box-shadow 0.4s ease;
+  border: 1px solid var(--border-color);
 }
+
 /* ============================================
    ADD THESE STYLES TO WalkinConfirmation.module.css
    ============================================ */
 
 /* Modern Queue Container */
+
 .modernQueueContainer {
   margin-top: 32px;
-  padding: 24px;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 20px;
+  background: var(--background-tertiary);
   border-radius: 20px;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--border-color);
+  transition: background-color 0.4s ease, border-color 0.4s ease;
+}
+
+.serviceTimeCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 2px solid #10b981;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.timeIcon {
+  font-size: 2rem;
+}
+
+.timerDisplay {
+  font-size: 42px;
+  font-weight: 800;
+  color: #ef4444;
+  margin: 16px 0;
+  transition: color 0.4s ease;
+}
+
+.serviceTime {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.serviceLabel {
+  display: block;
+  font-size: 0.875rem;
 }
 
 .queueHeader h3 {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #1e293b;
   text-align: center;
   margin: 0 0 24px 0;
 }
@@ -59,10 +100,9 @@
 }
 
 .modernStatCard {
-  padding: 20px;
+  padding: 20px 6px;
   border-radius: 16px;
   text-align: center;
-  color: white;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
   border: 2px solid rgba(0, 0, 0, 0.1);
@@ -94,13 +134,18 @@
 }
 
 .modernChair {
-  background: #eeeeee;
-  border-radius: 24px 24px 0 0;
+  background: #eeeeee; /* KEEP THIS - stays light gray always */
+  border-radius: 18px 18px 0 0;
   padding: 32px;
   min-width: 80px;
   text-align: center;
   position: relative;
   transition: all 0.3s ease;
+  color: #1f2937 !important; /* FORCE dark text always */
+}
+
+.modernChair * {
+  color: #1f2937 !important; /* FORCE all child text to be dark */
 }
 
 .chairIcon {
@@ -111,7 +156,6 @@
 .chairLabel {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 16px;
@@ -154,12 +198,10 @@
 .servingName {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #1e293b;
 }
 
 .servingBadge {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
   padding: 6px 16px;
   border-radius: 20px;
   font-size: 0.75rem;
@@ -171,7 +213,6 @@
 .emptyText {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #94a3b8;
 }
 
 /* Queue Flow */
@@ -179,10 +220,11 @@
   background-color: #eeeeee;
   display: flex;
   align-items: center;
+  border-radius: 0 18px 18px 18px;
   gap: 16px;
   margin-bottom: 32px;
   overflow-x: auto;
-  padding: 20px 0;
+  padding: 20px;
 }
 
 .queueArrow {
@@ -197,6 +239,7 @@
   gap: 16px;
   flex-wrap: nowrap;
   overflow-x: auto;
+
   padding: 8px;
 }
 
@@ -208,7 +251,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
@@ -219,8 +262,8 @@
   position: absolute;
   top: -8px;
   left: -8px;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   background: #000;
   color: #fff;
   border-radius: 50%;
@@ -233,15 +276,15 @@
 }
 
 .customerAvatar {
-  width: 56px;
-  height: 56px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.1);
   border: 3px solid rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 0.8rem;
   font-weight: 800;
   color: #000;
 }
@@ -313,17 +356,17 @@
 
 /* Queue Explanation */
 .queueExplanation {
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-  border-left: 4px solid #3b82f6;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
+  background: var(--background-tertiary);
+  border-left: 4px solid var(--primary);
+  padding: 16px;
+  border-radius: 8px;
+  margin-top: 20px;
+  transition: background-color 0.4s ease, border-color 0.4s ease;
 }
 
 .queueExplanation h4 {
   font-size: 1rem;
   font-weight: 700;
-  color: #1e40af;
   margin: 0 0 12px 0;
 }
 
@@ -336,7 +379,6 @@
 .queueExplanation li {
   font-size: 0.875rem;
   line-height: 1.8;
-  color: #1e40af;
   margin-bottom: 8px;
   padding-left: 8px;
 }
@@ -372,17 +414,22 @@
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .modernStatsGrid {
-    grid-template-columns: 1fr;
     gap: 12px;
   }
-
+  .modernStatCard,
+  .statIcon {
+    font-size: 1.5rem !important;
+  }
+  .statNumber {
+    font-size: 2rem !important;
+  }
   .modernQueueItem {
     min-width: 120px;
   }
 
   .modernChair {
-    min-width: 240px;
-    padding: 24px;
+    min-width: 160px;
+    padding: 20px;
   }
 
   .servingCircle {
@@ -403,11 +450,26 @@
     transform: rotate(90deg);
   }
 }
+
+@media (max-width: 640px) {
+  .modernStatsGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
 .title {
-  text-align: center;
-  color: #4caf50;
-  margin-bottom: 30px;
   font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  transition: color 0.4s ease;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  transition: color 0.4s ease;
 }
 
 .qrCode {
@@ -428,7 +490,6 @@
   align-items: center;
   justify-content: center;
   background: #f5f5f5;
-  color: #666;
   font-size: 14px;
 }
 
@@ -436,17 +497,35 @@
   font-size: 24px;
   font-weight: bold;
   margin: 15px 0 5px;
-  color: #333;
   letter-spacing: 2px;
 }
 
 .qrInstruction {
   font-size: 14px;
-  color: #666;
 }
 
 .details {
   margin-bottom: 30px;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+  transition: border-color 0.4s ease;
+}
+
+.detailLabel {
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color 0.4s ease;
+}
+
+.detailValue {
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: color 0.4s ease;
 }
 
 .detailItem {
@@ -457,13 +536,6 @@
   font-size: 16px;
 }
 
-.detailItem span {
-  color: #666;
-}
-
-.detailItem strong {
-  color: #333;
-}
 .statusBadge.orange {
   background: #fff3e0;
   color: #e65100;
@@ -517,7 +589,6 @@
 }
 
 .expiryAlert {
-  background: #fff3cd;
   border: 2px solid #ffc107;
   border-radius: 10px;
   padding: 15px;
@@ -536,11 +607,9 @@
 
 .note {
   font-size: 12px;
-  color: #666;
 }
 
 .instructions {
-  background: #f5f5f5;
   padding: 20px;
   border-radius: 10px;
   margin-bottom: 20px;
@@ -548,7 +617,6 @@
 
 .instructions h3 {
   margin: 0 0 15px;
-  color: #333;
 }
 
 .instructions ol {
@@ -567,6 +635,16 @@
   gap: 12px;
 }
 
+.actionButton {
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+}
+
 .btnPrimary,
 .btnSecondary {
   flex: 1;
@@ -580,8 +658,13 @@
 }
 
 .btnPrimary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  color: var(--contrast-dark);
+  box-shadow: 0 4px 12px rgba(195, 143, 10, 0.3);
 }
 
 .btnPrimary:hover {
@@ -590,12 +673,15 @@
 }
 
 .btnSecondary {
-  background: #f5f5f5;
-  color: #333;
+  background: var(--background-secondary);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+  transition: all 0.3s ease;
 }
 
 .btnSecondary:hover {
-  background: #e0e0e0;
+  background: var(--background-tertiary);
+  border-color: var(--primary);
 }
 
 .loading,
@@ -632,6 +718,17 @@
     flex-direction: column;
   }
 }
+.sectionHeader {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.4s ease;
+}
+
 .reviewsSection {
   width: 100%;
   max-width: 1400px;
@@ -989,6 +1086,12 @@
   padding: 40px;
   color: var(--text-secondary);
 }
+.successIcon {
+  font-size: 64px;
+  color: var(--primary);
+  margin-bottom: 16px;
+  transition: color 0.4s ease;
+}
 
 /* Responsive */
 @media (max-width: 1200px) {
@@ -1017,6 +1120,47 @@
     font-size: 0.8125rem;
   }
 }
+
+.queuePositionCard {
+  background: var(--background-secondary);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 2px solid var(--border-color);
+  transition: background-color 0.4s ease, border-color 0.4s ease;
+}
+
+.statusRED {
+  background: var(--background-tertiary);
+  border: 2px solid #ef4444;
+  color: #ef4444;
+  transition: all 0.4s ease;
+}
+
+.statusORANGE {
+  background: var(--background-tertiary);
+  border: 2px solid #f59e0b;
+  color: #f59e0b;
+  transition: all 0.4s ease;
+}
+
+.statusGREEN {
+  background: var(--background-tertiary);
+  border: 2px solid #10b981;
+  color: #10b981;
+  transition: all 0.4s ease;
+}
+
+.infoBox {
+  background: var(--background-tertiary);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+  transition: background-color 0.4s ease, border-color 0.4s ease;
+}
+
 .queueVisualizationContainer {
   margin-top: 24px;
   padding: 20px;

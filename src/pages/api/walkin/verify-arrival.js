@@ -43,45 +43,7 @@ export default async function handler(req, res) {
 
     const now = new Date();
 
-    // ✅ CHECK IF CHAIR IS EMPTY (no GREEN booking for this barber)
-    const greenBooking = await db.collection("bookings").findOne({
-      barberId: booking.barberId,
-      queueStatus: "GREEN",
-      isExpired: { $ne: true },
-    });
-
-    // ✅ CHAIR EMPTY → Serve immediately
-    if (!greenBooking) {
-      await db.collection("bookings").updateOne(
-        { _id: booking._id },
-        {
-          $set: {
-            queueStatus: "GREEN",
-            status: "started",
-            arrivedAt: now,
-            serviceStartedAt: now,
-            queuePosition: null,
-            lastUpdated: now,
-          },
-        }
-      );
-
-      const updatedBooking = await db
-        .collection("bookings")
-        .findOne({ _id: booking._id });
-
-      return res.status(200).json({
-        success: true,
-        message: "Chair empty - customer seated immediately!",
-        booking: {
-          customerName: updatedBooking.customerName,
-          queueStatus: "GREEN",
-          queuePosition: null,
-        },
-      });
-    }
-
-    // ✅ CHAIR OCCUPIED → Join ORANGE priority queue sorted by bookedAt
+    // Get all ORANGE bookings (sorted by bookedAt)
     const orangeBookings = await db
       .collection("bookings")
       .find({
@@ -89,7 +51,7 @@ export default async function handler(req, res) {
         queueStatus: "ORANGE",
         isExpired: { $ne: true },
       })
-      .sort({ bookedAt: 1 }) // Sort by booking time
+      .sort({ bookedAt: 1 })
       .toArray();
 
     // Calculate correct position for this booking
@@ -101,7 +63,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Update this booking to ORANGE with correct position
+    // ✅ ALWAYS MARK AS ORANGE (ARRIVED) - NEVER GREEN
     await db.collection("bookings").updateOne(
       { _id: booking._id },
       {
@@ -115,7 +77,7 @@ export default async function handler(req, res) {
       }
     );
 
-    // Recalculate positions for all ORANGE bookings (sorted by bookedAt)
+    // Recalculate positions for ALL ORANGE bookings
     const allOrangeBookings = await db
       .collection("bookings")
       .find({
@@ -137,22 +99,24 @@ export default async function handler(req, res) {
       await db.collection("bookings").bulkWrite(bulkOps);
     }
 
-    const myPos =
-      orangeBookings.findIndex(
-        (b) => b._id.toString() === booking._id.toString()
-      ) + 1;
+    // Fetch the final updated booking
+    const finalBooking = await db
+      .collection("bookings")
+      .findOne({ _id: booking._id });
 
     console.log(
-      `✅ ${booking.customerName} → Position ${myPos}/${orangeBookings.length}`
+      `${booking.customerName}: Position ${finalBooking.queuePosition}/${allOrangeBookings.length}`
     );
 
     return res.status(200).json({
       success: true,
       message: "Checked in successfully",
       booking: {
-        customerName: booking.customerName,
-        queuePosition: myPos,
-        totalInQueue: orangeBookings.length,
+        _id: finalBooking._id.toString(),
+        customerName: finalBooking.customerName,
+        queuePosition: finalBooking.queuePosition,
+        queueStatus: finalBooking.queueStatus,
+        totalInQueue: allOrangeBookings.length,
       },
     });
   } catch (error) {

@@ -440,6 +440,44 @@ function MyApp({ Component, pageProps }) {
                 </span>
               </motion.button>
 
+              {userGender && (
+                <div className={styles.genderToggle}>
+                  <button
+                    className={`${styles.genderOption} ${
+                      selectedGender === userGender ? styles.active : ""
+                    }`}
+                    onClick={() => {
+                      setSelectedGender(userGender);
+                      sessionStorage.setItem("selectedGender", userGender);
+                      window.dispatchEvent(
+                        new CustomEvent("genderFilterChange", {
+                          detail: userGender,
+                        })
+                      );
+                    }}
+                  >
+                    {userGender === "Male" ? "👨" : "👩 "}
+                  </button>
+
+                  <button
+                    className={`${styles.genderOption} ${
+                      selectedGender === "Unisex" ? styles.active : ""
+                    }`}
+                    onClick={() => {
+                      setSelectedGender("Unisex");
+                      sessionStorage.setItem("selectedGender", "Unisex");
+                      window.dispatchEvent(
+                        new CustomEvent("genderFilterChange", {
+                          detail: "Unisex",
+                        })
+                      );
+                    }}
+                  >
+                    ⚥
+                  </button>
+                </div>
+              )}
+
               {/* Mobile Menu Button */}
               <button
                 className={styles.mobileMenuButton}

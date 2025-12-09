@@ -28,7 +28,7 @@ export const useLocation = () => {
 
       // Only accept high-accuracy positions
       // ✅ REJECT TERRIBLE ACCURACY (259km+ is device error)
-      if (position.coords.accuracy > 2000000) {
+      if (position.coords.accuracy > 5000000) {
         console.log(
           `⚠️ Position accuracy too low: ${position.coords.accuracy}m - IGNORING`
         );
@@ -155,15 +155,17 @@ export const useLocation = () => {
       setLocationStatus("requesting");
 
       const position = await new Promise((resolve, reject) => {
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0, // Force fresh position on initial request
+          enableHighAccuracy: isMobile, // Only request high accuracy on mobile
+          timeout: isMobile ? 30000 : 90000, // Longer timeout for laptops
+          maximumAge: isMobile ? 60000 : 600000, // 10-min cache for laptops
         });
       });
 
       // ✅ VALIDATE ACCURACY BEFORE SAVING
-      if (position.coords.accuracy > 2000000) {
+      if (position.coords.accuracy > 5000000) {
         // 2000km
         setLocationError("Location accuracy extremely poor. Retrying...");
         startWatchingLocation();
