@@ -13,6 +13,7 @@
   "dependencies": {
     "@react-pdf/pdfkit": "^4.0.4",
     "@react-three/fiber": "^8.18.0",
+    "@sendinblue/client": "^3.3.1",
     "@studio-freight/lenis": "^1.0.42",
     "@uploadthing/react": "^7.3.3",
     "animejs": "^4.2.2",
@@ -38,6 +39,7 @@
     "lucide-react": "^0.544.0",
     "mongodb": "^6.20.0",
     "mongoose": "^7.5.0",
+    "motion": "^12.23.26",
     "multer": "^2.0.2",
     "next": "^14.2.32",
     "next-cloudinary": "^6.16.2",

@@ -16,6 +16,8 @@ export default function UserLoginPage() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false); // NEW
+  const [showVerificationPrompt, setShowVerificationPrompt] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
 
   useEffect(() => setMounted(true), []);
 
@@ -84,11 +86,58 @@ export default function UserLoginPage() {
         router.push("/user/dashboard");
       } else {
         const error = await response.json();
-        setError(error.message || "Login failed");
+
+        // ✅ CHECK FOR UNVERIFIED USER
+        if (response.status === 403 && error.requiresVerification) {
+          setUnverifiedEmail(error.email);
+          setShowVerificationPrompt(true);
+          setError(error.message);
+        } else {
+          setError(error.message || "Login failed");
+        }
       }
     } catch (error) {
       console.error("Login error:", error);
       setError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ADD NEW HANDLER FOR RESEND VERIFICATION
+  const handleResendVerification = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: unverifiedEmail }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showSuccess("Verification email sent! Redirecting...");
+
+        // Store verification data in localStorage
+        localStorage.setItem(
+          "verificationData",
+          JSON.stringify({
+            email: unverifiedEmail,
+            csrfToken: data.csrfToken,
+            step: 2, // Go directly to OTP step
+          })
+        );
+
+        // Redirect to register page (it will show OTP step)
+        setTimeout(() => {
+          router.push("/auth/user/register");
+        }, 1000);
+      } else {
+        showError(data.message || "Failed to send verification email");
+      }
+    } catch (error) {
+      showError("Network error. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -202,6 +251,20 @@ export default function UserLoginPage() {
                 )}
               </button>
             </form>
+            {/* ✅ VERIFICATION PROMPT */}
+            {showVerificationPrompt && (
+              <div className={styles.verificationPrompt}>
+                <p>Your email is not verified yet.</p>
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  className={styles.resendButton}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Sending..." : "Resend Verification Email"}
+                </button>
+              </div>
+            )}
 
             <div
               className={styles.authLink}

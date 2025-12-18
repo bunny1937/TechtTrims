@@ -54,9 +54,26 @@ export default async function handler(req, res) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    // ✅ NEW: Check if email is not verified
+    if (!user.isVerified) {
+      return res.status(403).json({
+        message: "Please verify your email first",
+        requiresVerification: true,
+        email: user.email,
+      });
+    }
+
     // Check if account is active
     if (!user.isActive) {
       return res.status(401).json({ message: "Account is deactivated" });
+    }
+
+    if (!user.isVerified) {
+      return res.status(403).json({
+        message: "Please verify your email first",
+        requiresVerification: true,
+        email: user.email,
+      });
     }
 
     // Verify password
@@ -66,15 +83,15 @@ export default async function handler(req, res) {
     }
 
     // Update last login
-    await db.collection("users").updateOne(
-      { _id: user._id },
-      {
-        $set: {
-          lastLogin: new Date(),
-          updatedAt: new Date(),
-        },
-      }
-    );
+    // await db.collection("users").updateOne(
+    //   { _id: user._id },
+    //   {
+    //     $set: {
+    //       lastLogin: new Date(),
+    //       updatedAt: new Date(),
+    //     },
+    //   }
+    // );
 
     // ✅ Create JWT token with dynamic expiry based on rememberMe
     const token = jwt.sign(
