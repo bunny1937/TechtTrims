@@ -1,5 +1,5 @@
 import { withAdminAuth } from "../../../../lib/middleware/withAdminAuth";
-import { sendPromotionalEmail } from "../../../../lib/brevoMarketing";
+import { sendPromotionalEmail } from "../../../../lib/brevo_email/brevoMarketing";
 import {
   logAdminAction,
   AuditActions,
