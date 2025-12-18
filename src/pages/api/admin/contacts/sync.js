@@ -1,6 +1,6 @@
 import { withAdminAuth } from "../../../../lib/middleware/withAdminAuth";
 import clientPromise from "../../../../lib/mongodb";
-import { addOrUpdateContact } from "../../../../lib/brevoMarketing";
+import { addOrUpdateContact } from "../../../../lib/brevo_email/brevoMarketing";
 import { logAdminAction, getClientIP } from "../../../../lib/auditLogger";
 
 async function handler(req, res) {
