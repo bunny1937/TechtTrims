@@ -527,7 +527,6 @@ export default function DashboardPage() {
                   status: newStatus,
                   queueStatus: queueStatusMap[newStatus],
                   estimatedDuration: estimatedTime || b.estimatedDuration,
-                  updatedAt: new Date(),
                 }
               : b
           )

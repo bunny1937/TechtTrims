@@ -8,6 +8,51 @@
   position: relative;
   overflow: hidden;
 }
+.stepRoadmap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0 30px;
+  gap: 20px;
+}
+
+.stepItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 0.4;
+  transition: 0.3s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.activeStep {
+  opacity: 1;
+}
+
+.stepCircle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #d7d7d7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+  font-weight: bold;
+}
+
+.activeStep .stepCircle {
+  background: #4f46e5; /* Indigo */
+  color: white;
+}
+
+.stepLine {
+  flex: 1;
+  height: 2px;
+  background: #d7d7d7;
+  margin-top: -12px;
+}
 
 .container::before {
   content: "";
@@ -214,6 +259,46 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.verificationPrompt {
+  background: linear-gradient(
+    135deg,
+    rgba(251, 191, 36, 0.1),
+    rgba(251, 191, 36, 0.05)
+  );
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  text-align: center;
+}
+
+.verificationPrompt p {
+  margin-bottom: var(--space-3);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.resendButton {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: var(--black);
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.resendButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+}
+
+.resendButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* ===== CHECKBOX IMPROVEMENT ===== */
@@ -570,6 +655,127 @@
   color: var(--text-secondary);
   font-size: 0.875rem;
   margin: 0;
+}
+/* ===== OTP CARD ===== */
+.otpCard {
+  animation: fadeInDown 0.4s ease-out;
+}
+
+.otpCard h2 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: var(--space-2);
+  color: var(--text-primary);
+}
+
+.otpCard p {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  margin-bottom: var(--space-4);
+}
+
+.otpCard strong {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* ===== OTP INPUT ===== */
+.otpInput {
+  width: 100%;
+  text-align: center;
+  letter-spacing: 0.4em;
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: var(--space-4);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  background: var(--background-primary);
+  color: var(--text-primary);
+  transition: all var(--transition-normal);
+}
+
+.otpInput::placeholder {
+  letter-spacing: normal;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.otpInput:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.15);
+  transform: translateY(-2px);
+}
+
+/* ===== OTP TIMER ===== */
+.otpCard form p {
+  margin-top: var(--space-3);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ===== OTP EXPIRED ===== */
+.expired {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.1),
+    rgba(239, 68, 68, 0.05)
+  );
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-lg);
+  color: var(--error);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* ===== RESEND BUTTON ===== */
+.otpCard .linkButton {
+  margin-top: var(--space-4);
+  display: block;
+  text-align: center;
+}
+
+.otpCard .linkButton:disabled {
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+/* ===== MOBILE OPTIMIZATION ===== */
+@media (max-width: 640px) {
+  .otpInput {
+    font-size: 1.125rem;
+    padding: var(--space-3);
+    letter-spacing: 0.3em;
+  }
+
+  .otpCard h2 {
+    font-size: 1.375rem;
+  }
+}
+
+/* ===== DARK MODE ===== */
+[data-theme="dark"] .otpInput {
+  background: var(--gray-900);
+  border-color: var(--gray-700);
+}
+
+[data-theme="dark"] .otpInput:focus {
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.2);
+}
+
+[data-theme="dark"] .expired {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
 }
 
 /* Dark mode */

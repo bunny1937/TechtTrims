@@ -10,6 +10,8 @@ import NetworkStatus from "../components/NetworkStatus";
 import OnboardingLogoutButton from "../components/OnBoardingLogout";
 import { Toaster } from "react-hot-toast";
 import { showConfirm, showSuccess } from "@/lib/toast";
+import { SunIcon } from "@/components/ui/sun";
+import { MoonIcon } from "@/components/ui/moon";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -289,7 +291,7 @@ function MyApp({ Component, pageProps }) {
                   }
                 >
                   <span className={styles.themeIcon}>
-                    {isDarkMode ? "☀" : "🌙"}
+                    {isDarkMode ? <SunIcon /> : <MoonIcon />}
                   </span>
                 </motion.button>
 
