@@ -41,7 +41,7 @@
     "mongoose": "^7.5.0",
     "motion": "^12.23.26",
     "multer": "^2.0.2",
-    "next": "^14.2.32",
+    "next": "14.2.35",
     "next-cloudinary": "^6.16.2",
     "nodemailer": "^7.0.7",
     "ogl": "^1.0.11",
