@@ -81,7 +81,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
       maxNativeZoom: 19,
     },
     atlas: {
-      url: "https://{s}.tile.thunderforest.com/mobile-atlas/{z}/{x}/{y}.png?apikey=20622b4dbbab4ee68c1024d1fc0ceee9",
+      url: `https://{s}.tile.thunderforest.com/mobile-atlas/{z}/{x}/{y}.png?apikey=${process.env.NEXT_PUBLIC_THUNDERFOREST_API_KEY}`,
       name: "Atlas",
       maxZoom: 22,
       maxNativeZoom: 19,
