@@ -1,20 +1,17 @@
-const SibApiV3Sdk = require("@sendinblue/client");
+import * as brevo from "@getbrevo/brevo";
 
-const brevoContactsApi = new SibApiV3Sdk.ContactsApi();
+const brevoContactsApi = new brevo.ContactsApi();
 brevoContactsApi.setApiKey(
-  SibApiV3Sdk.ContactsApiApiKeys.apiKey,
+  brevo.ContactsApiApiKeys.apiKey,
   process.env.BREVO_API_KEY
 );
 
-const brevoEmailCampaigns = new SibApiV3Sdk.EmailCampaignsApi();
+const brevoEmailCampaigns = new brevo.EmailCampaignsApi();
 brevoEmailCampaigns.setApiKey(
-  SibApiV3Sdk.EmailCampaignsApiApiKeys.apiKey,
+  brevo.EmailCampaignsApiApiKeys.apiKey,
   process.env.BREVO_API_KEY
 );
 
-/**
- * Add or update contact in Brevo
- */
 export async function addOrUpdateContact(email, attributes = {}) {
   try {
     const contactData = {
@@ -38,6 +35,7 @@ export async function addOrUpdateContact(email, attributes = {}) {
       console.log("Contact already exists:", email);
       return { success: true, message: "Contact already exists" };
     }
+
     console.error("Brevo contact error:", error.message);
     return { success: false, error: error.message };
   }
@@ -71,8 +69,8 @@ export async function sendPromotionalEmail(
       name: `Campaign - ${Date.now()}`,
       subject: subject,
       sender: {
-        name: process.env.BREVO_SENDER_NAME,
-        email: process.env.BREVO_SENDER_EMAIL,
+        name: process.env.BREVO_SENDER_NAME || "TechTrims Support",
+        email: process.env.BREVO_SENDER_EMAIL || "techtrims2025@gmail.com",
       },
       type: "classic",
       htmlContent: htmlContent,
@@ -100,9 +98,3 @@ export async function sendPromotionalEmail(
     return { success: false, error: error.message };
   }
 }
-
-module.exports = {
-  addOrUpdateContact,
-  removeContact,
-  sendPromotionalEmail,
-};

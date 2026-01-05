@@ -1,9 +1,5 @@
 import { connectToDatabase } from "../../../lib/mongodb";
-import {
-  getPriorityQueuePosition,
-  expireOldBookings,
-  calculateWaitTime,
-} from "../../../lib/walkinHelpers";
+import { getCachedQueuePosition, cacheQueuePosition } from "../../../lib/redis";
 import { ObjectId } from "mongodb";
 
 export default async function handler(req, res) {
@@ -18,38 +14,71 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "bookingId required" });
     }
 
+    // ✅ Check Redis cache first
+    const cached = await getCachedQueuePosition(bookingId);
+    if (cached) {
+      console.log("✅ Cache HIT for", bookingId);
+      return res.status(200).json(cached);
+    }
+
+    console.log("❌ Cache MISS - fetching from DB");
+
+    // ✅ Fetch from MongoDB
     const { db } = await connectToDatabase();
 
-    // Get booking details first
-    const booking = await db.collection("bookings").findOne({
-      _id: new ObjectId(bookingId),
-    });
+    const booking = await db.collection("bookings").findOne(
+      { _id: new ObjectId(bookingId) },
+      {
+        projection: {
+          queuePosition: 1,
+          queueStatus: 1,
+          barberId: 1,
+          isExpired: 1,
+        },
+      }
+    );
 
     if (!booking) {
       return res.status(404).json({ error: "Booking not found" });
     }
 
-    // Expire old bookings for this barber
-    await expireOldBookings(db, booking.barberId.toString());
+    // Get queue stats
+    const [queueStats] = await db
+      .collection("bookings")
+      .aggregate([
+        {
+          $match: {
+            barberId: booking.barberId,
+            queueStatus: { $in: ["ORANGE", "GREEN"] },
+            isExpired: { $ne: true },
+          },
+        },
+        {
+          $group: {
+            _id: "$queueStatus",
+            count: { $sum: 1 },
+          },
+        },
+      ])
+      .toArray();
 
-    // Get queue position
-    const position = await getPriorityQueuePosition(
-      db,
-      booking.barberId.toString(),
-      bookingId
-    );
+    const servingCount = queueStats.find((s) => s._id === "GREEN")?.count || 0;
+    const aheadCount = queueStats.find((s) => s._id === "ORANGE")?.count || 0;
 
-    // Calculate wait time
-    const waitTime = await calculateWaitTime(db, booking.barberId.toString());
-
-    res.status(200).json({
-      position: position || "Not Arrived",
-      waitTime,
-      queueStatus: booking.queueStatus,
+    const response = {
+      position: booking.queuePosition,
+      aheadOfYou: aheadCount,
+      serving: servingCount,
+      status: booking.queueStatus,
       isExpired: booking.isExpired || false,
-    });
+    };
+
+    // ✅ Cache for 5 seconds
+    await cacheQueuePosition(bookingId, response);
+
+    return res.status(200).json(response);
   } catch (error) {
-    console.error("Queue position API error:", error);
-    res.status(500).json({ error: "Failed to fetch queue position" });
+    console.error("Queue position error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 }

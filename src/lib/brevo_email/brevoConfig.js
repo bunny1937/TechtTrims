@@ -1,21 +1,15 @@
-import {
-  TransactionalEmailsApi,
-  TransactionalEmailsApiApiKeys,
-  ContactsApi,
-  ContactsApiApiKeys,
-} from "@sendinblue/client";
+import * as brevo from "@getbrevo/brevo";
 
-const brevoClient = new TransactionalEmailsApi();
+const brevoClient = new brevo.TransactionalEmailsApi();
 brevoClient.setApiKey(
-  TransactionalEmailsApiApiKeys.apiKey,
+  brevo.TransactionalEmailsApiApiKeys.apiKey,
   process.env.BREVO_API_KEY
 );
 
-const brevoContactsApi = new ContactsApi();
+const brevoContactsApi = new brevo.ContactsApi();
 brevoContactsApi.setApiKey(
-  ContactsApiApiKeys.apiKey,
+  brevo.ContactsApiApiKeys.apiKey,
   process.env.BREVO_API_KEY
 );
 
-// Named exports instead of default
 export { brevoClient, brevoContactsApi };

@@ -375,6 +375,7 @@ export default function DashboardPage() {
       console.log("🛑 Auto-refresh stopped");
       clearInterval(interval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [salon?.id, selectedDate, showSuccess]);
 
   const loadBarbers = useCallback(async (salonId) => {

@@ -55,8 +55,18 @@ export const showConfirm = (message, onConfirm) => {
           </button>
           <button
             onClick={() => {
-              onConfirm();
-              toast.dismiss(t.id);
+              try {
+                if (typeof onConfirm === "function") {
+                  onConfirm();
+                } else {
+                  console.warn(
+                    "confirmToast called without valid onConfirm",
+                    onConfirm
+                  );
+                }
+              } finally {
+                toast.dismiss(t.id);
+              }
             }}
             style={{
               padding: "8px 16px",

@@ -87,7 +87,7 @@ const SalonCard = ({
             typeof salon.salonImages?.[0] === "string"
               ? salon.salonImages[0]
               : salon.salonImages?.[0]?.url ||
-                "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=300&h=200&fit=crop"
+                "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=300&h=200&fit=crop"
           }
           alt={salon.salonName}
           className={styles.salonImage}

@@ -38,23 +38,33 @@ if (process.env.NODE_ENV === "development") {
 export default clientPromise;
 
 export async function connectToDatabase() {
-  try {
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB);
+  const MAX_RETRIES = 3;
+  let retries = 0;
 
-    // Test the connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("✅ Connected to MongoDB!");
+  while (retries < MAX_RETRIES) {
+    try {
+      const client = await clientPromise;
+      const db = client.db(process.env.MONGODB_DB);
+      await client.db("admin").command({ ping: 1 });
+      console.log("✅ Connected to MongoDB!");
+      return { client, db };
+    } catch (error) {
+      retries++;
+      console.error(
+        `❌ Database connection failed (attempt ${retries}/${MAX_RETRIES}):`,
+        error.message
+      );
 
-    return { client, db };
-  } catch (error) {
-    console.error("❌ Database connection failed:", error.message);
+      if (process.env.NODE_ENV === "development") {
+        global._mongoClientPromise = null;
+      }
 
-    // Reset global cache on connection failure
-    if (process.env.NODE_ENV === "development") {
-      global._mongoClientPromise = null;
+      if (retries === MAX_RETRIES) {
+        throw new Error(`Failed to connect after ${MAX_RETRIES} attempts`);
+      }
+
+      // Wait before retry (exponential backoff)
+      await new Promise((resolve) => setTimeout(resolve, 1000 * retries));
     }
-
-    throw error;
   }
 }

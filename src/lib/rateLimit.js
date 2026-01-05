@@ -1,76 +1,114 @@
-// src/lib/rateLimit.js - COMPLETE REPLACEMENT
+import redis from "./redis";
 
-// Use Redis in production for distributed rate limiting
-const rateLimit = new Map();
+const memoryStore = new Map();
 
-export function checkRateLimit(
-  identifier,
-  maxAttempts = 5,
-  windowMs = 15 * 60 * 1000
-) {
+/**
+ * Rate limit helper
+ * @param {string} key
+ * @param {number} limit
+ * @param {number} windowMs
+ */
+export async function checkRateLimit(key, limit, windowMs) {
   const now = Date.now();
-  const key = `limit:${identifier}`;
+  const resetAt = now + windowMs;
 
-  // Get existing attempts
-  const attempts = rateLimit.get(key) || [];
+  try {
+    // 🔹 Redis path
+    const redisKey = `rate:${key}`;
 
-  // Filter out expired attempts
-  const validAttempts = attempts.filter(
-    (timestamp) => now - timestamp < windowMs
-  );
+    const current = await redis.get(redisKey);
 
-  // Check if limit exceeded
-  if (validAttempts.length >= maxAttempts) {
-    const oldestAttempt = Math.min(...validAttempts);
-    const timeUntilReset = Math.ceil(
-      (windowMs - (now - oldestAttempt)) / 1000 / 60
+    if (!current) {
+      await redis.set(
+        redisKey,
+        {
+          count: 1,
+          resetAt,
+        },
+        { ex: Math.ceil(windowMs / 1000) }
+      );
+
+      return {
+        allowed: true,
+        remaining: limit - 1,
+        resetIn: Math.ceil(windowMs / 60000),
+      };
+    }
+
+    const data = typeof current === "string" ? JSON.parse(current) : current;
+
+    if (data.count >= limit) {
+      const retryMs = Math.max(0, data.resetAt - now);
+
+      return {
+        allowed: false,
+        remaining: 0,
+        resetIn: Math.max(1, Math.ceil(retryMs / 60000)),
+      };
+    }
+
+    await redis.set(
+      redisKey,
+      {
+        count: data.count + 1,
+        resetAt: data.resetAt,
+      },
+      { ex: Math.ceil((data.resetAt - now) / 1000) }
     );
 
     return {
-      allowed: false,
-      remaining: 0,
-      resetIn: timeUntilReset,
-      retryAfter: Math.ceil((windowMs - (now - oldestAttempt)) / 1000),
+      allowed: true,
+      remaining: limit - data.count - 1,
+      resetIn: Math.ceil((data.resetAt - now) / 60000),
+    };
+  } catch (err) {
+    // 🔹 MEMORY FALLBACK (SAFE)
+    const entry = memoryStore.get(key);
+
+    if (!entry || entry.resetAt < now) {
+      memoryStore.set(key, {
+        count: 1,
+        resetAt,
+      });
+
+      return {
+        allowed: true,
+        remaining: limit - 1,
+        resetIn: Math.ceil(windowMs / 60000),
+      };
+    }
+
+    if (entry.count >= limit) {
+      const retryMs = Math.max(0, entry.resetAt - now);
+      return {
+        allowed: false,
+        remaining: 0,
+        resetIn: Math.max(1, Math.ceil(retryMs / 60000)),
+      };
+    }
+
+    entry.count += 1;
+    memoryStore.set(key, entry);
+
+    return {
+      allowed: true,
+      remaining: limit - entry.count,
+      resetIn: Math.ceil((entry.resetAt - now) / 60000),
     };
   }
-
-  // Add current attempt
-  validAttempts.push(now);
-  rateLimit.set(key, validAttempts);
-
-  // Cleanup old entries periodically
-  if (Math.random() < 0.01) {
-    cleanupRateLimit(windowMs);
-  }
-
-  return {
-    allowed: true,
-    remaining: maxAttempts - validAttempts.length,
-    resetIn: null,
-  };
 }
-
-function cleanupRateLimit(windowMs) {
-  const now = Date.now();
-  for (const [key, attempts] of rateLimit.entries()) {
-    const validAttempts = attempts.filter(
-      (timestamp) => now - timestamp < windowMs
-    );
-    if (validAttempts.length === 0) {
-      rateLimit.delete(key);
-    } else {
-      rateLimit.set(key, validAttempts);
-    }
-  }
-}
-
-// Add IP-based rate limiting for sensitive endpoints
-export function checkIPRateLimit(req, maxAttempts = 10, windowMs = 60 * 1000) {
+// ✅ IP-based rate limiting
+export async function checkIPRateLimit(
+  req,
+  maxAttempts = 10,
+  windowMs = 60 * 1000
+) {
   const ip =
     req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
     req.headers["x-real-ip"] ||
-    req.connection.remoteAddress ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
     "unknown";
 
-  return checkRateLimit(`ip:${ip}`, maxAttempts, windowMs);
+  return await checkRateLimit(`ip:${ip}`, maxAttempts, windowMs);
 }

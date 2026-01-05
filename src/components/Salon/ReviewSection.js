@@ -8,16 +8,22 @@ export default function ReviewsSection({ salonId }) {
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState("relevant"); // 'relevant' or 'recent'
   const [displayCount, setDisplayCount] = useState(4); // Show 6 reviews initially
-  const REVIEWS_PER_PAGE = 4;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const REVIEWS_PER_PAGE = 6;
 
   useEffect(() => {
     const fetchReviews = async () => {
       try {
-        const response = await fetch(`/api/salons/${salonId}/reviews-detailed`);
+        const response = await fetch(
+          `/api/salons/${salonId}/reviews-paginated?page=${currentPage}&limit=${REVIEWS_PER_PAGE}&filter=${filter}&sort=${sortBy}`
+        );
+
         if (response.ok) {
           const data = await response.json();
           setReviews(data.reviews);
           setStats(data.stats);
+          setTotalPages(data.totalPages);
         }
       } catch (error) {
         console.error("Error fetching reviews:", error);
@@ -25,8 +31,9 @@ export default function ReviewsSection({ salonId }) {
         setLoading(false);
       }
     };
+
     fetchReviews();
-  }, [salonId]);
+  }, [salonId, currentPage, filter, sortBy]);
 
   const getRatingCategory = (rating) => {
     if (rating >= 4) return "positive";
@@ -84,11 +91,6 @@ export default function ReviewsSection({ salonId }) {
       : sortedReviews.filter((r) => getRatingCategory(r.rating) === filter);
 
   const displayedReviews = filteredReviews.slice(0, displayCount);
-  const hasMore = displayCount < filteredReviews.length;
-
-  const handleShowMore = () => {
-    setDisplayCount((prev) => prev + REVIEWS_PER_PAGE);
-  };
 
   const handleFilterChange = (newFilter) => {
     setFilter(newFilter);
@@ -228,13 +230,25 @@ export default function ReviewsSection({ salonId }) {
                 </select>
                 {/* Show More */}
               </div>
-              {hasMore && (
-                <div className={styles.showMore}>
-                  <button onClick={handleShowMore}>
-                    More ({filteredReviews.length - displayCount} )
-                  </button>
-                </div>
-              )}
+              <div className={styles.pagination}>
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((prev) => prev - 1)}
+                >
+                  ← Previous
+                </button>
+
+                <span>
+                  Page {currentPage} of {totalPages}
+                </span>
+
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
+                >
+                  Next →
+                </button>
+              </div>
             </div>
           </div>
           {/* Reviews Grid - 3 Columns */}

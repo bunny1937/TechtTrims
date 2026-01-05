@@ -16,14 +16,16 @@ export default async function handler(req, res) {
 
   try {
     // Rate limiting - 5 attempts per 15 minutes
-    const rateCheck = checkRateLimit(
+    const rateCheck = await checkRateLimit(
       `login:${req.headers["x-forwarded-for"] || "unknown"}`,
       5,
       15 * 60 * 1000
     );
     if (!rateCheck.allowed) {
       return res.status(429).json({
-        message: `Too many login attempts. Try again in ${rateCheck.resetIn} minutes.`,
+        message: `Too many login attempts. Try again in ${
+          rateCheck.resetIn || 1
+        }  minutes.`,
         retryAfter: rateCheck.resetIn * 60,
       });
     }
