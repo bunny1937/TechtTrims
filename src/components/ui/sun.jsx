@@ -1,8 +1,10 @@
 "use client";
 import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
-import { motion, useAnimation } from "motion/react";
-
+import { motion, useAnimation } from "framer-motion";
 import clsx from "clsx";
+
+const MotionSvg = motion.svg;
+const MotionPath = motion.path;
 
 const pathVariants = {
   normal: { opacity: 1 },
@@ -19,7 +21,6 @@ const SunIcon = forwardRef(
 
     useImperativeHandle(ref, () => {
       isControlledRef.current = true;
-
       return {
         startAnimation: () => controls.start("animate"),
         stopAnimation: () => controls.start("normal"),
@@ -28,25 +29,20 @@ const SunIcon = forwardRef(
 
     const handleMouseEnter = useCallback(
       (e) => {
-        if (!isControlledRef.current) {
-          controls.start("animate");
-        } else {
-          onMouseEnter?.(e);
-        }
+        if (!isControlledRef.current) controls.start("animate");
+        else onMouseEnter?.(e);
       },
       [controls, onMouseEnter]
     );
 
     const handleMouseLeave = useCallback(
       (e) => {
-        if (!isControlledRef.current) {
-          controls.start("normal");
-        } else {
-          onMouseLeave?.(e);
-        }
+        if (!isControlledRef.current) controls.start("normal");
+        else onMouseLeave?.(e);
       },
       [controls, onMouseLeave]
     );
+
     return (
       <div
         className={clsx(className)}
@@ -54,7 +50,7 @@ const SunIcon = forwardRef(
         onMouseLeave={handleMouseLeave}
         {...props}
       >
-        <svg
+        <MotionSvg
           xmlns="http://www.w3.org/2000/svg"
           width={size}
           height={size}
@@ -66,6 +62,7 @@ const SunIcon = forwardRef(
           strokeLinejoin="round"
         >
           <circle cx="12" cy="12" r="4" />
+
           {[
             "M12 2v2",
             "m19.07 4.93-1.41 1.41",
@@ -76,20 +73,19 @@ const SunIcon = forwardRef(
             "M2 12h2",
             "m4.93 4.93 1.41 1.41",
           ].map((d, index) => (
-            <motion.path
+            <MotionPath
               key={d}
               d={d}
-              animate={controls}
               variants={pathVariants}
+              animate={controls}
               custom={index + 1}
             />
           ))}
-        </svg>
+        </MotionSvg>
       </div>
     );
   }
 );
 
 SunIcon.displayName = "SunIcon";
-
-export { SunIcon };
+export default SunIcon;

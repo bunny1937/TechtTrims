@@ -1,5 +1,6 @@
 // pages/index.js
-import { useState, useEffect, useRef } from "react";
+/* eslint-disable react-hooks/exhaustive-deps */
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -8,9 +9,15 @@ import { useLocation } from "../hooks/useLocation";
 import { UserDataManager } from "../lib/userData";
 import { getAuthToken, getUserData } from "../lib/cookieAuth";
 
-export default function Home(theme) {
+// Dynamic import for map component
+const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
+  ssr: false,
+  loading: () => <div className={styles.mapLoading}>Loading map...</div>,
+});
+
+export default function Home({ initialSalons = [] }) {
   const router = useRouter();
-  const [salons, setSalons] = useState([]);
+  const [salons, setSalons] = useState(initialSalons || []);
   const [userOnboarding, setUserOnboarding] = useState(() => {
     // Load user data IMMEDIATELY from sessionStorage on mount
     if (typeof window === "undefined") return null;
@@ -65,13 +72,11 @@ export default function Home(theme) {
         const loc = JSON.parse(cached);
         // If we have coordinates, skip location check
         if (loc.lat && loc.lng) {
-          console.log("✅ Valid cached location found, skipping check");
           return false;
         }
       } catch (e) {}
     }
 
-    console.log("❌ No valid cached location, showing check");
     return true;
   });
 
@@ -87,12 +92,6 @@ export default function Home(theme) {
   const initializedRef = useRef(false);
   const initialLocationRef = useRef(null);
   const PLACEHOLDER_IMAGE = process.env.NEXT_PUBLIC_PLACEHOLDER_SALON_IMAGE;
-
-  // Dynamic import for map component
-  const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
-    ssr: false,
-    loading: () => <div className={styles.mapLoading}>Loading map...</div>,
-  });
 
   useEffect(() => {
     if (salons.length === 0) return;
@@ -110,12 +109,7 @@ export default function Home(theme) {
             distances[idx] !== undefined ? distances[idx] : salon.distance,
         }));
         setSalons(updatedSalons);
-        console.log(
-          "✅ Applied manual distances immediately after salons load"
-        );
-      } catch (e) {
-        console.error("❌ Error applying distances:", e);
-      }
+      } catch (e) {}
     }
   }, [salons.length]);
 
@@ -123,25 +117,20 @@ export default function Home(theme) {
     const initializeUser = async () => {
       // Prevent double initialization
       if (initializedRef.current) {
-        console.log("⏭️ Already initialized, skipping");
         return;
       }
 
       initializedRef.current = true;
-      console.log("🔍 INITIALIZING USER - START");
 
       if (typeof window === "undefined") {
-        console.log("❌ Window undefined, skipping");
         initializedRef.current = false;
         return;
       }
 
       // Check onboarding
       const hasOnboarded = sessionStorage.getItem("hasOnboarded");
-      console.log("📋 Onboarding status:", hasOnboarded);
 
       if (!hasOnboarded) {
-        console.log("❌ Not onboarded, redirecting...");
         router.push("/onboarding");
         return;
       }
@@ -152,12 +141,9 @@ export default function Home(theme) {
         try {
           const userData = await UserDataManager.fetchAndStoreUserData();
           if (userData) {
-            console.log("✅ User data loaded:", userData.name);
             setUserOnboarding(userData);
           }
-        } catch (error) {
-          console.error("❌ Error loading user data:", error);
-        }
+        } catch (error) {}
       }
 
       // Mark user data as ready
@@ -177,9 +163,6 @@ export default function Home(theme) {
 
           // Reject bad accuracy
           if (coords.accuracy && coords.accuracy > 50000) {
-            console.warn(
-              `⚠️ Bad accuracy: ${coords.accuracy}m - clearing cache`
-            );
             sessionStorage.removeItem("liveUserLocation");
             sessionStorage.removeItem("userLocation");
             localStorage.removeItem("cachedUserLocation");
@@ -188,29 +171,22 @@ export default function Home(theme) {
           }
 
           if (lat && lng) {
-            console.log("✅ Using cached location:", { lat, lng });
             salonsLoadedRef.current = true;
             setShowLocationCheck(false);
             setIsLoading(true);
             await loadNearbySalons(lat, lng, userOnboarding?.gender || "all");
             setIsLoading(false);
           } else {
-            console.warn("❌ Invalid cached coords");
             setShowLocationCheck(true);
           }
         } catch (e) {
-          console.error("❌ Error parsing cached location:", e);
           setShowLocationCheck(true);
         }
       } else if (!cached) {
-        console.log("❌ No cached location - showing location check");
         setShowLocationCheck(true);
       }
-
-      console.log("✅ INITIALIZING USER - DONE");
     };
 
-    console.log("🔄 useEffect TRIGGERED");
     initializeUser();
   }, []);
 
@@ -226,26 +202,15 @@ export default function Home(theme) {
         timestamp: Date.now(),
       };
 
-      console.log("💾💾💾 Saving location to sessionStorage:", normalized);
       sessionStorage.setItem("userLocation", JSON.stringify(normalized));
     }
   }, [liveUserLocation]);
 
   // Reset ref if we have location but 0 salons
   useEffect(() => {
-    console.log("🔄 Reset effect check:", {
-      hasLocation: !!liveUserLocation,
-      salonsLength: salons.length,
-      refValue: salonsLoadedRef.current,
-    });
-
     if (liveUserLocation && salons.length === 0 && salonsLoadedRef.current) {
-      console.log(
-        "🔄🔄🔄 RESETTING salonsLoadedRef - have location but 0 salons"
-      );
       const timeoutId = setTimeout(() => {
         salonsLoadedRef.current = false;
-        console.log("✅ salonsLoadedRef reset to false");
       }, 3000); // 3 seconds
 
       return () => clearTimeout(timeoutId);
@@ -264,7 +229,6 @@ export default function Home(theme) {
         timestamp: Date.now(),
       };
 
-      console.log("💾 Saving location to sessionStorage:", normalized);
       sessionStorage.setItem("userLocation", JSON.stringify(normalized));
     }
   }, [liveUserLocation]);
@@ -273,7 +237,6 @@ export default function Home(theme) {
   useEffect(() => {
     const handleGenderChange = (event) => {
       const newGender = event.detail;
-      console.log("🚻 Gender filter changed to:", newGender);
 
       // Reload salons with new gender filter
       if (liveUserLocation?.latitude && liveUserLocation?.longitude) {
@@ -293,25 +256,6 @@ export default function Home(theme) {
       window.removeEventListener("genderFilterChange", handleGenderChange);
   }, [liveUserLocation, userOnboarding]);
 
-  // useEffect(() => {
-  //   const stored = sessionStorage.getItem("manualLocation");
-  //   const isManual = sessionStorage.getItem("isManualMode") === "true";
-
-  //   if (stored && isManual) {
-  //     try {
-  //       const parsed = JSON.parse(stored);
-  //       if (!parsed.latitude && parsed.lat) {
-  //         parsed.latitude = parsed.lat;
-  //         parsed.longitude = parsed.lng;
-  //       }
-  //       console.log("📍 Manual location loaded from storage in parent");
-  //       // ✅ Just log it - SalonMap will handle the recalc
-  //     } catch (e) {
-  //       console.error("Error:", e);
-  //     }
-  //   }
-  // }, []);
-
   // NEW: Check device location status
   const checkLocationStatus = async () => {
     try {
@@ -325,12 +269,14 @@ export default function Home(theme) {
         return null;
       }
 
-      // IMPORTANT: Set maximumAge to 0 to force fresh location check
+      // fresh location check
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0, // Force fresh location, don't use cache
+          enableHighAccuracy: false, // Network-based for laptops
+          timeout: isMobile ? 15000 : 60000, // Longer timeout for laptops
+          maximumAge: 0,
         });
       });
 
@@ -351,11 +297,8 @@ export default function Home(theme) {
       sessionStorage.setItem("liveUserLocation", JSON.stringify(coords));
       localStorage.setItem("cachedUserLocation", JSON.stringify(coords));
 
-      console.log("✅ Fresh location obtained:", coords);
       return coords;
     } catch (error) {
-      console.error("❌ Location check error:", error);
-
       // Clear old cached locations if permission denied
       if (error.code === 1) {
         // PERMISSION_DENIED
@@ -399,27 +342,11 @@ export default function Home(theme) {
     gender = "all",
     salonGender = "all"
   ) => {
-    console.log("🚀 loadNearbySalons CALLED:", {
-      receivedLat: lat,
-      receivedLng: lng,
-      latType: typeof lat,
-      lngType: typeof lng,
-      gender,
-      salonGender,
-    });
-
     // Normalize coordinates
     const normalizedLat =
       lat || liveUserLocation?.latitude || liveUserLocation?.lat;
     const normalizedLng =
       lng || liveUserLocation?.longitude || liveUserLocation?.lng;
-
-    console.log("📍 After normalization:", {
-      normalizedLat,
-      normalizedLng,
-      normalizedLatType: typeof normalizedLat,
-      normalizedLngType: typeof normalizedLng,
-    });
 
     if (
       !normalizedLat ||
@@ -427,10 +354,6 @@ export default function Home(theme) {
       isNaN(normalizedLat) ||
       isNaN(normalizedLng)
     ) {
-      console.error("❌ INVALID COORDINATES:", {
-        normalizedLat,
-        normalizedLng,
-      });
       setSalonLoadError("Unable to load salons: Invalid location coordinates");
       return;
     }
@@ -438,17 +361,10 @@ export default function Home(theme) {
     // ✅ ONLY skip if manual mode AND salons already exist
     const isManual = sessionStorage.getItem("isManualMode") === "true";
     if (isManual && salons.length > 0) {
-      console.log("⏭ Skipping salon reload - manual mode with existing salons");
       return;
     }
 
     try {
-      console.log(
-        "🔍 Loading salons for coordinates:",
-        normalizedLat,
-        normalizedLng
-      );
-
       // Get salonGender from sessionStorage if not provided
       const genderFilter =
         salonGender === "all"
@@ -456,7 +372,6 @@ export default function Home(theme) {
           : salonGender;
 
       const url = `/api/salons/nearby?latitude=${normalizedLat}&longitude=${normalizedLng}&radius=${searchRadius}&gender=${gender}&salonGender=${genderFilter}`;
-      console.log("📡 FULL API URL:", url);
 
       setDebugInfo({
         userLat: normalizedLat,
@@ -466,21 +381,13 @@ export default function Home(theme) {
 
       const response = await fetch(url);
 
-      console.log("📦 Response status:", response.status);
-      console.log("📦 Response ok:", response.ok);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("❌ API ERROR RESPONSE:", errorText);
         throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      console.log("📦 API returned data:", data);
-      console.log("📦 Salons count:", data?.salons?.length || 0);
-
       if (data.salons && data.salons.length > 0) {
-        console.log(`📍 Found ${data.salons.length} salons:`);
         data.salons.forEach((salon, idx) => {
           const salonLat = salon.location?.coordinates?.latitude;
           const salonLng = salon.location?.coordinates?.longitude;
@@ -499,16 +406,9 @@ export default function Home(theme) {
 
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             const distance = R * c;
-
-            console.log(
-              `   ${idx + 1}. ${salon.salonName}: ${distance.toFixed(
-                2
-              )} km away (${salonLat}, ${salonLng})`
-            );
           }
         });
       } else {
-        console.log("❌ NO SALONS RETURNED FROM API");
         setSalonLoadError(
           `No salons found within ${searchRadius}km of your location (${lat.toFixed(
             4
@@ -518,23 +418,12 @@ export default function Home(theme) {
         );
       }
 
-      console.log("📦 Raw API response:", data);
-      console.log("📦 Data type:", typeof data);
-      console.log("📦 Is array:", Array.isArray(data));
-      console.log("📦 Data length:", data?.length);
-
       const salonsArray = Array.isArray(data.salons) ? data.salons : [];
-
-      console.log("✅ Loaded salons:", salonsArray.length);
-      console.log("🏢 First salon:", salonsArray[0]);
 
       setSalons(salonsArray);
       setNearbySalons(salonsArray);
       setFilteredSalons(salonsArray);
-
-      console.log("✅ State updated - salons count:", salonsArray.length);
     } catch (error) {
-      console.error("❌ Salon load error:", error);
       setSalonLoadError(
         `Failed to load salons: ${error.message}. Check your internet connection.`
       );
@@ -547,108 +436,59 @@ export default function Home(theme) {
   // ========================================
   // CHANGE 1: Replace handleLocationChange
   // ========================================
+  // ✅ NEW - Client-side distance calculation ONLY
   const handleLocationChange = (newLocation) => {
-    console.log("🔄 handleLocationChange triggered:", newLocation);
+    if (!newLocation?.latitude || !newLocation?.longitude) return;
 
-    const isManual = sessionStorage.getItem("isManualMode") === "true";
-    const hasManualDistances = sessionStorage.getItem(
-      "manualLocationDistances"
-    );
+    const userLat = newLocation.latitude || newLocation.lat;
+    const userLng = newLocation.longitude || newLocation.lng;
 
-    // ✅ BLOCK LIVE GPS ONLY if manual mode WITH existing saved distances
-    if (isManual && hasManualDistances) {
-      console.log("📍 BLOCKED: Manual mode active with existing distances");
-      return;
-    }
-
-    console.log("📍 CALCULATING distances for:", {
-      isManual,
-      hasManualDistances: !!hasManualDistances,
-    });
-
-    if (salons.length === 0) {
-      console.log("⚠ No salons loaded yet");
-      return;
-    }
-
+    // Haversine distance calculation (client-side)
     const updatedSalons = salons.map((salon) => {
-      const salonLat = salon.location.coordinates[1];
-      const salonLng = salon.location.coordinates[0];
+      if (
+        !salon.location?.coordinates ||
+        salon.location.coordinates.length !== 2
+      ) {
+        return salon;
+      }
 
-      const userLat = newLocation.latitude || newLocation.lat;
-      const userLng = newLocation.longitude || newLocation.lng;
+      const [salonLng, salonLat] = salon.location.coordinates;
+      const R = 6371; // Earth radius in km
 
-      const R = 6371;
       const dLat = (salonLat - userLat) * (Math.PI / 180);
       const dLng = (salonLng - userLng) * (Math.PI / 180);
+
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(userLat * (Math.PI / 180)) *
-          Math.cos(salonLat * (Math.PI / 180)) *
+        Math.cos((userLat * Math.PI) / 180) *
+          Math.cos((salonLat * Math.PI) / 180) *
           Math.sin(dLng / 2) *
           Math.sin(dLng / 2);
+
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       const distance = R * c;
 
-      return {
-        ...salon,
-        distance: parseFloat(distance.toFixed(2)),
-      };
+      return { ...salon, distance: Number(distance.toFixed(2)) };
     });
 
-    setSalons([...updatedSalons]);
-    setMapKey((prev) => prev + 1);
+    // Sort by distance
+    updatedSalons.sort((a, b) => (a.distance || 999) - (b.distance || 999));
 
-    // 👇 ADD THIS 3 LINES
-    const distances = updatedSalons.map((s) => s.distance);
-    sessionStorage.setItem(
-      "manualLocationDistances",
-      JSON.stringify(distances)
-    );
-
-    console.log(
-      "✅ Updated distances:",
-      updatedSalons.map((s) => s.distance)
-    );
+    setSalons(updatedSalons);
+    setNearbySalons(updatedSalons);
+    setFilteredSalons(updatedSalons);
   };
 
-  // ========================================
-  // CHANGE 2: ADD useEffect #1 - Load manual mode on mount
-  // ========================================
-  // useEffect(() => {
-  //   const isManual = sessionStorage.getItem("isManualMode") === "true";
-  //   const manualDistances = sessionStorage.getItem("manualLocationDistances");
-
-  //   if (isManual && manualDistances && salons.length > 0) {
-  //     try {
-  //       const distances = JSON.parse(manualDistances);
-  //       const updatedSalons = salons.map((salon, idx) => ({
-  //         ...salon,
-  //         distance:
-  //           distances[idx] !== undefined ? distances[idx] : salon.distance,
-  //       }));
-  //       setSalons(updatedSalons);
-  //       console.log("✅ Restored manual distances from storage:", distances);
-  //     } catch (e) {
-  //       console.error("❌ Error restoring distances:", e);
-  //     }
-  //   }
-  // }, [salons.length]);
-
-  // ========================================
-  // CHANGE 3: ADD useEffect #2 - Listen for storage changes (cross-tab sync)
   // ========================================
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === "isManualMode") {
-        console.log("🔄 Manual mode changed to:", e.newValue);
         const isNowManual = e.newValue === "true";
         if (!isNowManual) {
           // Switched to live mode from another tab
           sessionStorage.removeItem("manualLocationDistances");
         }
       } else if (e.key === "manualLocationDistances") {
-        console.log("🔄 Distances updated from another tab");
         if (salons.length > 0) {
           try {
             const distances = JSON.parse(e.newValue);
@@ -672,25 +512,11 @@ export default function Home(theme) {
   }, [salons.length]);
 
   const handleRevertToLive = () => {
-    console.log("🔄 Reverting to live location");
-
-    setIsManualMode(false);
-    setManualLocation(null);
-
     // ✅ CLEAR all manual data from storage
     sessionStorage.removeItem("isManualMode");
     sessionStorage.removeItem("manualLocation");
     sessionStorage.removeItem("manualLocationDistances");
     sessionStorage.removeItem("_pendingDistances");
-
-    // ✅ Force reload salons from live GPS
-    if (liveUserLocation?.latitude && liveUserLocation?.longitude) {
-      loadNearbySalons(
-        liveUserLocation.latitude,
-        liveUserLocation.longitude,
-        selectedGender
-      );
-    }
   };
 
   const handleRefreshLocation = async () => {
@@ -1119,11 +945,13 @@ export default function Home(theme) {
                     <div className={styles.statIcon}>
                       💆{" "}
                       <span className={styles.statNumber}>
-                        {salons.reduce(
-                          (total, salon) =>
-                            total + (salon.topServices?.length || 0),
-                          0
-                        )}
+                        {Array.isArray(salons)
+                          ? salons.reduce(
+                              (total, salon) =>
+                                total + (salon.topServices?.length || 0),
+                              0
+                            )
+                          : 0}
                       </span>
                     </div>
                     <div className={styles.statContent}>
@@ -1134,11 +962,13 @@ export default function Home(theme) {
                     <div className={styles.statIcon}>
                       ⭐
                       <span className={styles.statNumber}>
-                        {salons.reduce(
-                          (total, salon) =>
-                            total + (salon.stats?.totalBookings || 0),
-                          0
-                        )}
+                        {Array.isArray(salons)
+                          ? salons.reduce(
+                              (total, salon) =>
+                                total + (salon.stats?.totalBookings || 0),
+                              0
+                            )
+                          : 0}
                       </span>
                     </div>
                     <div className={styles.statContent}>
@@ -1176,10 +1006,14 @@ export default function Home(theme) {
                 <div className={styles.visualsContainer}>
                   <div className={styles.mainImage}>
                     <img
-                      src="https://images.unsplash.com/photo-1560066984-138dadb4c035?w=600&h=400&fit=crop&crop=face"
+                      src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&h=400&fit=crop&crop=face"
                       alt="Luxury salon interior"
+                      width={600}
+                      height={400}
                       className={styles.heroImage}
+                      unoptimized
                     />
+
                     <div className={styles.imageGradient}></div>
                   </div>
 
@@ -1302,73 +1136,7 @@ export default function Home(theme) {
             </div>
           </div>
         </motion.section>
-        {/* <motion.section
-        className={styles.servicesSection}
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.4 }}
-      >
-        <div className={styles.sectionHeader}>
-          <div className={styles.sectionTitleContainer}>
-            <motion.h3
-              className={styles.sectionTitle}
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8 }}
-            >
-              {userOnboarding
-                ? Perfect for ${userOnboarding.gender || "Everyone"}
-                : "Perfect Services for You"}
-            </motion.h3>
-            <motion.p
-              className={styles.sectionSubtitle}
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-            >
-              Curated services designed just for you
-            </motion.p>
-          </div>
-        </div>
 
-        <div className={styles.servicesGrid}>
-          {getGenderBasedServices(userOnboarding?.gender || "Other").map(
-            (service, index) => (
-              <motion.div
-                key={service.name}
-                className={styles.serviceCard}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.1 * index }}
-                whileHover={{
-                  y: -8,
-                  scale: 1.02,
-                  transition: { type: "spring", stiffness: 300 },
-                }}
-              >
-                <div className={styles.serviceCardBackground}></div>
-                <div className={styles.serviceIcon}>{service.icon}</div>
-                <h4 className={styles.serviceName}>{service.name}</h4>
-                <div className={styles.serviceDetails}>
-                  <p className={styles.servicePrice}>₹{service.price}</p>
-                  <p className={styles.serviceDuration}>
-                    ⏱ {service.duration} min
-                  </p>
-                </div>
-                <motion.button
-                  className={styles.serviceBookButton}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Book Now
-                </motion.button>
-              </motion.div>
-            )
-          )}
-        </div>
-      </motion.section>
-      ; */}
-        {/* Salons Section with Booking Type Tabs */}
         {/* Salons Section with Booking Type Tabs */}
         {/* Location Status Feedback */}
         {locationStatus === "requesting" && (
@@ -1411,7 +1179,6 @@ export default function Home(theme) {
                       // Reload after getting permission
                       window.location.reload();
                     } catch (error) {
-                      console.error("Permission request failed:", error);
                       alert("Please enable location in browser settings");
                     }
                   }}
@@ -1680,11 +1447,16 @@ Time: ${debugInfo.timestamp}`}
             </div>
           ) : (
             <div className={styles.salonsGrid}>
-              {(filteredSalons.length > 0 ? filteredSalons : salons).map(
+              {(Array.isArray(filteredSalons) && filteredSalons.length > 0
+                ? filteredSalons
+                : Array.isArray(salons)
+                ? salons
+                : []
+              ).map(
                 // ✅ CHANGE nearbySalons to salons
                 (salon, index) => (
                   <motion.div
-                    key={salon._id?.oid || salon._id?.toString() || index}
+                    key={String(salon._id)}
                     className={styles.salonCard}
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1703,10 +1475,11 @@ Time: ${debugInfo.timestamp}`}
                       <img
                         src={salon.profilePicture || PLACEHOLDER_IMAGE}
                         alt={salon.salonName}
+                        width={400}
+                        height={250}
                         style={{ objectFit: "cover", borderRadius: "8px" }}
-                        unoptimized // ðŸ‘ˆ Add this if using external CDN
+                        unoptimized
                       />
-
                       <div className={styles.salonImageOverlay}></div>
 
                       {/* Badges */}
@@ -1838,7 +1611,7 @@ Time: ${debugInfo.timestamp}`}
                 rating: 5,
                 text: "Absolutely amazing experience! The staff was professional and the results exceeded my expectations.",
                 image:
-                  "https://images.unsplash.com/photo-1494790108755-2616b612b742?w=80&h=80&fit=crop&crop=face",
+                  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&h=80&fit=crop&crop=face",
               },
               {
                 name: "Rajesh Kumar",
@@ -1846,7 +1619,7 @@ Time: ${debugInfo.timestamp}`}
                 rating: 5,
                 text: "Best grooming experience I've had in Mumbai. Clean, professional, and great attention to detail.",
                 image:
-                  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face",
+                  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&crop=face",
               },
               {
                 name: "Anita Patel",
@@ -1869,7 +1642,10 @@ Time: ${debugInfo.timestamp}`}
                   <img
                     src={testimonial.image}
                     alt={testimonial.name}
+                    width={80}
+                    height={80}
                     className={styles.testimonialAvatar}
+                    unoptimized
                   />
                   <div className={styles.testimonialMeta}>
                     <h5 className={styles.testimonialName}>
@@ -2009,34 +1785,36 @@ function highlightText(text, highlight) {
   );
 }
 
-function getGenderBasedServices(gender) {
-  const maleServices = [
-    { name: "Premium Haircut", price: 299, duration: 45, icon: "✂" },
-    { name: "Beard Styling", price: 199, duration: 30, icon: "🧔" },
-    { name: "Hair Styling", price: 349, duration: 35, icon: "💇‍♂" },
-    { name: "Face Treatment", price: 449, duration: 60, icon: "🧴" },
-  ];
+export async function getStaticProps() {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const response = await fetch(
+      `${baseUrl}/api/salons/nearby?latitude=28.6139&longitude=77.2090&radius=50&static=true`
+    );
 
-  const femaleServices = [
-    { name: "Hair Styling", price: 599, duration: 90, icon: "💇‍♀" },
-    { name: "Hair Coloring", price: 1299, duration: 150, icon: "🎨" },
-    { name: "Facial Glow", price: 799, duration: 90, icon: "✨" },
-    { name: "Luxury Manicure", price: 499, duration: 60, icon: "💅" },
-  ];
+    if (!response.ok) {
+      return {
+        props: {
+          initialSalons: [], // ✅ Empty array
+        },
+        revalidate: 300,
+      };
+    }
 
-  const otherServices = [
-    { name: "Hair Treatment", price: 699, duration: 75, icon: "🌿" },
-    { name: "Scalp Therapy", price: 449, duration: 45, icon: "💆" },
-    { name: "Hair Wash & Dry", price: 199, duration: 30, icon: "🚿" },
-    { name: "Style Consultation", price: 499, duration: 60, icon: "💫" },
-  ];
-
-  switch (gender) {
-    case "Male":
-      return maleServices;
-    case "Female":
-      return femaleServices;
-    default:
-      return otherServices;
+    const data = await response.json();
+    return {
+      props: {
+        initialSalons: Array.isArray(data.salons) ? data.salons : [], // ✅ Safe check
+      },
+      revalidate: 300,
+    };
+  } catch (error) {
+    console.error("SSG fetch error:", error);
+    return {
+      props: {
+        initialSalons: [], // ✅ Empty array
+      },
+      revalidate: 300,
+    };
   }
 }

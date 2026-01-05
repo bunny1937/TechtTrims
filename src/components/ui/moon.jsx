@@ -1,16 +1,14 @@
 "use client";
 import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
-import { motion, useAnimation } from "motion/react";
-
+import { motion, useAnimation } from "framer-motion";
 import clsx from "clsx";
 
+const MotionSvg = motion.svg;
+const MotionPath = motion.path;
+
 const svgVariants = {
-  normal: {
-    rotate: 0,
-  },
-  animate: {
-    rotate: [0, -10, 10, -5, 5, 0],
-  },
+  normal: { rotate: 0 },
+  animate: { rotate: [0, -10, 10, -5, 5, 0] },
 };
 
 const svgTransition = {
@@ -25,7 +23,6 @@ const MoonIcon = forwardRef(
 
     useImperativeHandle(ref, () => {
       isControlledRef.current = true;
-
       return {
         startAnimation: () => controls.start("animate"),
         stopAnimation: () => controls.start("normal"),
@@ -34,25 +31,20 @@ const MoonIcon = forwardRef(
 
     const handleMouseEnter = useCallback(
       (e) => {
-        if (!isControlledRef.current) {
-          controls.start("animate");
-        } else {
-          onMouseEnter?.(e);
-        }
+        if (!isControlledRef.current) controls.start("animate");
+        else onMouseEnter?.(e);
       },
       [controls, onMouseEnter]
     );
 
     const handleMouseLeave = useCallback(
       (e) => {
-        if (!isControlledRef.current) {
-          controls.start("normal");
-        } else {
-          onMouseLeave?.(e);
-        }
+        if (!isControlledRef.current) controls.start("normal");
+        else onMouseLeave?.(e);
       },
       [controls, onMouseLeave]
     );
+
     return (
       <div
         className={clsx(className)}
@@ -60,7 +52,7 @@ const MoonIcon = forwardRef(
         onMouseLeave={handleMouseLeave}
         {...props}
       >
-        <motion.svg
+        <MotionSvg
           xmlns="http://www.w3.org/2000/svg"
           width={size}
           height={size}
@@ -74,13 +66,12 @@ const MoonIcon = forwardRef(
           animate={controls}
           transition={svgTransition}
         >
-          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-        </motion.svg>
+          <MotionPath d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+        </MotionSvg>
       </div>
     );
   }
 );
 
 MoonIcon.displayName = "MoonIcon";
-
-export { MoonIcon };
+export default MoonIcon;

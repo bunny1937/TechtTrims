@@ -5,6 +5,7 @@ import feedbackStyles from "../../styles/Feedback.module.css";
 import { motion } from "framer-motion";
 import { isAuthenticated } from "@/lib/cookieAuth";
 import { showError, showWarning } from "@/lib/toast";
+import Image from "next/image";
 // Format time ago
 const formatTimeAgo = (date) => {
   if (!date) return "N/A";
@@ -177,53 +178,48 @@ export default function WalkinConfirmation() {
     return () => clearInterval(interval);
   }, [booking?.expiresAt]);
 
-  // 3. Poll booking status every 5 seconds (NEW - for live queue updates)
+  // ✅ Replace with THIS
   useEffect(() => {
     if (!bookingId) return;
 
     const pollStatus = async () => {
       try {
-        const res = await fetch(`/api/walkin/booking/${bookingId}`);
+        // ✅ Use lightweight queue-position API
+        const res = await fetch(
+          `/api/walkin/queue-position?bookingId=${bookingId}`
+        );
         if (!res.ok) return;
 
         const data = await res.json();
-        const updatedBooking = data.booking;
 
-        // ✅ UPDATE ALL CRITICAL FIELDS INCLUDING SERVICE DATA
+        // ✅ Update state with lightweight data
         setBooking((prev) => ({
           ...prev,
-          queueStatus: updatedBooking.queueStatus,
-          queuePosition: updatedBooking.queuePosition,
-          status: updatedBooking.status,
-          serviceStartedAt: updatedBooking.serviceStartedAt, // ✅ ADDED
-          estimatedDuration: updatedBooking.estimatedDuration, // ✅ ADDED
-          selectedDuration: updatedBooking.selectedDuration, // ✅ ADDED
-          expectedCompletionTime: updatedBooking.expectedCompletionTime, // ✅ ADDED
+          queueStatus: data.status,
+          queuePosition: data.position,
+          isExpired: data.isExpired,
         }));
 
-        // Auto-show feedback when COMPLETED
-        if (
-          updatedBooking.queueStatus === "COMPLETED" &&
-          !updatedBooking.feedback?.submitted &&
-          !showFeedback
-        ) {
+        // ✅ Auto-show feedback when COMPLETED
+        if (data.status === "COMPLETED" && !showFeedback) {
           setShowFeedback(true);
-        } else if (updatedBooking.feedback?.submitted && showFeedback) {
-          setShowFeedback(false);
+          showSuccess("Service completed! Please leave feedback.");
         }
 
-        // Update expiry status
-        if (updatedBooking.isExpired) {
-          setTimeLeft("EXPIRED");
+        // ✅ Handle expiry
+        if (data.isExpired) {
+          showError("Your booking has expired");
+          router.push("/");
         }
       } catch (err) {
-        console.error("❌ Poll status error:", err);
+        console.error("❌ Poll error:", err);
       }
     };
 
+    pollStatus(); // Initial
     const interval = setInterval(pollStatus, 5000);
     return () => clearInterval(interval);
-  }, [bookingId, showFeedback]);
+  }, [bookingId, showFeedback, router]); // ✅ Add dependencies
 
   // 4. Live service timer - updates every second
   useEffect(() => {
@@ -609,7 +605,10 @@ export default function WalkinConfirmation() {
               <img
                 src={qrCodeUrl}
                 alt="Booking QR Code"
+                width={200}
+                height={200}
                 className={styles.qrCode}
+                unoptimized
               />
             ) : (
               <div className={styles.qrPlaceholder}>

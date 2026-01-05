@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import Image from "next/image";
 import axios from "axios";
 
 export default function UploadImageButton({
@@ -141,7 +140,7 @@ export default function UploadImageButton({
           style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}
         >
           {images.map((img, index) => (
-            <Image
+            <img
               key={index}
               src={img.url}
               alt="Uploaded"

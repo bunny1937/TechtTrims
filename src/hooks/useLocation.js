@@ -123,13 +123,15 @@ export const useLocation = () => {
       }
     };
 
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
     watchIdRef.current = navigator.geolocation.watchPosition(
       handleSuccess,
       handleError,
       {
-        enableHighAccuracy: true,
-        timeout: 30000, // INCREASED to 30 seconds
-        maximumAge: 60000, // INCREASED to 60 seconds cache
+        enableHighAccuracy: isMobile, // Only use GPS on mobile
+        timeout: isMobile ? 15000 : 60000, // 60 seconds for laptops
+        maximumAge: isMobile ? 60000 : 300000, // 5 min cache for laptops
       }
     );
   }, []);
@@ -158,8 +160,8 @@ export const useLocation = () => {
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: isMobile, // Only request high accuracy on mobile
-          timeout: isMobile ? 30000 : 90000, // Longer timeout for laptops
+          enableHighAccuracy: false, // Use network positioning for speed
+          timeout: isMobile ? 30000 : 90000,
           maximumAge: isMobile ? 60000 : 600000, // 10-min cache for laptops
         });
       });

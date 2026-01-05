@@ -13,14 +13,12 @@ const nextConfig = {
         hostname: "**.imagekit.io",
       },
     ],
-    domains: [
-      "localhost",
-      "your-domain.com",
-      "tile.openstreetmap.org",
-      "images.unsplash.com",
-    ],
-    unoptimized: true,
+    domains: ["tile.openstreetmap.org", "images.unsplash.com"],
+    // ✅ REMOVE unoptimized: true
+    formats: ["image/webp", "image/avif"], // Add modern formats
+    minimumCacheTTL: 60,
   },
+
   env: {
     MONGODB_URI: process.env.MONGODB_URI,
     JWT_SECRET: process.env.JWT_SECRET,

@@ -7,6 +7,8 @@ import styles from "../../styles/Admin/AdminDashboard.module.css";
 export default function AdminDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState(null);
+  const [salons, setSalons] = useState([]); // ✅ ADD
+  const [analytics, setAnalytics] = useState(null); // ✅ ADD
   const [loading, setLoading] = useState(true);
   const [adminData, setAdminData] = useState(null);
 
@@ -14,26 +16,72 @@ export default function AdminDashboard() {
     const admin = sessionStorage.getItem("adminData");
 
     if (!admin) {
-      router.push("admin/login");
+      router.push("/admin/login");
       return;
     }
 
     setAdminData(JSON.parse(admin));
-    fetchDashboardStats();
+    fetchAllDashboardData(); // ✅ Changed function name
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  const fetchDashboardStats = async () => {
+  // ✅ NEW - Batch fetch all data in ONE request
+  const fetchAllDashboardData = async () => {
     try {
-      const response = await fetch("/api/admin/dashboard/stats", {
-        credentials: "include", // ✅ Include HttpOnly cookies
+      const response = await fetch("/api/admin/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          queries: [
+            { id: "stats", type: "stats" },
+            { id: "salons", type: "salons", params: { limit: 10 } },
+            { id: "analytics", type: "analytics" },
+            {
+              id: "recentBookings",
+              type: "recentBookings",
+              params: { limit: 5 },
+            },
+          ],
+        }),
       });
 
+      if (!response.ok) {
+        throw new Error("Batch fetch failed");
+      }
+
+      const { results } = await response.json();
+
+      // ✅ Set all state from single response
+      setStats(results.stats?.[0] || {});
+      setSalons(results.salons || []);
+      setAnalytics(results.analytics || []);
+
+      // ✅ Update stats with recent bookings
+      setStats((prev) => ({
+        ...prev,
+        recentBookings: results.recentBookings || [],
+      }));
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+
+      // ✅ Fallback to old method if batch fails
+      await fetchDashboardStatsFallback();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Fallback method (keep for compatibility)
+  const fetchDashboardStatsFallback = async () => {
+    try {
+      const response = await fetch("/api/admin/dashboard/stats", {
+        credentials: "include",
+      });
       const data = await response.json();
       setStats(data);
     } catch (error) {
       console.error("Error fetching stats:", error);
-    } finally {
-      setLoading(false);
     }
   };
 

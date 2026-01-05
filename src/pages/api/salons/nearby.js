@@ -35,16 +35,17 @@ export default async function handler(req, res) {
         query.salonGender = salonGender;
       }
 
-      // 🔍 ADD MORE DEBUGGING
-      console.log("📋 Query:", JSON.stringify(query));
-
+      // ✅ NEW - Only fetch required fields
       const allSalons = await db
         .collection("salons")
         .find(query)
+        .project({
+          ownerDetails: 0,
+          hashedPassword: 0,
+          barbers: 0,
+        })
         .maxTimeMS(30000)
         .toArray();
-
-      console.log("📊 Total salons fetched:", allSalons.length);
 
       const nearbySalons = [];
       for (const salon of allSalons) {

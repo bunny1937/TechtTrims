@@ -4,7 +4,6 @@ import { useRouter } from "next/router";
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import styles from "../../styles/SalonDetail.module.css";
-import Image from "next/image";
 import { UserDataManager } from "../../lib/userData";
 import RetryButton from "@/components/RetryButton";
 import ReviewsSection from "@/components/Salon/ReviewSection";
@@ -126,15 +125,13 @@ export default function SalonDetail({ initialSalon }) {
     }
   }, [salon?._id]); // Only recreate if salon ID changes
 
-  // NEW: Fetch all bookings for detailed per-barber queue info
+  // ✅ ONLY fetch on mount - NO POLLING on public page
   useEffect(() => {
     if (!id) return;
 
     const fetchAllBookings = async () => {
       try {
-        // Mark expired first
         await fetch("/api/walkin/booking/mark-expired", { method: "POST" });
-
         const res = await fetch(`/api/salons/${id}/bookings-detailed`, {
           cache: "no-store",
         });
@@ -150,19 +147,17 @@ export default function SalonDetail({ initialSalon }) {
           return true;
         });
 
-        setAllBookings(activeBookings); // ✅ FIX: Set filtered bookings
+        setAllBookings(activeBookings);
       } catch (error) {
         console.error("Error fetching bookings:", error);
       }
     };
 
-    fetchAllBookings();
-    // Poll every 5 seconds for live updates
-    const interval = setInterval(fetchAllBookings, 5000);
-    return () => clearInterval(interval);
+    fetchAllBookings(); // Only once on mount
+    // ✅ NO setInterval
   }, [id]);
 
-  // UPDATED: Fetch barber states - now 5 second polling for real-time
+  // ✅ Fetch once on mount - NO POLLING
   useEffect(() => {
     if (bookingMode !== "walkin" || !id) return;
 
@@ -176,11 +171,8 @@ export default function SalonDetail({ initialSalon }) {
       }
     };
 
-    fetchBarberStates();
-
-    // CHANGED: Update every 5 seconds (faster for live queue updates)
-    const interval = setInterval(fetchBarberStates, 5000);
-    return () => clearInterval(interval);
+    fetchBarberStates(); // Only once
+    // ✅ NO setInterval
   }, [bookingMode, id]);
 
   // Poll salon status every 5 seconds
@@ -297,7 +289,7 @@ export default function SalonDetail({ initialSalon }) {
     return () => clearInterval(interval);
   }, [pauseInfo?.closingTime, checkSalonStatus]);
 
-  // NEW: Poll barbers list to catch isAvailable changes in real-time
+  // ✅ Fetch once on mount - NO POLLING
   useEffect(() => {
     if (!id) return;
 
@@ -306,46 +298,20 @@ export default function SalonDetail({ initialSalon }) {
         const res = await fetch(`/api/salons/barbers?salonId=${id}`);
         if (res.ok) {
           const barbersData = await res.json();
-
           setSalon((prevSalon) => ({
             ...prevSalon,
             barbers: barbersData,
           }));
-
           setAvailableBarbers(barbersData);
-
-          console.log(
-            "✅ Barbers refreshed at",
-            new Date().toLocaleTimeString()
-          );
+          console.log("✅ Barbers loaded");
         }
       } catch (error) {
-        console.error("Error polling barbers:", error);
+        console.error("Error loading barbers:", error);
       }
     };
 
-    fetchBarbers();
-
-    // Visibility-aware polling - only poll when page is visible
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        fetchBarbers(); // Refresh immediately when user returns
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    // Poll every 5 seconds when page is visible
-    const interval = setInterval(() => {
-      if (!document.hidden) {
-        fetchBarbers();
-      }
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
+    fetchBarbers(); // Only once
+    // ✅ NO setInterval
   }, [id]);
 
   useEffect(() => {
@@ -1345,7 +1311,10 @@ export default function SalonDetail({ initialSalon }) {
                           <img
                             src={barber.photo || "/default-barber.png"}
                             alt={barber.name}
+                            width={120}
+                            height={120}
                             className={styles.barberImage}
+                            unoptimized
                           />
                         </div>
 
@@ -2071,25 +2040,35 @@ export default function SalonDetail({ initialSalon }) {
     </div>
   );
 }
-export async function getServerSideProps(context) {
-  const { id } = context.params;
+// ✅ NEW - Static generation with ISR
+export async function getStaticPaths() {
+  return {
+    paths: [], // No pre-render, generate on-demand
+    fallback: "blocking",
+  };
+}
 
+export async function getStaticProps({ params }) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-    const response = await fetch(`${baseUrl}/api/salons/${id}`);
-    const data = await response.json();
+    const response = await fetch(
+      `${baseUrl}/api/salons/${params.id}?public=true`
+    );
 
     if (!response.ok) {
       return { notFound: true };
     }
 
+    const data = await response.json();
+
     return {
       props: {
         initialSalon: data.salon,
       },
+      revalidate: 300, // 5 minutes
     };
   } catch (error) {
-    console.error("SSR fetch error:", error);
+    console.error("SSG salon fetch error:", error);
     return { notFound: true };
   }
 }

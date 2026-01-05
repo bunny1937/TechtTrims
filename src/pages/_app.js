@@ -10,8 +10,8 @@ import NetworkStatus from "../components/NetworkStatus";
 import OnboardingLogoutButton from "../components/OnBoardingLogout";
 import { Toaster } from "react-hot-toast";
 import { showConfirm, showSuccess } from "@/lib/toast";
-import { SunIcon } from "@/components/ui/sun";
-import { MoonIcon } from "@/components/ui/moon";
+import SunIcon from "@/components/ui/sun";
+import MoonIcon from "@/components/ui/moon";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -209,6 +209,20 @@ function MyApp({ Component, pageProps }) {
   const navigateToAuth = (type, role) => {
     router.push(`/auth/${role}/${type}`);
   };
+
+  // ✅ ADD at bottom of _app.js
+  useEffect(() => {
+    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => {
+          console.log("✅ Service Worker registered:", reg.scope);
+        })
+        .catch((err) => {
+          console.error("❌ SW registration failed:", err);
+        });
+    }
+  }, []);
 
   return (
     <>

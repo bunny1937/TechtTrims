@@ -1,6 +1,5 @@
 import { useRouter } from "next/router";
 import styles from "../../styles/SalonCard.module.css";
-import Image from "next/image";
 
 export default function SalonCard({ salon, gender }) {
   const router = useRouter();
@@ -15,7 +14,7 @@ export default function SalonCard({ salon, gender }) {
   return (
     <div className={styles.card}>
       <div className={styles.imageContainer}>
-        <Image
+        <img
           src={salon.images?.front || "/salon-placeholder.jpg"}
           alt={salon.name}
         />
