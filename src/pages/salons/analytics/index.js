@@ -34,7 +34,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     const salonSession = localStorage.getItem("salonSession");
     if (!salonSession) {
-      router.push("/auth/salon/login");
+      router.push("/auth/login");
       return;
     }
 
@@ -49,7 +49,7 @@ export default function AnalyticsPage() {
       setLoading(true);
 
       const bookingsRes = await fetch(
-        `/api/salons/bookings?salonId=${salonId}&date=all`
+        `/api/salons/bookings?salonId=${salonId}&date=all`,
       );
       const bookings = await bookingsRes.json();
 
@@ -67,31 +67,31 @@ export default function AnalyticsPage() {
 
       const todayBookings = bookings.filter((b) => b.date === today);
       const weekBookings = bookings.filter(
-        (b) => new Date(b.createdAt) >= weekAgo
+        (b) => new Date(b.createdAt) >= weekAgo,
       );
       const monthBookings = bookings.filter(
-        (b) => new Date(b.createdAt) >= monthStart
+        (b) => new Date(b.createdAt) >= monthStart,
       );
       const yearBookings = bookings.filter(
-        (b) => new Date(b.createdAt) >= yearStart
+        (b) => new Date(b.createdAt) >= yearStart,
       );
 
       const totalRevenue = bookings.reduce((sum, b) => sum + (b.price || 0), 0);
       const todayRevenue = todayBookings.reduce(
         (sum, b) => sum + (b.price || 0),
-        0
+        0,
       );
       const weekRevenue = weekBookings.reduce(
         (sum, b) => sum + (b.price || 0),
-        0
+        0,
       );
       const monthRevenue = monthBookings.reduce(
         (sum, b) => sum + (b.price || 0),
-        0
+        0,
       );
       const yearRevenue = yearBookings.reduce(
         (sum, b) => sum + (b.price || 0),
-        0
+        0,
       );
 
       const serviceCount = {};
@@ -100,7 +100,7 @@ export default function AnalyticsPage() {
       });
       const topService =
         Object.keys(serviceCount).sort(
-          (a, b) => serviceCount[b] - serviceCount[a]
+          (a, b) => serviceCount[b] - serviceCount[a],
         )[0] || "-";
 
       const barberCount = {};
@@ -111,17 +111,17 @@ export default function AnalyticsPage() {
       });
       const topBarber =
         Object.keys(barberCount).sort(
-          (a, b) => barberCount[b] - barberCount[a]
+          (a, b) => barberCount[b] - barberCount[a],
         )[0] || "-";
 
       const customerPhones = bookings.map((b) => b.customerPhone);
       const uniqueCustomers = [...new Set(customerPhones)];
       const repeatCustomers = customerPhones.filter(
-        (phone, index, arr) => arr.indexOf(phone) !== index
+        (phone, index, arr) => arr.indexOf(phone) !== index,
       ).length;
 
       const completedBookings = bookings.filter(
-        (b) => b.status === "completed"
+        (b) => b.status === "completed",
       ).length;
       const completionRate =
         bookings.length > 0
@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
 
       const services = salonData.services || {};
       const enabledServices = Object.values(services).filter(
-        (s) => s.enabled
+        (s) => s.enabled,
       ).length;
 
       setAnalytics({

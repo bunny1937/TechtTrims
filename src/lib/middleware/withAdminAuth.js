@@ -1,4 +1,5 @@
-// lib/middleware/withAdminAuth.js
+// src/lib/middleware/withAdminAuth.js
+// ✅ UPDATED: Compatible with unified auth (future admin migration)
 import { parse, serialize } from "cookie";
 import jwt from "jsonwebtoken";
 
@@ -30,7 +31,7 @@ export function withAdminAuth(handler) {
             sameSite: "strict",
             path: "/",
             maxAge: 0,
-          })
+          }),
         );
 
         return res.status(401).json({
@@ -39,11 +40,13 @@ export function withAdminAuth(handler) {
         });
       }
 
+      // Attach admin info
       req.admin = {
         adminId: decoded.adminId,
         username: decoded.username,
         role: decoded.role,
-        // ✅ Add helper methods
+
+        // Helper methods
         getClientIP: () => {
           return (
             req.headers["x-forwarded-for"]?.split(",")[0] ||

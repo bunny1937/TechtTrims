@@ -38,12 +38,22 @@ export default async function handler(req, res) {
       }
     );
 
+    if (!booking?.barberId) {
+      return res.status(200).json({
+        position: booking?.queuePosition ?? null,
+        aheadOfYou: 0,
+        serving: 0,
+        status: booking?.queueStatus ?? "RED",
+        isExpired: booking?.isExpired ?? false,
+      });
+    }
+
     if (!booking) {
       return res.status(404).json({ error: "Booking not found" });
     }
 
     // Get queue stats
-    const [queueStats] = await db
+    const queueStats = await db
       .collection("bookings")
       .aggregate([
         {
@@ -63,12 +73,36 @@ export default async function handler(req, res) {
       .toArray();
 
     const servingCount = queueStats.find((s) => s._id === "GREEN")?.count || 0;
+
     const aheadCount = queueStats.find((s) => s._id === "ORANGE")?.count || 0;
 
+    const position =
+      booking.queueStatus === "RED"
+        ? await db.collection("bookings").countDocuments({
+            barberId: booking.barberId,
+            queueStatus: "RED",
+            createdAt: { $lte: booking.createdAt },
+            isExpired: { $ne: true },
+          })
+        : booking.queuePosition;
+
+    const arrived = await db.collection("bookings").countDocuments({
+      barberId: booking.barberId,
+      queueStatus: "ORANGE",
+      isExpired: { $ne: true },
+    });
+
+    const serving = await db.collection("bookings").countDocuments({
+      barberId: booking.barberId,
+      queueStatus: "GREEN",
+      isExpired: { $ne: true },
+    });
+
     const response = {
-      position: booking.queuePosition,
-      aheadOfYou: aheadCount,
-      serving: servingCount,
+      position,
+      arrived,
+      serving,
+      booked: Math.max(position - arrived - serving, 0),
       status: booking.queueStatus,
       isExpired: booking.isExpired || false,
     };

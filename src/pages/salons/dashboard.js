@@ -10,11 +10,14 @@ function TimeRemaining({ endTime }) {
   const [timeLeft, setTimeLeft] = useState("");
   // Run every hour
   useEffect(() => {
-    const interval = setInterval(async () => {
-      await fetch("/api/walkin/booking/mark-expired", {
-        method: "POST",
-      });
-    }, 60 * 60 * 1000); // Every hour
+    const interval = setInterval(
+      async () => {
+        await fetch("/api/walkin/booking/mark-expired", {
+          method: "POST",
+        });
+      },
+      60 * 60 * 1000,
+    ); // Every hour
 
     return () => clearInterval(interval);
   }, []);
@@ -58,7 +61,7 @@ export default function DashboardPage() {
   const [error, setError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [serviceTimers, setServiceTimers] = useState({});
@@ -97,7 +100,7 @@ export default function DashboardPage() {
   // Service time notification system
   useEffect(() => {
     const activeBookings = bookings.filter(
-      (b) => b.status === "started" && b.serviceEndTime
+      (b) => b.status === "started" && b.serviceEndTime,
     );
 
     const checkTimers = () => {
@@ -112,7 +115,7 @@ export default function DashboardPage() {
           playNotificationSound();
           showNotification(
             `⏰ 5 Minutes Left!`,
-            `Service for ${booking.customerName} ending soon`
+            `Service for ${booking.customerName} ending soon`,
           );
           setServiceTimers((prev) => ({
             ...prev,
@@ -125,7 +128,7 @@ export default function DashboardPage() {
           playNotificationSound();
           showNotification(
             `⏰ 2 Minutes Left!`,
-            `Service for ${booking.customerName} almost done`
+            `Service for ${booking.customerName} almost done`,
           );
           setServiceTimers((prev) => ({
             ...prev,
@@ -138,7 +141,7 @@ export default function DashboardPage() {
           playNotificationSound();
           showNotification(
             `✅ Time's Up!`,
-            `Mark ${booking.customerName}'s service as Done or add more time`
+            `Mark ${booking.customerName}'s service as Done or add more time`,
           );
           setServiceTimers((prev) => ({
             ...prev,
@@ -209,7 +212,7 @@ export default function DashboardPage() {
         "🔄 Loading bookings for salon:",
         salonId,
         "date:",
-        dateString
+        dateString,
       );
 
       // Mark expired first
@@ -227,7 +230,7 @@ export default function DashboardPage() {
         {
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
 
       let data = []; // Declare data outside the if block
@@ -246,7 +249,7 @@ export default function DashboardPage() {
       // **ALSO fetch barbers to check availability**
       try {
         const barbersRes = await fetch(
-          `/api/salons/barbers?salonId=${salonId}`
+          `/api/salons/barbers?salonId=${salonId}`,
         );
         if (barbersRes.ok) {
           const barbersData = await barbersRes.json();
@@ -300,7 +303,7 @@ export default function DashboardPage() {
       });
 
       console.log(
-        `✅ Active bookings after filtering: ${sortedBookings.length}`
+        `✅ Active bookings after filtering: ${sortedBookings.length}`,
       );
       setBookings(sortedBookings);
       setError(null); // Clear any previous errors
@@ -334,7 +337,7 @@ export default function DashboardPage() {
         // Fetch fresh bookings
         const res = await fetch(
           `/api/salons/bookings?salonId=${salon.id}&date=${selectedDate}`,
-          { cache: "no-store" }
+          { cache: "no-store" },
         );
 
         if (res.ok) {
@@ -345,20 +348,20 @@ export default function DashboardPage() {
           if (previousBookingIds.size > 0) {
             const addedBookings = newBookings.filter(
               (b) =>
-                !previousBookingIds.has(b._id?.toString() || b.id?.toString())
+                !previousBookingIds.has(b._id?.toString() || b.id?.toString()),
             );
 
             // Show toast for each new booking
             addedBookings.forEach((booking) => {
               showSuccess(
-                `🔔 New Booking: ${booking.customerName} booked with ${booking.barber}`
+                `🔔 New Booking: ${booking.customerName} booked with ${booking.barber}`,
               );
             });
           }
 
           // Update tracking
           previousBookingIds = new Set(
-            newBookings.map((b) => b._id?.toString() || b.id?.toString())
+            newBookings.map((b) => b._id?.toString() || b.id?.toString()),
           );
 
           // Update state
@@ -391,12 +394,28 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!router.isReady) return;
-    const salonSession = localStorage.getItem("salonSession");
-    if (!salonSession) {
-      router.push("/auth/salon/login");
+    const salonSession = sessionStorage.getItem("salonSession");
+
+    if (!salonSession || salonSession === "undefined") {
+      console.error("No salon session found");
+      sessionStorage.removeItem("salonSession");
+      router.push("/auth/login?role=salon");
       return;
     }
-    const salonData = JSON.parse(salonSession);
+
+    let salonData;
+    try {
+      salonData = JSON.parse(salonSession);
+      if (!salonData || !salonData._id) {
+        throw new Error("Invalid salon data");
+      }
+    } catch (error) {
+      console.error("Failed to parse salon session:", error);
+      sessionStorage.removeItem("salonSession");
+      router.push("/auth/login?role=salon");
+      return;
+    }
+
     setSalon(salonData);
     loadBookings(salonData._id, selectedDate);
     loadBarbers(salonData._id);
@@ -467,7 +486,7 @@ export default function DashboardPage() {
 
         // Show position dialog with actual position number
         showSuccess(
-          `${bookingData.customerName} checked in!\nQueue Position: #${bookingData.queuePosition}`
+          `${bookingData.customerName} checked in!\nQueue Position: #${bookingData.queuePosition}`,
         );
 
         setScanResult({
@@ -492,7 +511,7 @@ export default function DashboardPage() {
   const updateBookingStatus = async (
     bookingId,
     newStatus,
-    estimatedTime = null
+    estimatedTime = null,
   ) => {
     try {
       const queueStatusMap = {
@@ -529,8 +548,8 @@ export default function DashboardPage() {
                   queueStatus: queueStatusMap[newStatus],
                   estimatedDuration: estimatedTime || b.estimatedDuration,
                 }
-              : b
-          )
+              : b,
+          ),
         );
 
         if (salon) {
@@ -551,7 +570,7 @@ export default function DashboardPage() {
 
     try {
       const booking = bookings.find(
-        (b) => b._id === bookingId || b.id === bookingId
+        (b) => b._id === bookingId || b.id === bookingId,
       );
       if (!booking) {
         console.error("Booking not found:", bookingId);
@@ -587,12 +606,12 @@ export default function DashboardPage() {
                   estimatedDuration: newEstimatedDuration,
                   serviceEndTime: data.newEndTime,
                 }
-              : b
-          )
+              : b,
+          ),
         );
 
         showSuccess(
-          `Added ${additionalMinutes} minutes. New duration: ${newEstimatedDuration} mins`
+          `Added ${additionalMinutes} minutes. New duration: ${newEstimatedDuration} mins`,
         );
 
         // Refresh bookings
@@ -921,16 +940,16 @@ export default function DashboardPage() {
                     salonStatus.isPaused
                       ? styles.paused
                       : salonStatus.isOpen
-                      ? styles.open
-                      : styles.closed
+                        ? styles.open
+                        : styles.closed
                   }`}
                 >
                   <span className={styles.statusDot}></span>
                   {salonStatus.isPaused
                     ? "Paused"
                     : salonStatus.isOpen
-                    ? "Open"
-                    : "Closed"}
+                      ? "Open"
+                      : "Closed"}
                 </div>
               </div>
             </div>
@@ -1192,16 +1211,16 @@ export default function DashboardPage() {
                       const barberBookings = bookings.filter(
                         (b) =>
                           b.barberId?.toString() ===
-                          (barber._id || barber.id)?.toString()
+                          (barber._id || barber.id)?.toString(),
                       );
                       const greenBooking = barberBookings.find(
-                        (b) => b.queueStatus === "GREEN"
+                        (b) => b.queueStatus === "GREEN",
                       );
                       const orangeBookings = barberBookings.filter(
-                        (b) => b.queueStatus === "ORANGE"
+                        (b) => b.queueStatus === "ORANGE",
                       );
                       const redBookings = barberBookings.filter(
-                        (b) => b.queueStatus === "RED"
+                        (b) => b.queueStatus === "RED",
                       );
 
                       return (
@@ -1240,7 +1259,7 @@ export default function DashboardPage() {
                               .sort(
                                 (a, b) =>
                                   new Date(a.bookedAt || a.createdAt) -
-                                  new Date(b.bookedAt || b.createdAt)
+                                  new Date(b.bookedAt || b.createdAt),
                               )
                               .map((b, idx) => (
                                 <div
@@ -1272,7 +1291,7 @@ export default function DashboardPage() {
                               .sort(
                                 (a, b) =>
                                   new Date(a.bookedAt || a.createdAt) -
-                                  new Date(b.bookedAt || b.createdAt)
+                                  new Date(b.bookedAt || b.createdAt),
                               )
                               .map((b, idx) => (
                                 <div
@@ -1388,12 +1407,12 @@ export default function DashboardPage() {
                                     {(() => {
                                       const now = new Date();
                                       const started = new Date(
-                                        b.serviceStartedAt
+                                        b.serviceStartedAt,
                                       );
                                       const duration =
                                         b.estimatedDuration || 30;
                                       const elapsed = Math.floor(
-                                        (now - started) / 1000 / 60
+                                        (now - started) / 1000 / 60,
                                       );
                                       const isOvertime = elapsed > duration;
 
@@ -1423,12 +1442,12 @@ export default function DashboardPage() {
                                     {(() => {
                                       const now = new Date();
                                       const started = new Date(
-                                        b.serviceStartedAt
+                                        b.serviceStartedAt,
                                       );
                                       const duration =
                                         b.estimatedDuration || 30;
                                       const elapsed = Math.floor(
-                                        (now - started) / 1000 / 60
+                                        (now - started) / 1000 / 60,
                                       );
                                       const isOvertime = elapsed > duration;
 
@@ -1564,16 +1583,16 @@ export default function DashboardPage() {
                             const barberBookings = bookings.filter(
                               (b) =>
                                 b.barberId?.toString() ===
-                                (barber._id || barber.id)?.toString()
+                                (barber._id || barber.id)?.toString(),
                             );
                             const greenBooking = barberBookings.find(
-                              (b) => b.queueStatus === "GREEN"
+                              (b) => b.queueStatus === "GREEN",
                             );
                             const orangeBookings = barberBookings.filter(
-                              (b) => b.queueStatus === "ORANGE"
+                              (b) => b.queueStatus === "ORANGE",
                             );
                             const redBookings = barberBookings.filter(
-                              (b) => b.queueStatus === "RED"
+                              (b) => b.queueStatus === "RED",
                             );
 
                             return barberBookings.length > 0 ? (
@@ -1614,9 +1633,9 @@ export default function DashboardPage() {
                                         .sort(
                                           (a, b) =>
                                             new Date(
-                                              a.bookedAt || a.createdAt
+                                              a.bookedAt || a.createdAt,
                                             ) -
-                                            new Date(b.bookedAt || b.createdAt)
+                                            new Date(b.bookedAt || b.createdAt),
                                         )
                                         .map((b, idx) => (
                                           <div
@@ -1649,9 +1668,9 @@ export default function DashboardPage() {
                                         .sort(
                                           (a, b) =>
                                             new Date(
-                                              a.bookedAt || a.createdAt
+                                              a.bookedAt || a.createdAt,
                                             ) -
-                                            new Date(b.bookedAt || b.createdAt)
+                                            new Date(b.bookedAt || b.createdAt),
                                         )
                                         .map((b, idx) => (
                                           <div
@@ -1699,11 +1718,11 @@ export default function DashboardPage() {
                                 ? new Date(b.createdAt)
                                 : new Date();
                               const expiryTime = new Date(
-                                createdTime.getTime() + 45 * 60 * 1000
+                                createdTime.getTime() + 45 * 60 * 1000,
                               );
                               const timeUntilExpiry = expiryTime - now;
                               const minutesLeft = Math.floor(
-                                timeUntilExpiry / 1000 / 60
+                                timeUntilExpiry / 1000 / 60,
                               );
 
                               let statusColor = "#ddd3c8"; // grey for BOOKED
@@ -1738,10 +1757,10 @@ export default function DashboardPage() {
                                     b.queueStatus === "GREEN"
                                       ? styles.greenCard
                                       : b.queueStatus === "ORANGE"
-                                      ? styles.orangeCard
-                                      : b.queueStatus === "COMPLETED"
-                                      ? styles.completedCard
-                                      : ""
+                                        ? styles.orangeCard
+                                        : b.queueStatus === "COMPLETED"
+                                          ? styles.completedCard
+                                          : ""
                                   }`}
                                   style={{
                                     background: statusColor,
@@ -1751,7 +1770,7 @@ export default function DashboardPage() {
                                 >
                                   {/* Card loading overlay */}
                                   {Object.keys(actionLoading).some((key) =>
-                                    key.includes(b._id)
+                                    key.includes(b._id),
                                   ) && (
                                     <div className={styles.cardLoadingOverlay}>
                                       <div className={styles.spinner} />
@@ -1771,17 +1790,17 @@ export default function DashboardPage() {
                                         b.queuePosition === 1
                                           ? "1st"
                                           : b.queuePosition === 2
-                                          ? "2nd"
-                                          : b.queuePosition === 3
-                                          ? "3rd"
-                                          : `${b.queuePosition}th`}
+                                            ? "2nd"
+                                            : b.queuePosition === 3
+                                              ? "3rd"
+                                              : `${b.queuePosition}th`}
                                       </span>
                                       <span className={styles.positionType}>
                                         {(() => {
                                           const hasActiveService =
                                             barberBookings.some(
                                               (booking) =>
-                                                booking.queueStatus === "GREEN"
+                                                booking.queueStatus === "GREEN",
                                             );
                                           return hasActiveService
                                             ? "Waiting"
@@ -1797,7 +1816,7 @@ export default function DashboardPage() {
                                     <div className={styles.bookingTime}>
                                       <div className={styles.timeBig}>
                                         {new Date(
-                                          b.createdAt
+                                          b.createdAt,
                                         ).toLocaleTimeString("en-IN", {
                                           hour: "2-digit",
                                           minute: "2-digit",
@@ -1835,14 +1854,14 @@ export default function DashboardPage() {
                                           {(() => {
                                             const now = new Date();
                                             const started = new Date(
-                                              b.serviceStartedAt
+                                              b.serviceStartedAt,
                                             );
                                             const duration =
                                               b.estimatedDuration ||
                                               b.selectedDuration ||
                                               30;
                                             const elapsed = Math.floor(
-                                              (now - started) / 1000 / 60
+                                              (now - started) / 1000 / 60,
                                             );
                                             const isOvertime =
                                               elapsed > duration;
@@ -1966,7 +1985,7 @@ export default function DashboardPage() {
                                       (() => {
                                         const now = new Date();
                                         const bufferTime = new Date(
-                                          now.getTime() - 5 * 60 * 1000
+                                          now.getTime() - 5 * 60 * 1000,
                                         );
                                         const isExpired =
                                           b.isExpired ||
@@ -1979,7 +1998,7 @@ export default function DashboardPage() {
                                               !isExpired &&
                                               updateBookingStatus(
                                                 b._id,
-                                                "arrived"
+                                                "arrived",
                                               )
                                             }
                                             className={
@@ -2009,30 +2028,30 @@ export default function DashboardPage() {
                                         const hasActiveService =
                                           barberBookings.some(
                                             (booking) =>
-                                              booking.queueStatus === "GREEN"
+                                              booking.queueStatus === "GREEN",
                                           );
 
                                         // Calculate actual position by counting ORANGE bookings sorted by bookedAt
                                         const orangeForBarber = barberBookings
                                           .filter(
                                             (booking) =>
-                                              booking.queueStatus === "ORANGE"
+                                              booking.queueStatus === "ORANGE",
                                           )
                                           .sort(
                                             (a, b) =>
                                               new Date(
-                                                a.bookedAt || a.createdAt
+                                                a.bookedAt || a.createdAt,
                                               ) -
                                               new Date(
-                                                b.bookedAt || b.createdAt
-                                              )
+                                                b.bookedAt || b.createdAt,
+                                              ),
                                           );
 
                                         const actualPosition =
                                           orangeForBarber.findIndex(
                                             (booking) =>
                                               (booking._id || booking.id) ===
-                                              (b._id || b.id)
+                                              (b._id || b.id),
                                           ) + 1;
 
                                         // Can start if: no active service AND is position 1
@@ -2047,7 +2066,7 @@ export default function DashboardPage() {
                                                 onClick={() => {
                                                   setBookingToStart(b);
                                                   setTimeEstimate(
-                                                    b.estimatedDuration || 30
+                                                    b.estimatedDuration || 30,
                                                   );
                                                   setShowTimeModal(true);
                                                 }}
@@ -2145,7 +2164,7 @@ export default function DashboardPage() {
                                         <button
                                           className={`${styles.pauseBtn} ${
                                             pausedBarbers.has(
-                                              barber._id || barber.id
+                                              barber._id || barber.id,
                                             )
                                               ? styles.pausedBtn
                                               : ""
@@ -2153,12 +2172,12 @@ export default function DashboardPage() {
                                           onClick={() =>
                                             handleTogglePause(
                                               barber._id || barber.id,
-                                              barber.name
+                                              barber.name,
                                             )
                                           }
                                         >
                                           {pausedBarbers.has(
-                                            barber._id || barber.id
+                                            barber._id || barber.id,
                                           )
                                             ? "▶ Resume"
                                             : "⏸ Pause"}
@@ -2186,17 +2205,17 @@ export default function DashboardPage() {
                                                     bookingId: b._id,
                                                     barberId: b.barberId,
                                                   }),
-                                                }
+                                                },
                                               );
                                               if (response.ok) {
                                                 await loadBookings(
-                                                  salon._id || salon.id
+                                                  salon._id || salon.id,
                                                 );
                                               }
                                             } catch (error) {
                                               console.error(
                                                 "Error ending service:",
-                                                error
+                                                error,
                                               );
                                             } finally {
                                               setActionLoading((prev) => {
@@ -2499,7 +2518,7 @@ export default function DashboardPage() {
                   await updateBookingStatus(
                     bookingToStart._id,
                     "started",
-                    timeEstimate
+                    timeEstimate,
                   );
                   setShowTimeModal(false);
                   setBookingToStart(null);
@@ -2597,7 +2616,7 @@ export default function DashboardPage() {
                       handleBarberBreak(
                         selectedBarberForBreak,
                         "Custom Break",
-                        parseInt(customBreakTime)
+                        parseInt(customBreakTime),
                       );
                       setCustomBreakTime("");
                     }

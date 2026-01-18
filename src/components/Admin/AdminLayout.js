@@ -4,14 +4,29 @@ import styles from "../../styles/Admin/AdminLayout.module.css";
 export default function AdminLayout({ children }) {
   const router = useRouter();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      // ✅ Call logout API to clear cookies
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (error) {
+      console.error("Logout API error:", error);
+    }
+
+    // ✅ Clear admin storage
     localStorage.removeItem("adminToken");
     localStorage.removeItem("adminData");
+    sessionStorage.clear();
+
+    // ✅ Redirect to admin login
     router.push("/admin/login");
   };
 
   const navigation = [
     { name: "Dashboard", path: "/admin/dashboard", icon: "📊" },
+    { name: "Salon Register", path: "/admin/salon-register", icon: "📝" },
     { name: "Salons", path: "/admin/salons", icon: "🏢" },
     { name: "Users", path: "/admin/users", icon: "👥" },
     { name: "Revenue", path: "/admin/revenue", icon: "💰" },

@@ -4,8 +4,7 @@ import styles from "../../styles/WalkinConfirmation.module.css";
 import feedbackStyles from "../../styles/Feedback.module.css";
 import { motion } from "framer-motion";
 import { isAuthenticated } from "@/lib/cookieAuth";
-import { showError, showWarning } from "@/lib/toast";
-import Image from "next/image";
+import { showError, showWarning, showSuccess } from "@/lib/toast";
 // Format time ago
 const formatTimeAgo = (date) => {
   if (!date) return "N/A";
@@ -95,8 +94,9 @@ export default function WalkinConfirmation() {
         console.log("📥 Fetching booking:", bookingId);
 
         // Mark expired first
-        await fetch("/api/walkin/mark-expired", { method: "POST" });
-
+        if (process.env.NODE_ENV === "development") {
+          await fetch("/api/walkin/mark-expired", { method: "POST" });
+        }
         const res = await fetch(`/api/walkin/booking/${bookingId}`, {
           cache: "no-store",
         });
@@ -119,8 +119,10 @@ export default function WalkinConfirmation() {
           setLoading(false); // ✅ ADD THIS
           return;
         }
-        setBooking(data.booking);
-
+        setBooking({
+          ...data.booking,
+          barberName: data.booking.barber || data.booking.barberName,
+        });
         // Generate QR Code dynamically
         if (data.booking?.bookingCode && !qrCodeUrl) {
           try {
@@ -163,13 +165,26 @@ export default function WalkinConfirmation() {
 
     const updateCountdown = () => {
       const remaining = new Date(booking.expiresAt) - new Date();
-      if (remaining > 0) {
-        const minutes = Math.floor(remaining / 1000 / 60);
-        const seconds = Math.floor((remaining / 1000) % 60);
-        setTimeLeft(`${minutes}:${seconds.toString().padStart(2, "0")}`);
-      } else {
-        setTimeLeft("EXPIRED");
+      if (!booking.expiresAt) {
+        setTimeLeft(null);
+        return;
       }
+
+      const remainingMs = new Date(booking.expiresAt).getTime() - Date.now();
+
+      if (Number.isNaN(remainingMs)) {
+        setTimeLeft(null);
+        return;
+      }
+
+      if (remainingMs <= 0) {
+        setTimeLeft("EXPIRED");
+        return;
+      }
+
+      const minutes = Math.floor(remainingMs / 1000 / 60);
+      const seconds = Math.floor((remainingMs / 1000) % 60);
+      setTimeLeft(`${minutes}:${seconds.toString().padStart(2, "0")}`);
     };
 
     updateCountdown(); // Call immediately
@@ -193,15 +208,28 @@ export default function WalkinConfirmation() {
         const data = await res.json();
 
         // ✅ Update state with lightweight data
-        setBooking((prev) => ({
-          ...prev,
-          queueStatus: data.status,
-          queuePosition: data.position,
-          isExpired: data.isExpired,
-        }));
+        setBooking((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            queueStatus: data.status,
+            queuePosition: data.position,
+            isExpired: data.isExpired,
+          };
+        });
+
+        // ✅ ALSO set queueInfo (required for UI)
+        setQueueInfo({
+          position: data.position,
+          arrived: data.arrived,
+          booked: data.booked,
+          serving: data.serving,
+          status: data.status,
+          queueList: data.queueList || [],
+        });
 
         // ✅ Auto-show feedback when COMPLETED
-        if (data.status === "COMPLETED" && !showFeedback) {
+        if (booking?.status === "completed" && !showFeedback) {
           setShowFeedback(true);
           showSuccess("Service completed! Please leave feedback.");
         }
@@ -285,7 +313,10 @@ export default function WalkinConfirmation() {
             return true;
           });
 
-          setBarberQueueData({ ...data, queue: activeQueue });
+          setBarberQueueData({
+            ...data,
+            queue: Array.isArray(activeQueue) ? activeQueue : [],
+          });
         } else {
           console.error("❌ Queue fetch failed:", res.status);
         }
@@ -608,7 +639,6 @@ export default function WalkinConfirmation() {
                 width={200}
                 height={200}
                 className={styles.qrCode}
-                unoptimized
               />
             ) : (
               <div className={styles.qrPlaceholder}>
@@ -731,7 +761,7 @@ export default function WalkinConfirmation() {
         )}
         {/* NEW: Queue Visualization */}
         {queueInfo && (
-          <div style={styles.queueVisualizationContainer}>
+          <div className={styles.queueVisualizationContainer}>
             <h3>📍 Your Queue Position</h3>
             <div
               style={{
@@ -751,94 +781,95 @@ export default function WalkinConfirmation() {
               </div>
             </div>
 
-            <div style={styles.queueStatsRow}>
-              <div style={{ ...styles.statBox, background: "#86efac" }}>
-                <div style={styles.statNumber}>{queueInfo.position}</div>
-                <div style={styles.statLabel}>Your Position</div>
+            <div className={styles.queueStatsRow}>
+              <div className={styles.statBox} style={{ background: "#86efac" }}>
+                <div className={styles.statNumber}>{queueInfo.position}</div>
+                <div className={styles.statLabel}>Your Position</div>
               </div>
-              <div style={{ ...styles.statBox, background: "#fbbf24" }}>
-                <div style={styles.statNumber}>{queueInfo.arrived}</div>
-                <div style={styles.statLabel}>Arrived (Priority)</div>
+              <div className={styles.statBox} style={{ background: "#fbbf24" }}>
+                <div className={styles.statNumber}>{queueInfo.arrived}</div>
+                <div className={styles.statLabel}>Arrived (Priority)</div>
               </div>
-              <div style={{ ...styles.statBox, background: "#d1d5db" }}>
-                <div style={styles.statNumber}>{queueInfo.booked}</div>
-                <div style={styles.statLabel}>Bookings (Temp)</div>
+              <div className={styles.statBox} style={{ background: "#d1d5db" }}>
+                <div className={styles.statNumber}>{queueInfo.booked}</div>
+                <div className={styles.statLabel}>Bookings (Temp)</div>
               </div>
             </div>
 
-            <div style={styles.queueVisualItems}>
-              {queueInfo.queueList.map((item, idx) => {
-                console.log(
-                  "🔍 QUEUE ITEM:",
-                  item.name,
-                  "position:",
-                  item.position,
-                  "id:",
-                  item.id,
-                  "_id:",
-                  item._id
-                );
-                // FIX: Compare using booking ID, not position
-                const bookingIdStr = (booking._id || booking.id)?.toString();
-                const itemIdStr = (
-                  item._id ||
-                  item.bookingId ||
-                  item.id
-                )?.toString();
+            <div className={styles.queueVisualItems}>
+              {Array.isArray(queueInfo?.queueList) &&
+                queueInfo.queueList.map((item, idx) => {
+                  console.log(
+                    "🔍 QUEUE ITEM:",
+                    item.name,
+                    "position:",
+                    item.position,
+                    "id:",
+                    item.id,
+                    "_id:",
+                    item._id
+                  );
+                  // FIX: Compare using booking ID, not position
+                  const bookingIdStr = (booking._id || booking.id)?.toString();
+                  const itemIdStr = (
+                    item._id ||
+                    item.bookingId ||
+                    item.id
+                  )?.toString();
 
-                // DEBUG - Check first card
-                const isYou = bookingIdStr === itemIdStr;
+                  // DEBUG - Check first card
+                  const isYou = bookingIdStr === itemIdStr;
 
-                // DEBUG
-                console.log(
-                  "🔍",
-                  item.name,
-                  "| isYou:",
-                  isYou,
-                  "| cardId:",
-                  itemIdStr
-                );
+                  // DEBUG
+                  console.log(
+                    "🔍",
+                    item.name,
+                    "| isYou:",
+                    isYou,
+                    "| cardId:",
+                    itemIdStr
+                  );
 
-                const bgColor =
-                  item.status === "SERVING"
-                    ? "rgba(16, 185, 129, 0.25)" // GREEN - 25% opacity fill
-                    : item.status === "ARRIVED"
-                    ? "rgba(245, 158, 11, 0.25)" // ORANGE - 25% opacity fill
-                    : "rgba(156, 163, 175, 0.25)"; // GRAY - 25% opacity fill
+                  const bgColor =
+                    item.status === "SERVING"
+                      ? "rgba(16, 185, 129, 0.25)" // GREEN - 25% opacity fill
+                      : item.status === "ARRIVED"
+                      ? "rgba(245, 158, 11, 0.25)" // ORANGE - 25% opacity fill
+                      : "rgba(156, 163, 175, 0.25)"; // GRAY - 25% opacity fill
 
-                const borderStyle =
-                  item.status === "BOOKED"
-                    ? "3px dotted #10b981" // GREEN border for booked
-                    : item.status === "SERVING"
-                    ? "3px solid #10b981" // GREEN border for serving
-                    : item.status === "ARRIVED"
-                    ? "3px solid #f59e0b" // ORANGE border for arrived
-                    : "3px solid #9ca3af"; // GRAY border for waiting
+                  const borderStyle =
+                    item.status === "BOOKED"
+                      ? "3px dotted #10b981" // GREEN border for booked
+                      : item.status === "SERVING"
+                      ? "3px solid #10b981" // GREEN border for serving
+                      : item.status === "ARRIVED"
+                      ? "3px solid #f59e0b" // ORANGE border for arrived
+                      : "3px solid #9ca3af"; // GRAY border for waiting
 
-                return (
-                  <div
-                    key={item.id}
-                    style={{
-                      ...styles.queueVisItem,
-                      background: bgColor,
-                      border: borderStyle,
-                      opacity: isYou ? 1 : 0.7,
-                      boxShadow: "none", // Removed glow, fill does the job
-                      border: isYou ? "3px solid #000" : borderStyle, // Bold black border for YOU
+                  return (
+                    <div
+                      key={item.id}
+                      className={styles.queueVisItem}
+                      style={{
+                        background: bgColor,
+                        border: borderStyle,
+                        opacity: isYou ? 1 : 0.7,
+                        boxShadow: "none", // Removed glow, fill does the job
+                        border: isYou ? "3px solid #000" : borderStyle, // Bold black border for YOU
 
-                      transform: isYou ? "scale(1.05)" : "scale(1)",
-                    }}
-                  >
-                    <div style={styles.position}>#{item.position}</div>
-                    <div style={styles.name}>{item.name}</div>
-                    {isYou && <div style={styles.youBadge}>YOU</div>}
-                  </div>
-                );
-              })}
+                        transform: isYou ? "scale(1.05)" : "scale(1)",
+                      }}
+                    >
+                      <div className={styles.position}>#{item.position}</div>
+                      <div className={styles.name}>{item.name}</div>
+                      {isYou && <div className={styles.youBadge}>YOU</div>}
+                    </div>
+                  );
+                })}
             </div>
 
-            <div style={styles.legend}>
-              <div style={styles.legendItem}>
+            <div className={styles.legend}>
+              <div className={styles.legendItem}>
                 <div
                   style={{
                     width: 20,
@@ -850,7 +881,7 @@ export default function WalkinConfirmation() {
                 ></div>
                 <span>🟢 Serving Now</span>
               </div>
-              <div style={styles.legendItem}>
+              <div className={styles.legendItem}>
                 <div
                   style={{
                     width: 20,
@@ -862,7 +893,7 @@ export default function WalkinConfirmation() {
                 ></div>
                 <span>🟡 Arrived (Priority)</span>
               </div>
-              <div style={styles.legendItem}>
+              <div className={styles.legendItem}>
                 <div
                   style={{
                     width: 20,
@@ -1008,184 +1039,188 @@ export default function WalkinConfirmation() {
 
               <div className={styles.horizontalQueue}>
                 {/* Priority Queue Golden */}
-                {barberQueueData.queue
-                  ?.filter((c) => c.queueStatus === "ORANGE")
-                  .map((customer, idx) => {
-                    // Use strict comparison wi th both _id and id
-                    const bookingIdStr =
-                      booking._id?.toString() || booking.id?.toString();
-                    const customerIdStr =
-                      customer._id?.toString() || customer.id?.toString();
-                    const isYou = bookingIdStr === customerIdStr;
-                    console.log("🔍 BARBER QUEUE:", customer.customerName, {
-                      myId: bookingIdStr,
-                      customerId: customerIdStr,
-                      isYou: isYou,
-                    });
-                    const createdAtDate = customer.createdAt
-                      ? new Date(customer.createdAt)
-                      : null;
-                    const pos = idx + 1;
-                    // ... rest of code
+                {Array.isArray(barberQueueData?.queue) &&
+                  barberQueueData.queue
+                    .filter((c) => c.queueStatus === "ORANGE")
+                    .map((customer, idx) => {
+                      // Use strict comparison wi th both _id and id
+                      const bookingIdStr =
+                        booking._id?.toString() || booking.id?.toString();
+                      const customerIdStr =
+                        customer._id?.toString() || customer.id?.toString();
+                      const isYou = bookingIdStr === customerIdStr;
+                      console.log("🔍 BARBER QUEUE:", customer.customerName, {
+                        myId: bookingIdStr,
+                        customerId: customerIdStr,
+                        isYou: isYou,
+                      });
+                      const createdAtDate = customer.createdAt
+                        ? new Date(customer.createdAt)
+                        : null;
+                      const pos = idx + 1;
+                      // ... rest of code
 
-                    const posLabel =
-                      pos === 1
-                        ? "1st"
-                        : pos === 2
-                        ? "2nd"
-                        : pos === 3
-                        ? "3rd"
-                        : `${pos}th`;
+                      const posLabel =
+                        pos === 1
+                          ? "1st"
+                          : pos === 2
+                          ? "2nd"
+                          : pos === 3
+                          ? "3rd"
+                          : `${pos}th`;
 
-                    return (
-                      <motion.div
-                        key={customer.id}
-                        className={`${styles.modernQueueItem} ${
-                          styles.orangeCard || ""
-                        }`}
-                        initial={{ opacity: 0, x: -50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        whileHover={{ scale: 1.1, zIndex: 10 }}
-                        style={{
-                          background: "rgba(245, 158, 11, 0.75)", // 25% orange fill instead of gradient
-                          border: isYou
-                            ? "3px solid #000"
-                            : "3px solid #f59e0b", // Bold border for YOU
-                          boxShadow: isYou
-                            ? "0 0 30px rgba(251, 191, 36, 0.8), 0 8px 20px rgba(0,0,0,0.2)"
-                            : "0 4px 15px rgba(0,0,0,0.15)",
-                          position: "relative",
-                        }}
-                      >
-                        {/* Position label top-right */}
-                        <div className={styles.positionLabel}>
-                          <span className={styles.positionNumber}>
-                            {posLabel}
-                          </span>
-                          <span className={styles.positionType}>Priority</span>
-                        </div>
-
-                        {/* Booking created time top-left */}
-                        {createdAtDate && (
-                          <div className={styles.bookingTime}>
-                            <div className={styles.timeSmall}>
-                              {createdAtDate.toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })}
-                            </div>
-                            <div className={styles.timeBig}>
-                              {createdAtDate.toLocaleTimeString("en-US", {
-                                hour: "numeric",
-                                minute: "2-digit",
-                                hour12: true,
-                              })}
-                            </div>
+                      return (
+                        <motion.div
+                          key={customer.id}
+                          className={`${styles.modernQueueItem} ${
+                            styles.orangeCard || ""
+                          }`}
+                          initial={{ opacity: 0, x: -50 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.1 }}
+                          whileHover={{ scale: 1.1, zIndex: 10 }}
+                          style={{
+                            background: "rgba(245, 158, 11, 0.75)", // 25% orange fill instead of gradient
+                            border: isYou
+                              ? "3px solid #000"
+                              : "3px solid #f59e0b", // Bold border for YOU
+                            boxShadow: isYou
+                              ? "0 0 30px rgba(251, 191, 36, 0.8), 0 8px 20px rgba(0,0,0,0.2)"
+                              : "0 4px 15px rgba(0,0,0,0.15)",
+                            position: "relative",
+                          }}
+                        >
+                          {/* Position label top-right */}
+                          <div className={styles.positionLabel}>
+                            <span className={styles.positionNumber}>
+                              {posLabel}
+                            </span>
+                            <span className={styles.positionType}>
+                              Priority
+                            </span>
                           </div>
-                        )}
 
-                        <div className={styles.positionBadge}>{pos}</div>
-                        <div className={styles.customerAvatar}>
-                          {customer.customerName
-                            ? customer.customerName.charAt(0)
-                            : "?"}
-                        </div>
-                        <div className={styles.customerName}>
-                          {customer.customerName || "Guest"}
-                        </div>
-                        <div className={styles.queueTime}>
-                          {formatTimeAgo(customer.arrivedAt)}
-                        </div>
-                        {isYou && (
-                          <motion.div
-                            className={styles.youPill}
-                            animate={{ scale: [1, 1.1, 1] }}
-                            transition={{ duration: 1, repeat: Infinity }}
-                          >
-                            YOU
-                          </motion.div>
-                        )}
-                        <div
-                          className={styles.statusDot}
-                          style={{ background: "#fbbf24" }}
-                        />
-                      </motion.div>
-                    );
-                  })}
+                          {/* Booking created time top-left */}
+                          {createdAtDate && (
+                            <div className={styles.bookingTime}>
+                              <div className={styles.timeSmall}>
+                                {createdAtDate.toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </div>
+                              <div className={styles.timeBig}>
+                                {createdAtDate.toLocaleTimeString("en-US", {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                  hour12: true,
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className={styles.positionBadge}>{pos}</div>
+                          <div className={styles.customerAvatar}>
+                            {customer.customerName
+                              ? customer.customerName.charAt(0)
+                              : "?"}
+                          </div>
+                          <div className={styles.customerName}>
+                            {customer.customerName || "Guest"}
+                          </div>
+                          <div className={styles.queueTime}>
+                            {formatTimeAgo(customer.arrivedAt)}
+                          </div>
+                          {isYou && (
+                            <motion.div
+                              className={styles.youPill}
+                              animate={{ scale: [1, 1.1, 1] }}
+                              transition={{ duration: 1, repeat: Infinity }}
+                            >
+                              YOU
+                            </motion.div>
+                          )}
+                          <div
+                            className={styles.statusDot}
+                            style={{ background: "#fbbf24" }}
+                          />
+                        </motion.div>
+                      );
+                    })}
 
                 {/* Temporary Queue (Grey Dotted) */}
-                {barberQueueData.queue
-                  ?.filter((c) => c.queueStatus === "RED")
-                  .map((customer, idx) => {
-                    // Use strict comparison with both _id and id
-                    const bookingIdStr =
-                      booking._id?.toString() || booking.id?.toString();
-                    const customerIdStr =
-                      customer._id?.toString() || customer.id?.toString();
-                    const isYou = bookingIdStr === customerIdStr;
+                {Array.isArray(barberQueueData?.queue) &&
+                  barberQueueData.queue
+                    .filter((c) => c.queueStatus === "RED")
+                    .map((customer, idx) => {
+                      // Use strict comparison with both _id and id
+                      const bookingIdStr =
+                        booking._id?.toString() || booking.id?.toString();
+                      const customerIdStr =
+                        customer._id?.toString() || customer.id?.toString();
+                      const isYou = bookingIdStr === customerIdStr;
 
-                    const priorityCount = barberQueueData.queue.filter(
-                      (c) => c.queueStatus === "ORANGE"
-                    ).length;
+                      const priorityCount = barberQueueData.queue.filter(
+                        (c) => c.queueStatus === "ORANGE"
+                      ).length;
 
-                    return (
-                      <motion.div
-                        key={customer._id}
-                        className={styles.modernQueueItem}
-                        initial={{ opacity: 0, x: -50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: (priorityCount + idx) * 0.1 }}
-                        whileHover={{ scale: 1.1, zIndex: 10 }}
-                        style={{
-                          background:
-                            "linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)",
-                          border: "3px dotted #000",
-                          boxShadow: isYou
-                            ? "0 0 30px rgba(209, 213, 219, 0.8), 0 8px 20px rgba(0,0,0,0.2)"
-                            : "0 4px 15px rgba(0,0,0,0.15)",
-                        }}
-                      >
-                        <div
-                          className={styles.positionBadge}
-                          style={{ opacity: 0.6 }}
+                      return (
+                        <motion.div
+                          key={customer._id}
+                          className={styles.modernQueueItem}
+                          initial={{ opacity: 0, x: -50 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: (priorityCount + idx) * 0.1 }}
+                          whileHover={{ scale: 1.1, zIndex: 10 }}
+                          style={{
+                            background:
+                              "linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)",
+                            border: "3px dotted #000",
+                            boxShadow: isYou
+                              ? "0 0 30px rgba(209, 213, 219, 0.8), 0 8px 20px rgba(0,0,0,0.2)"
+                              : "0 4px 15px rgba(0,0,0,0.15)",
+                          }}
                         >
-                          #{priorityCount + idx + 1}
-                        </div>
-                        <div
-                          className={styles.customerAvatar}
-                          style={{ opacity: 0.7 }}
-                        >
-                          {customer.customerName
-                            ? customer.customerName.charAt(0).toUpperCase()
-                            : "?"}
-                        </div>
-                        <div className={styles.customerName}>
-                          {customer.customerName || "Unknown Customer"}
-                        </div>
-
-                        <div
-                          className={styles.queueTime}
-                          style={{ color: "#dc2626" }}
-                        >
-                          ⏱️ {formatExpiry(customer.expiresAt)}
-                        </div>
-                        {isYou && (
-                          <motion.div
-                            className={styles.youPill}
-                            animate={{ scale: [1, 1.1, 1] }}
-                            transition={{ duration: 1, repeat: Infinity }}
+                          <div
+                            className={styles.positionBadge}
+                            style={{ opacity: 0.6 }}
                           >
-                            YOU
-                          </motion.div>
-                        )}
-                        <div
-                          className={styles.statusDot}
-                          style={{ background: "#9ca3af" }}
-                        />
-                      </motion.div>
-                    );
-                  })}
+                            #{priorityCount + idx + 1}
+                          </div>
+                          <div
+                            className={styles.customerAvatar}
+                            style={{ opacity: 0.7 }}
+                          >
+                            {customer.customerName
+                              ? customer.customerName.charAt(0).toUpperCase()
+                              : "?"}
+                          </div>
+                          <div className={styles.customerName}>
+                            {customer.customerName || "Unknown Customer"}
+                          </div>
+
+                          <div
+                            className={styles.queueTime}
+                            style={{ color: "#dc2626" }}
+                          >
+                            ⏱️ {formatExpiry(customer.expiresAt)}
+                          </div>
+                          {isYou && (
+                            <motion.div
+                              className={styles.youPill}
+                              animate={{ scale: [1, 1.1, 1] }}
+                              transition={{ duration: 1, repeat: Infinity }}
+                            >
+                              YOU
+                            </motion.div>
+                          )}
+                          <div
+                            className={styles.statusDot}
+                            style={{ background: "#9ca3af" }}
+                          />
+                        </motion.div>
+                      );
+                    })}
               </div>
             </div>
 

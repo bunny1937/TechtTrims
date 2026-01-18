@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       .aggregate([
         {
           $match: {
-            salonId: new ObjectId(salonId),
+            salonId: new ObjectId(id),
             "feedback.submitted": true,
           },
         },

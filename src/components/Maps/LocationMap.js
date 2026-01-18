@@ -117,7 +117,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
         setIsManualMode(true);
         console.log(
           "📍 LocationMap loaded manual location from storage:",
-          normalized
+          normalized,
         );
       } catch (e) {
         console.error("Error loading manual location:", e);
@@ -170,7 +170,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
     ) {
       console.warn(
         "⚠️ effectiveUserLocation has invalid coordinates:",
-        effectiveUserLocation
+        effectiveUserLocation,
       );
       return;
     }
@@ -233,7 +233,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
       // ✅ SAFE: Create marker with validated coordinates
       const userMarker = L.marker(
         [effectiveUserLocation.latitude, effectiveUserLocation.longitude],
-        { icon: userIcon }
+        { icon: userIcon },
       )
         .addTo(map)
         .bindPopup("Your Location");
@@ -256,7 +256,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
           weight: 3,
           opacity: 0.7,
           dashArray: "10, 10",
-        }
+        },
       ).addTo(map);
 
       routeLineRef.current = routeLine;
@@ -296,8 +296,8 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
     try {
       const response = await fetch(
         `/api/geocode?query=${encodeURIComponent(
-          query + ", Maharashtra, India"
-        )}`
+          query + ", Maharashtra, India",
+        )}`,
       );
       if (!response.ok) throw new Error("Search failed");
 
@@ -391,7 +391,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
           latitude: lat,
           longitude: lng,
           address: location.address || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-        })
+        }),
       );
       sessionStorage.setItem("isManualMode", "true");
 
@@ -645,7 +645,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
     // No location - request geolocation
     if (!navigator.geolocation) {
       showWarning(
-        "⚠️ Geolocation not supported. Use Pin button to set manually."
+        "⚠️ Geolocation not supported. Use Pin button to set manually.",
       );
       return;
     }
@@ -706,7 +706,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
     const [lng, lat] = location.coordinates;
     window.open(
       `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
-      "_blank"
+      "_blank",
     );
   };
 
@@ -746,7 +746,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
               setSearching(true);
               searchTimeoutRef.current = setTimeout(
                 () => searchLocation(value),
-                1000
+                1000,
               );
             } else {
               setSearchResults([]);

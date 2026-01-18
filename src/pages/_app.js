@@ -6,6 +6,7 @@ import "leaflet/dist/leaflet.css";
 import "../styles/globals.css";
 import styles from "../styles/Home.module.css";
 import { UserDataManager } from "../lib/userData";
+import { SalonDataManager } from "../lib/salonData";
 import NetworkStatus from "../components/NetworkStatus";
 import OnboardingLogoutButton from "../components/OnBoardingLogout";
 import { Toaster } from "react-hot-toast";
@@ -38,7 +39,7 @@ function MyApp({ Component, pageProps }) {
     // Check for userAuth cookie (readable by JavaScript)
     const getCookie = (name) => {
       const matches = document.cookie.match(
-        new RegExp("(?:^|; )" + name + "=([^;]*)")
+        new RegExp("(?:^|; )" + name + "=([^;]*)"),
       );
       return matches ? decodeURIComponent(matches[1]) : null;
     };
@@ -138,7 +139,7 @@ function MyApp({ Component, pageProps }) {
           const hasPrompted = sessionStorage.getItem("genderPromptShown");
           if (!hasPrompted) {
             const userChoice = confirm(
-              "To provide better salon recommendations, please update your gender in your profile settings."
+              "To provide better salon recommendations, please update your gender in your profile settings.",
             );
             if (userChoice) {
               router.push("/user/dashboard");
@@ -201,7 +202,7 @@ function MyApp({ Component, pageProps }) {
           duration: 1800, // was 900 — now slower & smoother
           easing: "cubic-bezier(0.4, 0, 0.2, 1)", // smooth ease-in-out curve
           pseudoElement: "::view-transition-new(root)",
-        }
+        },
       );
     });
   };
@@ -321,7 +322,7 @@ function MyApp({ Component, pageProps }) {
                         window.dispatchEvent(
                           new CustomEvent("genderFilterChange", {
                             detail: userGender,
-                          })
+                          }),
                         );
                       }}
                     >
@@ -338,7 +339,7 @@ function MyApp({ Component, pageProps }) {
                         window.dispatchEvent(
                           new CustomEvent("genderFilterChange", {
                             detail: "Unisex",
-                          })
+                          }),
                         );
                       }}
                     >
@@ -348,39 +349,52 @@ function MyApp({ Component, pageProps }) {
                 )}
 
                 {/* ✅ SHOW DASHBOARD ONLY IF LOGGED IN */}
-                {UserDataManager.isLoggedIn() && (
+                {(UserDataManager.isLoggedIn() ||
+                  SalonDataManager.isLoggedIn()) && (
                   <motion.button
                     className={`${styles.actionButton} ${styles.bookingButton}`}
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => router.push("/user/dashboard")}
+                    onClick={() =>
+                      router.push(
+                        UserDataManager.isLoggedIn()
+                          ? "/user/dashboard"
+                          : "/salons/dashboard",
+                      )
+                    }
                   >
                     Dashboard
                   </motion.button>
                 )}
 
                 {/* SHOW LOGOUT ONLY IF LOGGED IN */}
-                {UserDataManager.isLoggedIn() && (
+                {(UserDataManager.isLoggedIn() ||
+                  SalonDataManager.isLoggedIn()) && (
                   <motion.button
                     className={`${styles.actionButton} ${styles.logoutButton}`}
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      showConfirm("Are you sure you want to logout?", () => {
-                        // Call UserDataManager logout (synchronous, no await needed)
-                        UserDataManager.clearUserData();
+                    onClick={async () => {
+                      showConfirm(
+                        "Are you sure you want to logout?",
+                        async () => {
+                          try {
+                            await fetch("/api/auth/logout", {
+                              method: "POST",
+                              credentials: "include",
+                            });
+                          } catch (error) {
+                            console.error("Logout error:", error);
+                          }
 
-                        // Clear other storage items
-                        if (typeof window !== "undefined") {
-                          localStorage.removeItem("salonToken");
-                          localStorage.removeItem("ownerToken");
-                        }
-
-                        showSuccess("Logged out successfully!");
-
-                        // Force redirect to home page
-                        window.location.href = "/";
-                      });
+                          UserDataManager.clearUserData();
+                          SalonDataManager.clearSalonData();
+                          sessionStorage.clear();
+                          localStorage.clear();
+                          showSuccess("Logged out successfully!");
+                          window.location.href = "/";
+                        },
+                      );
                     }}
                   >
                     Logout
@@ -388,57 +402,59 @@ function MyApp({ Component, pageProps }) {
                 )}
 
                 {/* ✅ SHOW REGISTER SALON ONLY IF NOT LOGGED IN */}
-                {!UserDataManager.isLoggedIn() && (
-                  <motion.button
-                    className={`${styles.actionButton} ${styles.ownerButton}`}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => navigateToAuth("register", "salon")}
-                  >
-                    Register Salon
-                  </motion.button>
-                )}
-
-                {/* ✅ SHOW LOGIN ONLY IF NOT LOGGED IN */}
-                {!UserDataManager.isLoggedIn() && (
-                  <div className={styles.loginDropdown}>
+                {!UserDataManager.isLoggedIn() &&
+                  !SalonDataManager.isLoggedIn() && (
                     <motion.button
-                      className={`${styles.actionButton} ${styles.loginButton}`}
+                      className={`${styles.actionButton} ${styles.ownerButton}`}
                       whileHover={{ scale: 1.05, y: -2 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => setShowLoginMenu(!showLoginMenu)}
+                      onClick={() => navigateToAuth("register", "salon")}
                     >
-                      <span className={styles.buttonIcon}>👤</span>
-                      Login
-                      <span className={styles.dropdownArrow}>▼</span>
+                      Register Salon
                     </motion.button>
-                    {showLoginMenu && (
-                      <motion.div
-                        className={styles.loginMenu}
-                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        transition={{ duration: 0.2 }}
+                  )}
+
+                {/* ✅ SHOW LOGIN ONLY IF NOT LOGGED IN */}
+                {!UserDataManager.isLoggedIn() &&
+                  !SalonDataManager.isLoggedIn() && (
+                    <div className={styles.loginDropdown}>
+                      <motion.button
+                        className={`${styles.actionButton} ${styles.loginButton}`}
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowLoginMenu(!showLoginMenu)}
                       >
-                        <button
-                          onClick={() => {
-                            router.push("/auth/user/login");
-                            setShowLoginMenu(false);
-                          }}
+                        <span className={styles.buttonIcon}>👤</span>
+                        Login
+                        <span className={styles.dropdownArrow}>▼</span>
+                      </motion.button>
+                      {showLoginMenu && (
+                        <motion.div
+                          className={styles.loginMenu}
+                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          transition={{ duration: 0.2 }}
                         >
-                          👤 User Login
-                        </button>
-                        <button
-                          onClick={() => {
-                            navigateToAuth("login", "salon");
-                            setShowLoginMenu(false);
-                          }}
-                        >
-                          🏪 Salon Login
-                        </button>
-                      </motion.div>
-                    )}
-                  </div>
-                )}
+                          <button
+                            onClick={() => {
+                              router.push("/auth/login");
+                              setShowLoginMenu(false);
+                            }}
+                          >
+                            👤 User Login
+                          </button>
+                          <button
+                            onClick={() => {
+                              navigateToAuth("login", "salon");
+                              setShowLoginMenu(false);
+                            }}
+                          >
+                            🏪 Salon Login
+                          </button>
+                        </motion.div>
+                      )}
+                    </div>
+                  )}
               </div>
             </nav>
             <div className={styles.rightControls}>
@@ -468,7 +484,7 @@ function MyApp({ Component, pageProps }) {
                       window.dispatchEvent(
                         new CustomEvent("genderFilterChange", {
                           detail: userGender,
-                        })
+                        }),
                       );
                     }}
                   >
@@ -485,7 +501,7 @@ function MyApp({ Component, pageProps }) {
                       window.dispatchEvent(
                         new CustomEvent("genderFilterChange", {
                           detail: "Unisex",
-                        })
+                        }),
                       );
                     }}
                   >
@@ -532,11 +548,16 @@ function MyApp({ Component, pageProps }) {
                   <div className={styles.mobileNavDivider}></div>
 
                   {/* Show Dashboard if logged in */}
-                  {UserDataManager.isLoggedIn() && (
+                  {(UserDataManager.isLoggedIn() ||
+                    SalonDataManager.isLoggedIn()) && (
                     <button
                       className={styles.mobileNavLink}
                       onClick={() => {
-                        router.push("/user/dashboard");
+                        router.push(
+                          UserDataManager.isLoggedIn()
+                            ? "/user/dashboard"
+                            : "/salons/dashboard",
+                        );
                         setIsMobileMenuOpen(false);
                       }}
                     >
@@ -550,7 +571,7 @@ function MyApp({ Component, pageProps }) {
                       <button
                         className={styles.mobileNavLink}
                         onClick={() => {
-                          router.push("/auth/user/login");
+                          router.push("/auth/login");
                           setIsMobileMenuOpen(false);
                         }}
                       >
@@ -578,23 +599,31 @@ function MyApp({ Component, pageProps }) {
                   )}
 
                   {/* Show Logout if logged in */}
-                  {UserDataManager.isLoggedIn() && (
+                  {(UserDataManager.isLoggedIn() ||
+                    SalonDataManager.isLoggedIn()) && (
                     <button
                       className={styles.mobileNavLink}
-                      onClick={() => {
-                        showConfirm("Are you sure you want to logout?", () => {
-                          // Call UserDataManager logout (synchronous)
-                          UserDataManager.clearUserData();
+                      onClick={async () => {
+                        showConfirm(
+                          "Are you sure you want to logout?",
+                          async () => {
+                            try {
+                              await fetch("/api/auth/logout", {
+                                method: "POST",
+                                credentials: "include",
+                              });
+                            } catch (error) {
+                              console.error("Logout error:", error);
+                            }
 
-                          // Clear other storage
-                          if (typeof window !== "undefined") {
-                            localStorage.removeItem("salonToken");
-                            localStorage.removeItem("ownerToken");
-                          }
-
-                          showSuccess("Logged out successfully!");
-                          window.location.href = "/";
-                        });
+                            UserDataManager.clearUserData();
+                            SalonDataManager.clearSalonData();
+                            sessionStorage.clear();
+                            localStorage.clear();
+                            showSuccess("Logged out successfully!");
+                            window.location.href = "/";
+                          },
+                        );
                       }}
                     >
                       Logout

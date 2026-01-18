@@ -46,7 +46,7 @@ async function tryRefreshToken() {
         ) {
           console.log("❌ Fatal auth error, clearing and redirecting...");
           await UserDataManager.clearUserData();
-          window.location.href = "/auth/user/login";
+          window.location.href = "/auth/login";
         }
 
         return false;
@@ -83,7 +83,7 @@ export class UserDataManager {
         let cachedLocation = null;
         try {
           cachedLocation = JSON.parse(
-            localStorage.getItem("cachedUserLocation")
+            localStorage.getItem("cachedUserLocation"),
           );
         } catch {}
 

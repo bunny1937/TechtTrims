@@ -38,12 +38,12 @@ export default function ReviewsPage() {
       try {
         setLoading(true);
         const res = await fetch(
-          `/api/salons/bookings?salonId=${salonId}&date=all`
+          `/api/salons/bookings?salonId=${salonId}&date=all`,
         );
         const bookings = await res.json();
 
         const reviewedBookings = bookings.filter(
-          (b) => b.feedback && b.feedback.submitted
+          (b) => b.feedback && b.feedback.submitted,
         );
 
         const reviewsData = reviewedBookings.map((b) => ({
@@ -78,7 +78,7 @@ export default function ReviewsPage() {
 
     const salonSession = localStorage.getItem("salonSession");
     if (!salonSession) {
-      router.push("/auth/salon/login");
+      router.push("/auth/login");
       return;
     }
 
@@ -127,16 +127,16 @@ export default function ReviewsPage() {
     ).toFixed(1);
 
     const fiveStars = reviewsData.filter(
-      (r) => r.ratings.overall >= 4.5
+      (r) => r.ratings.overall >= 4.5,
     ).length;
     const fourStars = reviewsData.filter(
-      (r) => r.ratings.overall >= 3.5 && r.ratings.overall < 4.5
+      (r) => r.ratings.overall >= 3.5 && r.ratings.overall < 4.5,
     ).length;
     const threeStars = reviewsData.filter(
-      (r) => r.ratings.overall >= 2.5 && r.ratings.overall < 3.5
+      (r) => r.ratings.overall >= 2.5 && r.ratings.overall < 3.5,
     ).length;
     const twoStars = reviewsData.filter(
-      (r) => r.ratings.overall >= 1.5 && r.ratings.overall < 2.5
+      (r) => r.ratings.overall >= 1.5 && r.ratings.overall < 2.5,
     ).length;
     const oneStar = reviewsData.filter((r) => r.ratings.overall < 1.5).length;
 
@@ -164,7 +164,7 @@ export default function ReviewsPage() {
         (r) =>
           r.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           r.customerPhone?.includes(searchTerm) ||
-          r.comment?.toLowerCase().includes(searchTerm.toLowerCase())
+          r.comment?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
@@ -197,14 +197,14 @@ export default function ReviewsPage() {
       stars.push(
         <span key={`full-${i}`} className={styles.starFilled}>
           ★
-        </span>
+        </span>,
       );
     }
     if (hasHalfStar) {
       stars.push(
         <span key="half" className={styles.starHalf}>
           ★
-        </span>
+        </span>,
       );
     }
     const emptyStars = 5 - stars.length;
@@ -212,7 +212,7 @@ export default function ReviewsPage() {
       stars.push(
         <span key={`empty-${i}`} className={styles.starEmpty}>
           ☆
-        </span>
+        </span>,
       );
     }
     return stars;
@@ -461,7 +461,7 @@ export default function ReviewsPage() {
                                   day: "2-digit",
                                   month: "short",
                                   year: "numeric",
-                                }
+                                },
                               )
                             : "N/A"}
                         </span>

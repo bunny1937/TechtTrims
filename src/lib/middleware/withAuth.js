@@ -1,39 +1,37 @@
+// src/lib/middleware/withAuth.js
+// ✅ UPDATED: Now uses auth_identities system
 import { parse, serialize } from "cookie";
-import jwt from "jsonwebtoken";
+import { verifyJWT } from "../auth/roleResolver";
+import { IdentityService } from "../auth/identityService";
 
 /**
- * Secure authentication middleware for API routes
- * Extracts and verifies HttpOnly cookie token
- * @param {Function} handler - Your API route handler
- * @returns {Function} - Wrapped handler with auth check
+ * ✅ UNIFIED AUTH MIDDLEWARE
+ * Works with new auth_identities system
+ * Backward compatible with existing routes
  */
 export function withAuth(handler) {
   return async (req, res) => {
     try {
-      // Parse cookies from request headers
+      // Parse cookies
       const cookies = req.headers.cookie ? parse(req.headers.cookie) : {};
       const token = cookies.authToken;
 
-      // No token - Unauthorized
+      // No token
       if (!token) {
-        console.log("❌ No authentication token provided");
+        console.log("❌ No authentication token");
         return res.status(401).json({
           message: "Authentication required",
           code: "NO_TOKEN",
         });
       }
 
-      // Verify JWT token
-      let decoded;
-      try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET, {
-          issuer: "techtrims-api",
-          audience: "techtrims-app",
-        });
-      } catch (error) {
-        console.log("❌ Token verification failed:", error.message);
+      // Verify JWT using new system
+      const decoded = verifyJWT(token);
 
-        // Clear invalid cookie
+      if (!decoded) {
+        console.log("❌ Invalid token");
+
+        // Clear invalid cookies
         res.setHeader("Set-Cookie", [
           serialize("authToken", "", {
             httpOnly: true,
@@ -54,17 +52,23 @@ export function withAuth(handler) {
         });
       }
 
-      // Attach user info to request object
-      req.user = {
-        userId: decoded.userId,
-        email: decoded.email,
-        role: decoded.role,
-        name: decoded.name,
+      // ✅ NEW: Attach auth info to request (unified format)
+      req.auth = {
+        identityId: decoded.sub, // auth_identities._id
+        role: decoded.role, // USER | SALON | BARBER
+        linkedId: decoded.linkedId, // users._id | salons._id | barbers._id
       };
 
-      console.log("✅ User authenticated:", req.user.userId);
+      // ✅ BACKWARD COMPATIBILITY: Old code expects req.user
+      req.user = {
+        userId: decoded.linkedId, // For backward compatibility
+        role: decoded.role,
+        // Add more fields as needed by existing code
+      };
 
-      // Call the actual API handler
+      console.log(`✅ Authenticated: ${decoded.role} (${decoded.linkedId})`);
+
+      // Call handler
       return handler(req, res);
     } catch (error) {
       console.error("❌ Auth middleware error:", error);

@@ -245,7 +245,7 @@ export default function Home({ initialSalons = [] }) {
           liveUserLocation.latitude,
           liveUserLocation.longitude,
           userOnboarding?.gender || "all",
-          newGender
+          newGender,
         );
         salonsLoadedRef.current = true;
       }
@@ -325,7 +325,7 @@ export default function Home({ initialSalons = [] }) {
       await loadNearbySalons(
         coords.lat,
         coords.lng,
-        userOnboarding?.gender || "all"
+        userOnboarding?.gender || "all",
       );
       setIsLoading(false);
     }
@@ -340,7 +340,7 @@ export default function Home({ initialSalons = [] }) {
     lat,
     lng,
     gender = "all",
-    salonGender = "all"
+    salonGender = "all",
   ) => {
     // Normalize coordinates
     const normalizedLat =
@@ -411,10 +411,10 @@ export default function Home({ initialSalons = [] }) {
       } else {
         setSalonLoadError(
           `No salons found within ${searchRadius}km of your location (${lat.toFixed(
-            4
+            4,
           )}, ${lng.toFixed(
-            4
-          )}). Try increasing search radius or check if salons exist in your area.`
+            4,
+          )}). Try increasing search radius or check if salons exist in your area.`,
         );
       }
 
@@ -425,7 +425,7 @@ export default function Home({ initialSalons = [] }) {
       setFilteredSalons(salonsArray);
     } catch (error) {
       setSalonLoadError(
-        `Failed to load salons: ${error.message}. Check your internet connection.`
+        `Failed to load salons: ${error.message}. Check your internet connection.`,
       );
       setNearbySalons([]);
     } finally {
@@ -530,7 +530,7 @@ export default function Home({ initialSalons = [] }) {
           loadNearbySalons(
             liveUserLocation.latitude,
             liveUserLocation.longitude,
-            userOnboarding?.gender
+            userOnboarding?.gender,
           );
         }
       }, 1000);
@@ -539,7 +539,7 @@ export default function Home({ initialSalons = [] }) {
       loadNearbySalons(
         liveUserLocation.latitude,
         liveUserLocation.longitude,
-        userOnboarding?.gender
+        userOnboarding?.gender,
       );
     }
   };
@@ -553,7 +553,7 @@ export default function Home({ initialSalons = [] }) {
         liveUserLocation.latitude,
         liveUserLocation.longitude,
         userOnboarding?.gender,
-        salonGender
+        salonGender,
       );
 
       salonsLoadedRef.current = true;
@@ -572,8 +572,8 @@ export default function Home({ initialSalons = [] }) {
     if (selectedService) {
       filtered = filtered.filter((salon) =>
         salon.topServices?.some((service) =>
-          service.name.toLowerCase().includes(selectedService.toLowerCase())
-        )
+          service.name.toLowerCase().includes(selectedService.toLowerCase()),
+        ),
       );
     }
 
@@ -585,8 +585,8 @@ export default function Home({ initialSalons = [] }) {
           salon.salonName.toLowerCase().includes(searchLower) ||
           salon.location.address.toLowerCase().includes(searchLower) ||
           salon.topServices?.some((service) =>
-            service.name.toLowerCase().includes(searchLower)
-          )
+            service.name.toLowerCase().includes(searchLower),
+          ),
       );
     }
 
@@ -798,7 +798,7 @@ export default function Home({ initialSalons = [] }) {
                   loadNearbySalons(
                     locationCheckStatus.coordinates.lat,
                     locationCheckStatus.coordinates.lng,
-                    userOnboarding?.gender || "all"
+                    userOnboarding?.gender || "all",
                   ).finally(() => setIsLoading(false));
                 }}
                 className={styles.continueBtn}
@@ -949,7 +949,7 @@ export default function Home({ initialSalons = [] }) {
                           ? salons.reduce(
                               (total, salon) =>
                                 total + (salon.topServices?.length || 0),
-                              0
+                              0,
                             )
                           : 0}
                       </span>
@@ -966,7 +966,7 @@ export default function Home({ initialSalons = [] }) {
                           ? salons.reduce(
                               (total, salon) =>
                                 total + (salon.stats?.totalBookings || 0),
-                              0
+                              0,
                             )
                           : 0}
                       </span>
@@ -1244,7 +1244,7 @@ export default function Home({ initialSalons = [] }) {
                 </p>
                 <div className={styles.bannerActions}>
                   <button
-                    onClick={() => router.push("/auth/user/login")}
+                    onClick={() => router.push("/auth/login")}
                     className={styles.bannerBtnPrimary}
                   >
                     Login
@@ -1417,7 +1417,7 @@ Time: ${debugInfo.timestamp}`}
                     loadNearbySalons(
                       liveUserLocation.latitude || liveUserLocation.lat,
                       liveUserLocation.longitude || liveUserLocation.lng,
-                      userOnboarding?.gender
+                      userOnboarding?.gender,
                     );
                   } else {
                     requestLocationPermission();
@@ -1450,8 +1450,8 @@ Time: ${debugInfo.timestamp}`}
               {(Array.isArray(filteredSalons) && filteredSalons.length > 0
                 ? filteredSalons
                 : Array.isArray(salons)
-                ? salons
-                : []
+                  ? salons
+                  : []
               ).map(
                 // ✅ CHANGE nearbySalons to salons
                 (salon, index) => (
@@ -1466,7 +1466,7 @@ Time: ${debugInfo.timestamp}`}
                       const salonId = salon._id?.oid || salon._id;
                       handleSalonCardClick(
                         salonId,
-                        isPrebook ? "prebook" : "walkin"
+                        isPrebook ? "prebook" : "walkin",
                       );
                     }}
                   >
@@ -1498,8 +1498,8 @@ Time: ${debugInfo.timestamp}`}
                               {salon.distance < 2
                                 ? "Very Close"
                                 : salon.isVerified
-                                ? "Verified"
-                                : "Popular"}
+                                  ? "Verified"
+                                  : "Popular"}
                             </span>
                             <span
                               className={`${styles.salonBadge} ${styles.distanceBadge}`}
@@ -1583,7 +1583,7 @@ Time: ${debugInfo.timestamp}`}
                       </motion.button>
                     </div>
                   </motion.div>
-                )
+                ),
               )}
             </div>
           )}
@@ -1781,7 +1781,7 @@ function highlightText(text, highlight) {
       </mark>
     ) : (
       part
-    )
+    ),
   );
 }
 
@@ -1789,7 +1789,7 @@ export async function getStaticProps() {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const response = await fetch(
-      `${baseUrl}/api/salons/nearby?latitude=28.6139&longitude=77.2090&radius=50&static=true`
+      `${baseUrl}/api/salons/nearby?latitude=28.6139&longitude=77.2090&radius=50&static=true`,
     );
 
     if (!response.ok) {

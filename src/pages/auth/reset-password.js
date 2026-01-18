@@ -79,7 +79,7 @@ export default function ResetPassword() {
 
       if (response.ok) {
         showSuccess("Password reset successfully! Redirecting to login...");
-        setTimeout(() => router.push("/auth/user/login"), 2000);
+        setTimeout(() => router.push("/auth/login"), 2000);
       } else {
         // Handle specific error for password reuse
         if (data.code === "PASSWORD_REUSED") {
@@ -247,7 +247,7 @@ export default function ResetPassword() {
             Remember your password?{" "}
             <button
               type="button"
-              onClick={() => router.push("/auth/user/login")}
+              onClick={() => router.push("/auth/login")}
               className={styles.linkButton}
             >
               Login here

@@ -19,20 +19,25 @@ export default function OwnerSidebar({ closeSidebar }) {
   ];
 
   const handleLogout = () => {
-    showConfirm("Are you sure you want to logout?", () => {
-      // Clear all salon/owner authentication data
-      localStorage.removeItem("ownerToken");
-      localStorage.removeItem("salonToken");
-      localStorage.removeItem("salonSession");
-      localStorage.removeItem("adminToken");
-      localStorage.removeItem("adminData");
+    showConfirm("Are you sure you want to logout?", async () => {
+      try {
+        // ✅ Call logout API to clear cookies
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "include",
+        });
+      } catch (error) {
+        console.error("Logout API error:", error);
+      }
+
+      // ✅ Clear all storage
+      localStorage.clear();
+      sessionStorage.clear();
 
       showSuccess("Logged out successfully!");
 
-      // Redirect to HOME page (/)
-      router.push("/").then(() => {
-        window.location.href = "/";
-      });
+      // ✅ Redirect to unified login
+      router.push("/auth/login");
     });
   };
 

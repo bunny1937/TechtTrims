@@ -232,7 +232,7 @@ export default function UserRegisterPage() {
 
       if (response.ok) {
         showSuccess("Email verified successfully!");
-        setTimeout(() => router.push("/auth/user/login"), 1500);
+        setTimeout(() => router.push("/auth/login"), 1500);
       } else {
         setOtpError(data.message || "Invalid OTP");
       }
@@ -631,7 +631,7 @@ export default function UserRegisterPage() {
           Already have an account?{" "}
           <button
             type="button"
-            onClick={() => router.push("/auth/user/login")}
+            onClick={() => router.push("/auth/login")}
             className={styles.linkButton}
           >
             Login here

@@ -35,7 +35,7 @@ export default function PaymentsPage() {
   useEffect(() => {
     const salonSession = localStorage.getItem("salonSession");
     if (!salonSession) {
-      router.push("/auth/salon/login");
+      router.push("/auth/login");
       return;
     }
 
@@ -45,7 +45,7 @@ export default function PaymentsPage() {
 
     if (!salonId) {
       showError("Invalid salon session");
-      router.push("/auth/salon/login");
+      router.push("/auth/login");
       return;
     }
 
@@ -57,7 +57,7 @@ export default function PaymentsPage() {
       setLoading(true);
 
       const bookingsRes = await fetch(
-        `/api/salons/bookings?salonId=${salonId}&date=all&includeWalkins=true`
+        `/api/salons/bookings?salonId=${salonId}&date=all&includeWalkins=true`,
       );
       const bookings = await bookingsRes.json();
 
@@ -75,7 +75,7 @@ export default function PaymentsPage() {
         (b) =>
           (b.status === "completed" || b.status === "confirmed") &&
           b.price &&
-          b.price > 0
+          b.price > 0,
       );
 
       const paymentsData = paidBookings.map((b) => {
@@ -127,7 +127,7 @@ export default function PaymentsPage() {
 
     const cashPayments = paymentsData.filter((p) => p.paymentMode === "cash");
     const onlinePayments = paymentsData.filter(
-      (p) => p.paymentMode === "online"
+      (p) => p.paymentMode === "online",
     );
 
     const totalAmount = paymentsData.reduce((sum, p) => sum + p.amount, 0);
@@ -151,7 +151,7 @@ export default function PaymentsPage() {
         (p) =>
           p.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           p.customerPhone?.includes(searchTerm) ||
-          p.bookingCode?.toLowerCase().includes(searchTerm.toLowerCase())
+          p.bookingCode?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 

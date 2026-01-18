@@ -25,7 +25,7 @@ export default function ServicesPage() {
   useEffect(() => {
     const salonSession = localStorage.getItem("salonSession");
     if (!salonSession) {
-      router.push("/auth/salon/login");
+      router.push("/auth/login");
       return;
     }
 
@@ -50,7 +50,7 @@ export default function ServicesPage() {
           description: value.description || "",
           duration: value.duration || 30,
           enabled: value.enabled !== false,
-        })
+        }),
       );
 
       setServices(servicesArray);

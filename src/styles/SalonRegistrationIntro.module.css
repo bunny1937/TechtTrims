@@ -1,0 +1,349 @@
+/* src/styles/SalonRegistrationIntro.module.css */
+
+.container {
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.introCard {
+  max-width: 1200px;
+  width: 100%;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, #d4af37 0%, #c9a02c 100%);
+  color: white;
+  padding: 3rem 2rem;
+  text-align: center;
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin: 0 0 1rem 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  opacity: 0.95;
+  margin: 0;
+}
+
+/* Instructions & Notes */
+.instructions,
+.notes {
+  padding: 2rem;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.instructions h3,
+.notes h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 1.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.instructions ol,
+.notes ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #4b5563;
+  line-height: 1.8;
+}
+
+.instructions li,
+.notes li {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+/* Plans Section */
+.plansSection {
+  padding: 2rem;
+  background: #f9fafb;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.plansSection h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 2rem 0;
+  text-align: center;
+}
+
+.plansGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.planCard {
+  background: white;
+  border: 3px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.planCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: #d4af37;
+}
+
+.planCard.selected {
+  border-color: #d4af37;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  box-shadow: 0 8px 24px rgba(212, 175, 55, 0.3);
+}
+
+.planCard.popular {
+  border-color: #10b981;
+}
+
+.popularBadge {
+  position: absolute;
+  top: -12px;
+  right: 20px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.planCard h4 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 1rem 0;
+}
+
+.price {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #d4af37;
+  margin-bottom: 1.5rem;
+}
+
+.price span {
+  font-size: 1rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.features li {
+  padding: 0.75rem 0;
+  color: #4b5563;
+  font-size: 0.9375rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.features li:last-child {
+  border-bottom: none;
+}
+
+/* Payment Section */
+.paymentSection {
+  padding: 2rem;
+}
+
+.paymentSection h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 1.5rem 0;
+}
+
+.paymentInfo {
+  background: #f9fafb;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  border: 2px solid #e5e7eb;
+}
+
+.paymentInfo p {
+  margin: 0.5rem 0;
+  color: #4b5563;
+  font-size: 1rem;
+}
+
+.paymentInfo strong {
+  color: #1f2937;
+  font-weight: 700;
+}
+
+/* Payment Gateway */
+.paymentGateway {
+  background: #fffbeb;
+  border: 2px solid #fbbf24;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.paymentGateway h4 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #92400e;
+  margin: 0 0 1rem 0;
+}
+
+.bankDetails {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.bankDetails p {
+  margin: 0.5rem 0;
+  color: #4b5563;
+  font-size: 0.9375rem;
+}
+
+.qrPlaceholder {
+  margin-top: 1rem;
+  padding: 3rem;
+  background: #f3f4f6;
+  border: 2px dashed #9ca3af;
+  border-radius: 8px;
+  text-align: center;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+/* Form Group */
+.formGroup {
+  margin-bottom: 1.5rem;
+}
+
+.formGroup label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.input,
+.select {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 2px solid #e5e7eb;
+  color: black;
+  border-radius: 10px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: #f8fafc;
+}
+
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: #d4af37;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+}
+
+/* Checkbox */
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.checkbox label {
+  color: #4b5563;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  margin: 0;
+}
+
+.checkbox a {
+  color: #d4af37;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.checkbox a:hover {
+  text-decoration: underline;
+}
+
+/* Proceed Button */
+.proceedBtn {
+  width: 100%;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.proceedBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+}
+
+.proceedBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+
+  .header h1 {
+    font-size: 2rem;
+  }
+
+  .plansGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .price {
+    font-size: 2rem;
+  }
+}

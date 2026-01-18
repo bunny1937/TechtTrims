@@ -61,7 +61,7 @@ export default function Onboarding() {
     if (!navigator.geolocation) {
       setLocationStatus("error");
       showWarning(
-        "Geolocation is not supported. You can skip this step and use manual location."
+        "Geolocation is not supported. You can skip this step and use manual location.",
       );
       // Allow skipping location
       setLocationStatus("success");
@@ -109,7 +109,7 @@ export default function Onboarding() {
               lng: longitude,
               address: data.address || `${latitude}, ${longitude}`,
               timestamp: Date.now(),
-            })
+            }),
           );
 
           setLocationStatus("success");
@@ -131,7 +131,7 @@ export default function Onboarding() {
               lat: latitude,
               lng: longitude,
               timestamp: Date.now(),
-            })
+            }),
           );
 
           setLocationStatus("success");
@@ -143,7 +143,7 @@ export default function Onboarding() {
 
         // Don't block user - allow them to continue without location
         showWarning(
-          "Unable to get your location. You can update it later from settings or skip for now."
+          "Unable to get your location. You can update it later from settings or skip for now.",
         );
 
         // Mark location as skipped
@@ -165,7 +165,7 @@ export default function Onboarding() {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 600000,
-      }
+      },
     );
   };
 
@@ -244,7 +244,7 @@ export default function Onboarding() {
       // Allow continuing even if location is not provided
       if (locationStatus === "pending") {
         const proceed = confirm(
-          "You haven't provided your location yet. Continue anyway? You can update it later."
+          "You haven't provided your location yet. Continue anyway? You can update it later.",
         );
         if (!proceed) return;
       }
@@ -283,7 +283,7 @@ export default function Onboarding() {
           lng: formData.location.longitude,
           address: formData.location.address,
           timestamp: Date.now(),
-        })
+        }),
       );
     }
 
@@ -307,16 +307,6 @@ export default function Onboarding() {
       </div>
 
       <div className={styles.onboardingCard}>
-        <div className={styles.loginPrompt}>
-          <p className={styles.loginText}>Already have an account?</p>
-          <button
-            type="button"
-            onClick={() => router.push("/auth/user/login")}
-            className={styles.loginLink}
-          >
-            Sign In
-          </button>
-        </div>
         <div className={styles.header}>
           <h1 className={styles.title}>
             Welcome to <span className={styles.goldText}>TechTrims</span>
@@ -384,8 +374,8 @@ export default function Onboarding() {
                       {gender === "Male"
                         ? "👨"
                         : gender === "Female"
-                        ? "👩"
-                        : "🧑"}
+                          ? "👩"
+                          : "🧑"}
                     </div>
                     <span>{gender}</span>
                   </button>
@@ -404,7 +394,7 @@ export default function Onboarding() {
                   type="date"
                   max={
                     new Date(
-                      new Date().setFullYear(new Date().getFullYear() - 13)
+                      new Date().setFullYear(new Date().getFullYear() - 13),
                     )
                       .toISOString()
                       .split("T")[0]
@@ -447,7 +437,7 @@ export default function Onboarding() {
                   onChange={(e) =>
                     handleInputChange(
                       "phoneNumber",
-                      e.target.value.replace(/\D/g, "").slice(0, 10)
+                      e.target.value.replace(/\D/g, "").slice(0, 10),
                     )
                   }
                   className={styles.input}
@@ -605,6 +595,16 @@ export default function Onboarding() {
             ) : (
               "Next →"
             )}
+          </button>
+        </div>
+        <div className={styles.loginPrompt}>
+          <p className={styles.loginText}>Already have an account?</p>
+          <button
+            type="button"
+            onClick={() => router.push("/auth/login")}
+            className={styles.loginLink}
+          >
+            Sign In
           </button>
         </div>
       </div>

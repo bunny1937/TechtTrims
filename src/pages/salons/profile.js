@@ -33,7 +33,7 @@ export default function SalonProfilePage() {
   useEffect(() => {
     const salonSession = localStorage.getItem("salonSession");
     if (!salonSession) {
-      router.push("/auth/salon/login");
+      router.push("/auth/login");
       return;
     }
 
@@ -42,7 +42,7 @@ export default function SalonProfilePage() {
 
     if (!salonId) {
       showError("Invalid salon session");
-      router.push("/auth/salon/login");
+      router.push("/auth/login");
       return;
     }
 

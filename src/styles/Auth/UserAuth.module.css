@@ -514,7 +514,9 @@
   font-family: var(--font-body);
   cursor: pointer;
   transition: all var(--transition-luxury);
-  box-shadow: var(--shadow-md), 0 0 20px rgba(212, 175, 55, 0.3);
+  box-shadow:
+    var(--shadow-md),
+    0 0 20px rgba(212, 175, 55, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -524,7 +526,9 @@
 
 .submitButton:hover:not(:disabled) {
   transform: translateY(-2px) scale(1.02);
-  box-shadow: var(--shadow-xl), 0 0 30px rgba(212, 175, 55, 0.5);
+  box-shadow:
+    var(--shadow-xl),
+    0 0 30px rgba(212, 175, 55, 0.5);
 }
 
 .submitButton:disabled {

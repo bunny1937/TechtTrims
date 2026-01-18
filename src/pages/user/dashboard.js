@@ -37,7 +37,7 @@ export default function UserDashboard() {
       try {
         const token = getAuthToken();
         if (!token) {
-          router.push("/auth/user/login");
+          router.push("/auth/login");
           return;
         }
 
@@ -113,20 +113,30 @@ export default function UserDashboard() {
   };
 
   const handleLogout = () => {
-    // Confirm logout
-    showConfirm("Are you sure you want to logout?", () => {
+    showConfirm("Are you sure you want to logout?", async () => {
+      try {
+        // ✅ Call logout API to clear cookies
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "include",
+        });
+      } catch (error) {
+        console.error("Logout API error:", error);
+      }
+
       // ✅ Clear ALL authentication data
-      UserDataManager.clearUserData(); // Clears HttpOnly cookie + session EXCEPT location
+      UserDataManager.clearUserData();
 
       if (typeof window !== "undefined") {
-        // ✅ Clear other storage
-        localStorage.removeItem("salonToken");
-        localStorage.removeItem("ownerToken");
+        // ✅ Clear all storage
+        localStorage.clear();
+        sessionStorage.clear();
       }
 
       showSuccess("Logged out successfully!");
-      // Force redirect to home page
-      window.location.href = "/";
+
+      // ✅ Redirect to unified login
+      router.push("/auth/login");
     });
   };
 
@@ -218,7 +228,7 @@ export default function UserDashboard() {
                     router.push(
                       `/walkin/confirmation?bookingId=${
                         booking._id || booking.id
-                      }`
+                      }`,
                     )
                   }
                   style={{ cursor: "pointer" }}
@@ -524,7 +534,7 @@ export default function UserDashboard() {
                           <h3>{booking.salonName}</h3>
                           <p className={styles.reviewDate}>
                             {new Date(
-                              booking.feedback.submittedAt
+                              booking.feedback.submittedAt,
                             ).toLocaleDateString("en-IN", {
                               day: "numeric",
                               month: "short",
@@ -532,7 +542,7 @@ export default function UserDashboard() {
                             })}{" "}
                             at{" "}
                             {new Date(
-                              booking.feedback.submittedAt
+                              booking.feedback.submittedAt,
                             ).toLocaleTimeString("en-IN", {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -667,8 +677,8 @@ export default function UserDashboard() {
                         {method.type === "UPI"
                           ? "📱"
                           : method.type === "Card"
-                          ? "💳"
-                          : "💵"}
+                            ? "💳"
+                            : "💵"}
                       </span>
                       <div>
                         <h4>{method.type}</h4>
@@ -710,7 +720,7 @@ export default function UserDashboard() {
                         </p>
                         <p className={styles.historyDate}>
                           {new Date(
-                            booking.completedAt || booking.createdAt
+                            booking.completedAt || booking.createdAt,
                           ).toLocaleDateString("en-IN")}
                         </p>
                       </div>
@@ -753,7 +763,7 @@ export default function UserDashboard() {
                       .filter((b) => b.status === "completed")
                       .reduce((sum, b) => sum + (b.price || 0), 0) /
                       (bookings.filter((b) => b.status === "completed")
-                        .length || 1)
+                        .length || 1),
                   )}
                 </p>
               </div>

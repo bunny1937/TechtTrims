@@ -1,263 +1,140 @@
-import { connectToDatabase, clientPromise } from "../../../lib/mongodb";
+import clientPromise from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
-import { updateSalonStats } from "../../../lib/statsHelper";
-import { csrfMiddleware } from "../../../lib/middleware/csrf";
 
-async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const { db, client } = await connectToDatabase();
     const {
       salonId,
-      service,
-      barber,
       barberId,
-      date,
-      time,
-      user,
+      service,
       price,
       customerName,
       customerPhone,
+      customerEmail,
       userId,
+      estimatedDuration = 45,
     } = req.body;
 
-    if (!salonId || !service || !date || !time) {
-      return res.status(400).json({ error: "Missing required fields" });
+    /* ---------------- VALIDATION ---------------- */
+
+    if (!salonId || !barberId || !service) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
     }
 
-    const session = client.startSession ? client.startSession() : null;
-    let bookingId = null;
-    let finalUserId = null;
+    if (!customerName || !customerName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer name is required",
+      });
+    }
 
-    const transactionFn = async (session) => {
-      // ✅ CREATE LOCK KEY
-      const bookingLockKey = `${salonId}:${date}:${time}`;
-      const lockTimeout = 5000; // 5 seconds
+    const client = await clientPromise;
+    const db = client.db("techtrims");
 
-      // ✅ ACQUIRE LOCK - Atomic operation to prevent race condition
-      const lockResult = await db.collection("booking_locks").updateOne(
-        {
-          _id: bookingLockKey,
-          $or: [
-            { expiresAt: { $lt: new Date() } }, // Lock expired
-            { expiresAt: { $exists: false } }, // No lock exists
-          ],
-        },
-        {
-          $set: {
-            expiresAt: new Date(Date.now() + lockTimeout),
-            lockedBy:
-              req.headers["x-forwarded-for"] ||
-              req.connection?.remoteAddress ||
-              "unknown",
-            lockedAt: new Date(),
-          },
-        },
-        { upsert: true, session }
-      );
+    /* ---------------- SALON ---------------- */
 
-      // ✅ CHECK IF LOCK WAS ACQUIRED
-      if (lockResult.matchedCount === 0 && lockResult.upsertedCount === 0) {
-        throw new Error(
-          "Slot is being booked by another user. Please try again in a few seconds."
-        );
-      }
+    const salon = await db.collection("salons").findOne({
+      _id: new ObjectId(salonId),
+    });
 
-      // Check for existing booking inside transaction
-      const existingBooking = await db.collection("bookings").findOne(
-        {
-          salonId: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId,
-          date,
-          time,
-          status: { $ne: "cancelled" },
-        },
-        { session }
-      );
+    /* ---------------- BARBER ---------------- */
 
-      if (existingBooking) {
-        // ✅ RELEASE LOCK ON ERROR
-        await db
-          .collection("booking_locks")
-          .deleteOne({ _id: bookingLockKey }, { session });
-        throw new Error("Time slot already booked");
-      }
+    let barberObjectId = null;
+    let barberName = "Unassigned";
 
-      const bookingData = {
-        salonId: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId,
-        service,
-        barber: barber || null,
-        barberId: barberId ? new ObjectId(barberId) : null,
-        date,
-        time,
-        customerName: customerName || user?.name || "Guest",
-        customerPhone:
-          customerPhone ||
-          user?.phoneNumber ||
-          user?.phone ||
-          user?.mobile ||
-          "",
-        customerAge: user?.age || null,
-        customerGender: user?.gender || null,
-        customerLocation: user?.location || null,
-        price: price || 0,
-        paymentStatus: "pending",
-        status: "confirmed",
-        userId: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        feedback: {
-          submitted: false,
-          ratings: {},
-          comment: "",
-        },
-      };
+    if (barberId && barberId !== "ANY") {
+      barberObjectId = new ObjectId(barberId);
+      const barberDoc = await db
+        .collection("barbers")
+        .findOne({ _id: barberObjectId });
 
-      const result = await db
-        .collection("bookings")
-        .insertOne(bookingData, { session });
-      bookingId = result.insertedId;
+      barberName = barberDoc?.name || "Unknown";
+    }
 
-      // Enhanced user handling - Create or find user
-      if (userId && ObjectId.isValid(userId)) {
-        // Authenticated user booking
-        finalUserId = new ObjectId(userId);
-        await db
-          .collection("bookings")
-          .updateOne(
-            { _id: bookingId },
-            { $set: { userId: finalUserId } },
-            { session }
-          );
+    /* ---------------- TIME & QUEUE ---------------- */
 
-        // Update user's booking history
-        await db.collection("users").updateOne(
-          { _id: finalUserId },
-          {
-            $push: { bookingHistory: bookingId },
-          },
-          { session }
-        );
-      } else if (user && (user.phone || user.mobile)) {
-        // Anonymous user booking - create or find user
-        const phoneNumber = user.phone || user.mobile || customerPhone;
-        let existingUser = await db.collection("users").findOne(
-          {
-            $or: [{ phone: phoneNumber }, { mobile: phoneNumber }],
-          },
-          { session }
-        );
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + estimatedDuration * 60 * 1000);
 
-        if (!existingUser) {
-          const newUser = {
-            name: user.name || "Guest",
-            mobile: user.phoneNumber || user.mobile,
-            phone: user.phoneNumber || user.phone,
-            phoneNumber: user.phoneNumber || user.mobile,
-            email: user.email || null,
-            gender: user.gender || "other",
-            age: user.age || null,
-            dateOfBirth: user.dateOfBirth || null,
-            location: user.location || null,
-            bookingHistory: [bookingId],
-            preferences: user.preferences || {},
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            isActive: true,
-          };
+    const bookingDoc = {
+      // Relations
+      salonId: new ObjectId(salonId),
+      barberId: barberObjectId,
+      barber: barberName,
 
-          const userResult = await db
-            .collection("users")
-            .insertOne(newUser, { session });
-          finalUserId = userResult.insertedId;
-        } else {
-          finalUserId = existingUser._id;
-          // Update existing user's booking history and preserve location data
-          await db.collection("users").updateOne(
-            { _id: finalUserId },
-            {
-              $push: { bookingHistory: bookingId },
-              $set: {
-                // Update location if new location data is provided
-                ...(user.location && { location: user.location }),
-              },
-            },
-            { session }
-          );
-        }
+      // Customer
+      customerName: customerName.trim(),
+      customerPhone: customerPhone || "",
+      customerEmail: customerEmail || "",
+      userId: userId ? new ObjectId(userId) : null,
 
-        // Always link booking to user
-        await db
-          .collection("bookings")
-          .updateOne(
-            { _id: bookingId },
-            { $set: { userId: finalUserId } },
-            { session }
-          );
-      }
+      // Service
+      service,
+      price: Number(price) || 0,
+      estimatedDuration,
 
-      // Update salon bookings array
-      await db.collection("salons").updateOne(
-        { _id: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId },
-        {
-          $push: {
-            bookings: { _id: bookingId, date, time, service, barber },
-          },
-        },
-        { session }
-      );
+      // ✅ WALK-IN QUEUE CORE
+      bookingType: "WALKIN",
+      queueStatus: "RED", // not arrived yet
+      queuePosition: null,
+      isExpired: false,
 
-      // ✅ RELEASE LOCK AFTER SUCCESS
-      await db
-        .collection("booking_locks")
-        .deleteOne({ _id: bookingLockKey }, { session });
+      // Timing
+      bookedAt: now,
+      expiresAt,
+      expectedCompletionTime: null,
+      arrivedAt: null,
+      serviceStartedAt: null,
+      serviceEndedAt: null,
+
+      // Status
+      status: "confirmed",
+
+      // Meta
+      createdAt: now,
+      updatedAt: now,
     };
 
-    if (session) {
-      try {
-        await session.withTransaction(async () => {
-          await transactionFn(session);
-        });
-      } finally {
-        await session.endSession();
-      }
-    } else {
-      // fallback: not a replica set / no sessions available
-      await transactionFn(null);
+    /* ---------------- INSERT ---------------- */
+
+    const result = await db.collection("bookings").insertOne(bookingDoc);
+
+    /* ---------------- BARBER STATS (SAFE) ---------------- */
+
+    if (barberObjectId) {
+      await db.collection("barbers").updateOne(
+        { _id: barberObjectId },
+        {
+          $inc: {
+            totalBookings: 1,
+          },
+        }
+      );
     }
 
-    await updateSalonStats(salonId);
+    /* ---------------- RESPONSE (BACKWARD COMPATIBLE) ---------------- */
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      message: "Booking created successfully",
-      bookingId: bookingId,
-      _id: bookingId,
-      userId: finalUserId,
+      booking: {
+        bookingId: result.insertedId.toString(),
+        barber: barberName,
+        expiresAt: expiresAt.toISOString(),
+        queueStatus: "RED",
+      },
     });
   } catch (error) {
-    // ✅ CLEANUP LOCK ON ANY ERROR
-    try {
-      const bookingLockKey = `${req.body.salonId}:${req.body.date}:${req.body.time}`;
-      const { db } = await connectToDatabase();
-      await db.collection("booking_locks").deleteOne({ _id: bookingLockKey });
-    } catch (cleanupError) {
-      console.error("Lock cleanup error:", cleanupError);
-    }
-
-    if (error.message && error.message.includes("Time slot already booked")) {
-      return res.status(409).json({ error: "Time slot already booked" });
-    }
-
-    if (error.message && error.message.includes("Slot is being booked")) {
-      return res.status(409).json({ error: error.message });
-    }
-
-    console.error("Booking creation error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Walk-in booking error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 }
-
-export default csrfMiddleware(handler);

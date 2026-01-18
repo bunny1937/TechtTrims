@@ -73,7 +73,7 @@ export default function SalonBarbersPage() {
         }
       } else {
         showError("No salon session found. Please login first.");
-        setTimeout(() => router.push("/auth/salon/login"), 2000);
+        setTimeout(() => router.push("/auth/login"), 2000);
       }
     }
   }, [router]);
@@ -96,7 +96,7 @@ export default function SalonBarbersPage() {
         setError("");
       } catch (err) {
         setError(
-          `Failed to fetch barbers: ${err.response?.data?.error || err.message}`
+          `Failed to fetch barbers: ${err.response?.data?.error || err.message}`,
         );
       }
       setLoading(false);
@@ -120,7 +120,7 @@ export default function SalonBarbersPage() {
       setError("");
     } catch (err) {
       setError(
-        `Failed to create barber: ${err.response?.data?.error || err.message}`
+        `Failed to create barber: ${err.response?.data?.error || err.message}`,
       );
     }
   };
@@ -153,8 +153,8 @@ export default function SalonBarbersPage() {
       // Update local state
       setBarbers(
         barbers.map((b) =>
-          b._id === barberId ? { ...b, isAvailable: !currentStatus } : b
-        )
+          b._id === barberId ? { ...b, isAvailable: !currentStatus } : b,
+        ),
       );
 
       console.log("✅ Availability updated:", res.data);
@@ -163,7 +163,7 @@ export default function SalonBarbersPage() {
       alert(
         `Failed to update barber status: ${
           err.response?.data?.message || err.message
-        }`
+        }`,
       );
     }
   };
@@ -188,13 +188,14 @@ export default function SalonBarbersPage() {
       });
 
       setBarbers(
-        barbers.map((b) => (b._id === editingBarber._id ? res.data : b))
+        barbers.map((b) => (b._id === editingBarber._id ? res.data : b)),
       );
       setEditingBarber(null);
       showSuccess("Barber updated successfully!");
     } catch (err) {
       showError(
-        "Failed to update barber: " + (err.response?.data?.error || err.message)
+        "Failed to update barber: " +
+          (err.response?.data?.error || err.message),
       );
     }
   };

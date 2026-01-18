@@ -1,5 +1,5 @@
 // pages/salons/[id].js
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -16,15 +16,15 @@ import { showError, showSuccess, showWarning } from "@/lib/toast";
 // Dynamic map import to avoid SSR issues
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false }
+  { ssr: false },
 );
 const TileLayer = dynamic(
   () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false }
+  { ssr: false },
 );
 const Marker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
-  { ssr: false }
+  { ssr: false },
 );
 const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
   ssr: false,
@@ -86,13 +86,49 @@ export default function SalonDetail({ initialSalon }) {
   const [showClosingTimer, setShowClosingTimer] = useState(false);
   const [salonClosed, setSalonClosed] = useState(false);
   const [allBookings, setAllBookings] = useState([]); // NEW: Store all bookings for queue details
-
+  const [csrfToken, setCsrfToken] = useState(null);
   const {
     userLocation,
     locationStatus,
     locationError,
     requestLocationPermission,
   } = useLocation();
+  // ADD THESE NEW STATES
+  const [isOnline, setIsOnline] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const dataCache = useRef({
+    services: null,
+    barbers: null,
+    bookings: null,
+  });
+
+  useEffect(() => {
+    const fetchCSRFToken = async () => {
+      try {
+        const response = await fetch("/api/auth/csrf-token", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        setCsrfToken(data.csrfToken);
+        console.log(
+          "✅ CSRF token fetched:",
+          data.csrfToken?.substring(0, 8) + "...",
+        );
+      } catch (error) {
+        console.error("❌ CSRF token fetch error:", error);
+        // Retry after 2 seconds
+        setTimeout(fetchCSRFToken, 2000);
+      }
+    };
+
+    fetchCSRFToken();
+  }, []);
 
   useEffect(() => {
     // Only run once when component mounts
@@ -125,55 +161,168 @@ export default function SalonDetail({ initialSalon }) {
     }
   }, [salon?._id]); // Only recreate if salon ID changes
 
-  // ✅ ONLY fetch on mount - NO POLLING on public page
+  // ✅ OPTIMIZED: Memoized fetch with cache comparison
+  const fetchAllBookings = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      await fetch("/api/walkin/booking/mark-expired", { method: "POST" });
+      const res = await fetch(`/api/salons/${id}/bookings-detailed`, {
+        cache: "no-store",
+      });
+      const data = await res.json();
+
+      const now = new Date();
+      const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
+      const activeBookings = (data.bookings || []).filter((b) => {
+        if (b.isExpired) return false;
+        if (b.queueStatus === "RED") {
+          return new Date(b.expiresAt) > bufferTime;
+        }
+        return true;
+      });
+
+      // Only update if changed
+      if (
+        JSON.stringify(activeBookings) !==
+        JSON.stringify(dataCache.current.bookings)
+      ) {
+        dataCache.current.bookings = activeBookings;
+        setAllBookings(activeBookings);
+        setLastUpdate(Date.now());
+        console.log("✅ Bookings updated:", new Date().toLocaleTimeString());
+      }
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+    }
+  }, [id]);
+
+  // Initial fetch only
+  useEffect(() => {
+    if (id) {
+      fetchAllBookings();
+    }
+  }, [id, fetchAllBookings]);
+
+  // ✅ OPTIMIZED: Memoized with cache
+  const fetchBarberStates = useCallback(async () => {
+    if (bookingMode !== "walkin" || !id) return;
+
+    try {
+      const res = await fetch(`/api/walkin/salon-state?salonId=${id}`);
+      const data = await res.json();
+
+      // Only update if changed
+      if (
+        JSON.stringify(data.barbers) !==
+        JSON.stringify(dataCache.current.barbers)
+      ) {
+        dataCache.current.barbers = data.barbers;
+        setBarberStates(data.barbers);
+        console.log(
+          "✅ Barber states updated:",
+          new Date().toLocaleTimeString(),
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching barber states:", error);
+    }
+  }, [bookingMode, id]);
+
+  // Initial fetch
+  useEffect(() => {
+    if (bookingMode === "walkin" && id) {
+      fetchBarberStates();
+    }
+  }, [bookingMode, id, fetchBarberStates]);
+
+  // ✅ NEW: Dynamic polling based on activity
+  useEffect(() => {
+    if (!id || !isOnline || bookingMode !== "walkin") return;
+
+    let pollInterval = 5000; // Start with 5 seconds
+
+    const pollData = async () => {
+      const timeSinceLastUpdate = Date.now() - lastUpdate;
+
+      // Dynamic interval based on activity
+      if (timeSinceLastUpdate < 30000) {
+        pollInterval = 3000; // Recent activity - poll every 3s
+      } else if (timeSinceLastUpdate < 60000) {
+        pollInterval = 5000; // Moderate - poll every 5s
+      } else {
+        pollInterval = 10000; // Low activity - poll every 10s
+      }
+
+      await Promise.all([fetchAllBookings(), fetchBarberStates()]);
+    };
+
+    const intervalId = setInterval(pollData, pollInterval);
+
+    return () => clearInterval(intervalId);
+  }, [
+    id,
+    isOnline,
+    lastUpdate,
+    bookingMode,
+    fetchAllBookings,
+    fetchBarberStates,
+  ]);
+
+  // ✅ KEEP SERVICES POLLING - But optimize with visibility
   useEffect(() => {
     if (!id) return;
 
-    const fetchAllBookings = async () => {
+    const fetchServices = async () => {
       try {
-        await fetch("/api/walkin/booking/mark-expired", { method: "POST" });
-        const res = await fetch(`/api/salons/${id}/bookings-detailed`, {
-          cache: "no-store",
-        });
-        const data = await res.json();
+        const res = await fetch(`/api/salons/${id}`);
+        if (res.ok) {
+          const data = await res.json();
 
-        const now = new Date();
-        const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
-        const activeBookings = (data.bookings || []).filter((b) => {
-          if (b.isExpired) return false;
-          if (b.queueStatus === "RED") {
-            return new Date(b.expiresAt) > bufferTime;
+          // Only update if services changed
+          if (
+            JSON.stringify(data.salon.services) !==
+            JSON.stringify(dataCache.current.services)
+          ) {
+            dataCache.current.services = data.salon.services;
+            setSalon((prevSalon) => ({
+              ...prevSalon,
+              services: data.salon.services,
+            }));
+            console.log(
+              "✅ Services refreshed at",
+              new Date().toLocaleTimeString(),
+            );
           }
-          return true;
-        });
-
-        setAllBookings(activeBookings);
+        }
       } catch (error) {
-        console.error("Error fetching bookings:", error);
+        console.error("Error polling services:", error);
       }
     };
 
-    fetchAllBookings(); // Only once on mount
-    // ✅ NO setInterval
+    fetchServices();
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log("📍 Page visible - refreshing services");
+        fetchServices();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Poll only when visible
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        fetchServices();
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [id]);
-
-  // ✅ Fetch once on mount - NO POLLING
-  useEffect(() => {
-    if (bookingMode !== "walkin" || !id) return;
-
-    const fetchBarberStates = async () => {
-      try {
-        const res = await fetch(`/api/walkin/salon-state?salonId=${id}`);
-        const data = await res.json();
-        setBarberStates(data.barbers);
-      } catch (error) {
-        console.error("Error fetching barber states:", error);
-      }
-    };
-
-    fetchBarberStates(); // Only once
-    // ✅ NO setInterval
-  }, [bookingMode, id]);
 
   // Poll salon status every 5 seconds
   useEffect(() => {
@@ -222,7 +371,7 @@ export default function SalonDetail({ initialSalon }) {
 
           console.log(
             "✅ Services refreshed at",
-            new Date().toLocaleTimeString()
+            new Date().toLocaleTimeString(),
           );
         }
       } catch (error) {
@@ -289,37 +438,12 @@ export default function SalonDetail({ initialSalon }) {
     return () => clearInterval(interval);
   }, [pauseInfo?.closingTime, checkSalonStatus]);
 
-  // ✅ Fetch once on mount - NO POLLING
-  useEffect(() => {
-    if (!id) return;
-
-    const fetchBarbers = async () => {
-      try {
-        const res = await fetch(`/api/salons/barbers?salonId=${id}`);
-        if (res.ok) {
-          const barbersData = await res.json();
-          setSalon((prevSalon) => ({
-            ...prevSalon,
-            barbers: barbersData,
-          }));
-          setAvailableBarbers(barbersData);
-          console.log("✅ Barbers loaded");
-        }
-      } catch (error) {
-        console.error("Error loading barbers:", error);
-      }
-    };
-
-    fetchBarbers(); // Only once
-    // ✅ NO setInterval
-  }, [id]);
-
   useEffect(() => {
     console.log(
       "🔎 Button enable check → Services:",
       selectedServices,
       "Time:",
-      selectedTime
+      selectedTime,
     );
   }, [selectedServices, selectedTime]);
 
@@ -355,7 +479,7 @@ export default function SalonDetail({ initialSalon }) {
           const res = await fetch(
             `/api/salons/barbers/available?salonId=${
               salon._id
-            }&service=${encodeURIComponent(firstServiceName)}`
+            }&service=${encodeURIComponent(firstServiceName)}`,
           );
 
           if (!res.ok) {
@@ -424,10 +548,31 @@ export default function SalonDetail({ initialSalon }) {
   const chosenBarber =
     salon?.barbers && selectedBarber
       ? salon.barbers.find(
-          (b) => (b.id || b._id || b.name) === selectedBarber
+          (b) => (b.id || b._id || b.name) === selectedBarber,
         ) || null
       : null;
   const [showBookingModal, setShowBookingModal] = useState(false);
+
+  // ✅ NEW: Network status monitoring
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      console.log("✅ Back online - resuming polling");
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      console.log("🔴 Offline - pausing polling");
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   // Client re-fetch (optional, keeps data fresh if user navigates without reload)
   const computeTimeSlotsForDate = useCallback(
@@ -452,7 +597,7 @@ export default function SalonDetail({ initialSalon }) {
               return false;
             }
           })
-          .map((b) => b.date === selectedDate)
+          .map((b) => b.date === selectedDate),
       );
 
       for (let hour = startHour; hour < endHour; hour++) {
@@ -469,7 +614,7 @@ export default function SalonDetail({ initialSalon }) {
 
       return slots;
     },
-    [salon, selectedDate]
+    [salon, selectedDate],
   );
   useEffect(() => {
     if (!selectedDate) {
@@ -491,7 +636,7 @@ export default function SalonDetail({ initialSalon }) {
         enabled: value.enabled,
         duration: value.duration || 30, // fallback if not stored
         gender: value.gender || ["All"], // fallback if not stored
-      })
+      }),
     );
 
     if (!userOnboarding) return servicesArray;
@@ -499,7 +644,7 @@ export default function SalonDetail({ initialSalon }) {
     return servicesArray.filter(
       (service) =>
         service.gender.includes(userOnboarding.gender) ||
-        service.gender.includes("All")
+        service.gender.includes("All"),
     );
   };
 
@@ -541,7 +686,7 @@ export default function SalonDetail({ initialSalon }) {
 
     if (barberState?.isPaused) {
       showWarning(
-        "This barber is temporarily unavailable. Please select another barber."
+        "This barber is temporarily unavailable. Please select another barber.",
       );
       return;
     }
@@ -574,7 +719,7 @@ export default function SalonDetail({ initialSalon }) {
       if (response.status === 409) {
         const errorData = await response.json();
         showWarning(
-          "Sorry! This time slot was just booked by another customer. Please select a different time."
+          "Sorry! This time slot was just booked by another customer. Please select a different time.",
         );
         window.location.reload();
         throw new Error("Slot already booked");
@@ -598,6 +743,7 @@ export default function SalonDetail({ initialSalon }) {
     setIsWalkinBooking(true);
     // ✅ Basic service validation (required for both modes)
     if (selectedServices.length === 0) {
+      setIsWalkinBooking(false);
       showWarning("Please select at least one service");
       return;
     }
@@ -610,6 +756,7 @@ export default function SalonDetail({ initialSalon }) {
 
     // ✅ Walk-in mode: NO date/time needed, just barber selection
     if (!selectedBarber) {
+      setIsWalkinBooking(false);
       showWarning("Please select a barber");
       return;
     }
@@ -620,8 +767,21 @@ export default function SalonDetail({ initialSalon }) {
         selectedServices,
         selectedSlot,
         selectedBarber,
-        userInfo
+        userInfo,
       );
+      // ✅ BETTER: Wait for token + retry logic
+      if (!csrfToken) {
+        console.log("⏳ Waiting for CSRF token...");
+        // Wait max 2 seconds for token
+        const startTime = Date.now();
+        while (!csrfToken && Date.now() - startTime < 2000) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if (!csrfToken) {
+          showError("Security check failed. Refresh page and try again.");
+          return;
+        }
+      }
 
       // Find selected barber details if one is selected
       const selectedBarberDetails = selectedBarber
@@ -635,21 +795,24 @@ export default function SalonDetail({ initialSalon }) {
 
       const totalPrice = selectedServices.reduce(
         (sum, service) => sum + service.price,
-        0
+        0,
       );
 
       // ✅ GET userToken FIRST
       const currentUserInfo = UserDataManager.getStoredUserData();
       const userToken = localStorage.getItem("userToken");
+      const now = new Date();
 
       // ✅ BRANCH: Different logic based on booking mode
       if (bookingMode === "walkin") {
-        // ========== WALK-IN BOOKING ==========
         // ========== WALK-IN BOOKING ==========
         const walkinPayload = {
           salonId: salon?._id || id,
           barberId: selectedBarber,
           service: allServices,
+          // 👇 REQUIRED BY BACKEND
+          date: now.toISOString().split("T")[0],
+          time: now.toTimeString().slice(0, 5),
           price: totalPrice,
           customerName: currentUserInfo?.name || "Guest",
           customerPhone:
@@ -660,29 +823,42 @@ export default function SalonDetail({ initialSalon }) {
         };
 
         console.log("✅ Walk-in Booking payload:", walkinPayload);
-
         const walkinResponse = await fetch("/api/walkin/create-booking", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken, // ✅ CSRF token included
+          },
+          credentials: "include",
           body: JSON.stringify(walkinPayload),
         });
 
+        const walkinResult = await walkinResponse.json();
+
         if (!walkinResponse.ok) {
-          const errorData = await walkinResponse.json();
-          throw new Error(errorData.message || "Walk-in booking failed");
+          throw new Error(walkinResult.message || "Walk-in booking failed");
         }
 
-        const walkinResult = await walkinResponse.json();
         console.log("✅ Walk-in booking confirmed:", walkinResult);
+
+        // Refresh all data immediately
+        await Promise.all([fetchAllBookings(), fetchBarberStates()]);
 
         // Reset form
         setSelectedServices([]);
         setSelectedBarber(null);
 
-        // Redirect to walk-in confirmation with QR code
-        router.push(
-          `/walkin/confirmation?bookingId=${walkinResult.booking.bookingId}`
-        );
+        const bookingId = walkinResult?.booking?.bookingId;
+
+        if (!bookingId) {
+          throw new Error("Booking ID missing from walk-in response");
+        }
+
+        router.push(`/walkin/confirmation?bookingId=${bookingId}`);
+
+        // Reset form
+        setSelectedServices([]);
+        setSelectedBarber(null);
       } else {
         // ========== PRE-BOOK BOOKING (EXISTING) ==========
         const prebookPayload = {
@@ -723,7 +899,7 @@ export default function SalonDetail({ initialSalon }) {
             if (response.status === 409) {
               const errorData = await response.json();
               showWarning(
-                "Sorry! This time slot was just booked by another customer. Please select a different time."
+                "Sorry! This time slot was just booked by another customer. Please select a different time.",
               );
               window.location.reload();
               throw new Error("Slot already booked");
@@ -787,7 +963,7 @@ export default function SalonDetail({ initialSalon }) {
       if (!res.ok) {
         setIsBooking(false);
         return showError(
-          "Registration failed: " + (data.message || res.statusText)
+          "Registration failed: " + (data.message || res.statusText),
         );
       }
       // set onboarding and close modal
@@ -1016,14 +1192,6 @@ export default function SalonDetail({ initialSalon }) {
         </div>
 
         <div className={styles.salonBasicInfo}>
-          {/* <div className={styles.ratingSection}>
-            <div className={styles.mainRating}>
-              ⭐ {salon.ratings.overall.toFixed(1)}
-            </div>
-            <div className={styles.reviewCount}>
-              ({salon.ratings.totalReviews} reviews)
-            </div>
-          </div> */}
           {/* 
           <div className={styles.locationInfo}>
             <p>📍 {salon.location.address}</p>
@@ -1129,7 +1297,7 @@ export default function SalonDetail({ initialSalon }) {
                       onClick={() => {
                         if (isDisabled) {
                           alert(
-                            `${service.name} is currently unavailable. Please select another service.`
+                            `${service.name} is currently unavailable. Please select another service.`,
                           );
                           return;
                         }
@@ -1208,30 +1376,30 @@ export default function SalonDetail({ initialSalon }) {
 
                   {availableBarbers.map((barber) => {
                     const barberState =
-                      bookingMode === "walkin"
+                      bookingMode === "walkin" && Array.isArray(barberStates)
                         ? barberStates.find(
-                            (b) => b.barberId === barber._id.toString()
+                            (b) => b.barberId === barber._id.toString(),
                           )
                         : null;
 
                     // NEW: Get per-barber queue data
                     const barberBookings =
                       allBookings?.filter(
-                        (b) => b.barberId === barber._id.toString()
+                        (b) => b.barberId === barber._id.toString(),
                       ) || [];
                     const greenBookings = barberBookings.filter(
-                      (b) => b.queueStatus === "GREEN"
+                      (b) => b.queueStatus === "GREEN",
                     );
                     const orangeBookings = barberBookings
                       .filter((b) => b.queueStatus === "ORANGE")
                       .sort(
-                        (a, b) => new Date(a.arrivedAt) - new Date(b.arrivedAt)
+                        (a, b) => new Date(a.arrivedAt) - new Date(b.arrivedAt),
                       );
                     const redBookings = barberBookings.filter(
                       (b) =>
                         b.queueStatus === "RED" &&
                         !b.isExpired &&
-                        new Date(b.expiresAt) > new Date()
+                        new Date(b.expiresAt) > new Date(),
                     );
 
                     return (
@@ -1247,7 +1415,7 @@ export default function SalonDetail({ initialSalon }) {
                         onClick={() => {
                           if (barber.isAvailable === false) {
                             alert(
-                              `${barber.name} is currently unavailable. Please select another barber.`
+                              `${barber.name} is currently unavailable. Please select another barber.`,
                             );
                             return;
                           }
@@ -1523,7 +1691,7 @@ export default function SalonDetail({ initialSalon }) {
                         <span className={styles.statValue}>
                           {
                             allBookings.filter(
-                              (b) => b.queueStatus === "ORANGE"
+                              (b) => b.queueStatus === "ORANGE",
                             ).length
                           }
                         </span>
@@ -1559,19 +1727,19 @@ export default function SalonDetail({ initialSalon }) {
                   <div className={styles.barbersQueueContainer}>
                     {availableBarbers.map((barber, barberIndex) => {
                       const barberBookings = allBookings.filter(
-                        (b) => b.barberId === barber._id
+                        (b) => b.barberId === barber._id,
                       );
                       const greenBooking = barberBookings.find(
-                        (b) => b.queueStatus === "GREEN"
+                        (b) => b.queueStatus === "GREEN",
                       );
                       const orangeBookings = barberBookings
                         .filter((b) => b.queueStatus === "ORANGE")
                         .sort(
                           (a, b) =>
-                            new Date(a.arrivedAt) - new Date(b.arrivedAt)
+                            new Date(a.arrivedAt) - new Date(b.arrivedAt),
                         );
                       const redBookings = barberBookings.filter(
-                        (b) => b.queueStatus === "RED"
+                        (b) => b.queueStatus === "RED",
                       );
 
                       return (
@@ -1661,7 +1829,7 @@ export default function SalonDetail({ initialSalon }) {
                               {/* Temporary Queue (RED) */}
                               {redBookings.map((booking, idx) => {
                                 const bookingTime = new Date(
-                                  booking.createdAt
+                                  booking.createdAt,
                                 ).toLocaleTimeString("en-US", {
                                   hour: "2-digit",
                                   minute: "2-digit",
@@ -1672,8 +1840,8 @@ export default function SalonDetail({ initialSalon }) {
                                   Math.ceil(
                                     (new Date(booking.expiresAt) - new Date()) /
                                       1000 /
-                                      60
-                                  )
+                                      60,
+                                  ),
                                 );
 
                                 return (
@@ -1749,12 +1917,12 @@ export default function SalonDetail({ initialSalon }) {
                                       0,
                                       Math.ceil(
                                         (new Date(
-                                          greenBooking.expectedCompletionTime
+                                          greenBooking.expectedCompletionTime,
                                         ) -
                                           new Date()) /
                                           1000 /
-                                          60
-                                      )
+                                          60,
+                                      ),
                                     ) +
                                     orangeBookings.length * 30
                                   : orangeBookings.length * 30}
@@ -1799,10 +1967,10 @@ export default function SalonDetail({ initialSalon }) {
                     {isWalkinBooking || isBooking
                       ? "Processing..."
                       : bookingMode === "walkin" && !isSalonOpen()
-                      ? "Salon is Closed"
-                      : bookingMode === "walkin"
-                      ? "Book Walk-in Now"
-                      : "Book Appointment"}
+                        ? "Salon is Closed"
+                        : bookingMode === "walkin"
+                          ? "Book Walk-in Now"
+                          : "Book Appointment"}
 
                     {availableBarbers.length === 0 &&
                       selectedServices.length > 0 && (
@@ -1992,14 +2160,14 @@ export default function SalonDetail({ initialSalon }) {
                         .json()
                         .catch(() => ({ message: "Unknown error" }));
                       showError(
-                        "Booking failed: " + (err.message || res.statusText)
+                        "Booking failed: " + (err.message || res.statusText),
                       );
                       return;
                     }
                     const data = await res.json();
                     showSuccess(
                       "Booking confirmed! Booking ID: " +
-                        (data.bookingId || data.id || "N/A")
+                        (data.bookingId || data.id || "N/A"),
                     );
                     if (!userOnboarding) {
                       setRegName(payload.user?.name || "");
@@ -2011,13 +2179,15 @@ export default function SalonDetail({ initialSalon }) {
                     // lock selected slot locally
                     setTimeSlots((prev) =>
                       prev.map((s) =>
-                        s.time === selectedSlot ? { ...s, available: false } : s
-                      )
+                        s.time === selectedSlot
+                          ? { ...s, available: false }
+                          : s,
+                      ),
                     );
                     // optionally navigate to confirmation page
                     router.push(
                       "user/bookings/confirmed?id=" +
-                        (data.bookingId || data.id)
+                        (data.bookingId || data.id),
                     );
                   } catch (e) {
                     console.error(e);
@@ -2052,7 +2222,7 @@ export async function getStaticProps({ params }) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const response = await fetch(
-      `${baseUrl}/api/salons/${params.id}?public=true`
+      `${baseUrl}/api/salons/${params.id}?public=true`,
     );
 
     if (!response.ok) {

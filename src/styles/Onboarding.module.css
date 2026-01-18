@@ -12,21 +12,19 @@
   );
 }
 .loginPrompt {
+  padding: 1.6rem 0;
   text-align: center;
-  margin-bottom: 20px;
-  padding-bottom: 20px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .loginText {
   font-size: 14px;
   color: var(--text-secondary);
-  margin-bottom: 8px;
 }
 
 .loginLink {
-  background: transparent;
-  color: var(--gold-primary);
+  background: none;
+  color: var(--primary);
   border: 2px solid var(--gold-primary);
   padding: 8px 24px;
   border-radius: 8px;
@@ -380,7 +378,6 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 40px;
   gap: 16px;
 }
 
@@ -404,11 +401,7 @@
 .nextButton {
   flex: 1;
   padding: 14px 28px;
-  background: linear-gradient(
-    135deg,
-    var(--gold-primary) 0%,
-    var(--gold-dark) 100%
-  );
+  background: var(--primary);
   color: var(--contrast-dark);
   border: none;
   border-radius: 12px;

@@ -222,7 +222,7 @@
   .mapWrapper {
     width: 96%;
     margin: 0 auto;
-    height: 300px !important;
-    min-height: 300px !important;
+    height: 150px !important;
+    min-height: 150px !important;
   }
 }

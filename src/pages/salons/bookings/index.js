@@ -29,7 +29,7 @@ export default function BookingsPage() {
   useEffect(() => {
     const salonSession = localStorage.getItem("salonSession");
     if (!salonSession) {
-      router.push("/auth/salon/login");
+      router.push("/auth/login");
       return;
     }
 
@@ -43,7 +43,7 @@ export default function BookingsPage() {
       setLoading(true);
       // FIX: Remove date filter from API call to get ALL bookings
       const res = await fetch(
-        `/api/salons/bookings?salonId=${salonId}&includeWalkins=true`
+        `/api/salons/bookings?salonId=${salonId}&includeWalkins=true`,
       );
       const data = await res.json();
 
@@ -69,7 +69,7 @@ export default function BookingsPage() {
           b.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           b.customerPhone?.includes(searchTerm) ||
           b.bookingCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          b.service?.toLowerCase().includes(searchTerm.toLowerCase())
+          b.service?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
@@ -144,7 +144,7 @@ export default function BookingsPage() {
   const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
   const paginatedBookings = filteredBookings.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   // Highlight search term in text
@@ -158,7 +158,7 @@ export default function BookingsPage() {
         </mark>
       ) : (
         part
-      )
+      ),
     );
   };
 
@@ -382,26 +382,26 @@ export default function BookingsPage() {
                             <code>
                               {highlightText(
                                 booking.bookingCode || "N/A",
-                                searchTerm
+                                searchTerm,
                               )}
                             </code>
                           </td>
                           <td>
                             {highlightText(
                               booking.customerName || "N/A",
-                              searchTerm
+                              searchTerm,
                             )}
                           </td>
                           <td>
                             {highlightText(
                               booking.customerPhone || "N/A",
-                              searchTerm
+                              searchTerm,
                             )}
                           </td>
                           <td>
                             {highlightText(
                               booking.service || "N/A",
-                              searchTerm
+                              searchTerm,
                             )}
                           </td>
                           <td>{booking.barber || "Unassigned"}</td>
@@ -415,7 +415,7 @@ export default function BookingsPage() {
                                     year: "numeric",
                                     hour: "2-digit",
                                     minute: "2-digit",
-                                  }
+                                  },
                                 )
                               : "N/A"}
                           </td>

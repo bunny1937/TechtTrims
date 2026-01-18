@@ -124,8 +124,9 @@ export default function ReviewsSection({ salonId }) {
             {/* Overall Rating */}
             <div className={styles.overallBox}>
               <div className={styles.bigRating}>
-                {stats.averageRating.toFixed(1)}
+                {Number(stats.averageRating || 0).toFixed(1)}
               </div>
+
               <div className={styles.stars}>
                 {"⭐".repeat(Math.round(stats.averageRating))}
               </div>
