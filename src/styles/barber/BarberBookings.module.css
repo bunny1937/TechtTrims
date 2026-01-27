@@ -1,0 +1,514 @@
+/* src/styles/barber/BarberBookings.module.css */
+
+/* ==================== DASHBOARD WRAPPER ==================== */
+.dashboardWrapper {
+  display: flex;
+  min-height: 100vh;
+  background: var(--background-secondary);
+  font-family: var(--font-body);
+}
+
+/* ==================== MAIN CONTENT ==================== */
+.mainContent {
+  flex: 1;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+/* ==================== HEADER ==================== */
+.header {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 20px;
+  padding: 40px;
+  margin-bottom: var(--space-8);
+  border: 3px solid #2196f3;
+  box-shadow: var(--shadow-luxury);
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1a237e;
+  margin: 0 0 var(--space-2) 0;
+  font-family: var(--font-display);
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  color: #4a5568;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ==================== FILTERS ==================== */
+.filtersSection {
+  background: white;
+  border-radius: 20px;
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.filterHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  color: #1a237e;
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.filtersGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-4);
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.filterGroup label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1a237e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filterSelect {
+  padding: var(--space-4) var(--space-5);
+  border: 2px solid #cbd5e1;
+  border-radius: var(--radius-lg);
+  background: white;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all var(--transition-normal);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+.filterSelect:focus {
+  outline: none;
+  border-color: #2196f3;
+  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.15);
+}
+
+/* ==================== STATS ROW ==================== */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.statBox {
+  background: white;
+  padding: var(--space-6);
+  border-radius: 16px;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.statLabel {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-2);
+}
+
+.statValue {
+  display: block;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #1a237e;
+  font-family: var(--font-display);
+}
+
+/* ==================== BOOKINGS LIST ==================== */
+.bookingsList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--space-5);
+}
+
+/* ==================== BOOKING CARD ==================== */
+.bookingCard {
+  background: white;
+  border: 3px solid #e0e0e0;
+  border-radius: 16px;
+  padding: var(--space-6);
+  transition: all var(--transition-luxury);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.bookingCard:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  border-color: #2196f3;
+}
+
+.bookingHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.customerInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.customerInfo h4 {
+  margin: 0 0 var(--space-1) 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1a237e;
+}
+
+.customerInfo p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.statusBadge {
+  padding: var(--space-2) var(--space-4);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 2px solid;
+}
+
+.statusBadge.confirmed {
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  color: #155724;
+  border-color: #28a745;
+}
+
+.statusBadge.completed {
+  background: linear-gradient(135deg, #cce5ff 0%, #b3d9ff 100%);
+  color: #004085;
+  border-color: #007bff;
+}
+
+.statusBadge.cancelled {
+  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+  color: #721c24;
+  border-color: #dc3545;
+}
+
+.statusBadge.started {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  color: #856404;
+  border-color: #ffc107;
+}
+
+.bookingDetails {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.detailItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9375rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.serviceInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.service {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a237e;
+}
+
+.price {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #10b981;
+  font-family: var(--font-display);
+}
+
+/* ==================== EMPTY STATE ==================== */
+.emptyState {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: var(--space-12);
+  color: #94a3b8;
+}
+
+.emptyState p {
+  font-size: 1.25rem;
+  margin: var(--space-4) 0 0 0;
+  font-weight: 600;
+}
+
+.emptyState span {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: 1rem;
+  color: #cbd5e1;
+}
+
+/* ==================== LOADING ==================== */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  font-size: 1.25rem;
+  color: #1a237e;
+  font-weight: 700;
+}
+/* ==================== SERVICE SECTION ==================== */
+.serviceSection {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
+  padding: var(--space-5);
+  border-radius: 12px;
+  margin-bottom: var(--space-4);
+  border: 2px solid #e0e0e0;
+}
+
+.serviceMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.serviceIcon {
+  font-size: 2rem;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.serviceName {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a237e;
+  margin: 0 0 var(--space-2) 0;
+}
+
+.serviceMeta {
+  display: flex;
+  gap: var(--space-4);
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.duration,
+.price {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.price {
+  color: #10b981;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+/* ==================== CUSTOMER SECTION ==================== */
+.customerSection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.customerAvatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+}
+
+.bookingId {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-family: monospace;
+  margin: 0;
+}
+
+/* ==================== DATE TIME SECTION ==================== */
+.dateTimeSection {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.dateTimeItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: #f8fafc;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  color: #1a237e;
+  font-weight: 600;
+}
+
+/* ==================== CONTACT SECTION ==================== */
+.contactSection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.contactItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.contactItem a {
+  color: #2196f3;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.contactItem a:hover {
+  text-decoration: underline;
+}
+
+/* ==================== PAYMENT SECTION ==================== */
+.paymentSection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: #f0fdf4;
+  border: 2px solid #10b981;
+  border-radius: 10px;
+  margin-bottom: var(--space-4);
+}
+
+.paymentMode {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #059669;
+  flex: 1;
+}
+
+.paymentStatus {
+  padding: var(--space-1) var(--space-3);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.paymentStatus.paid {
+  background: #d4edda;
+  color: #155724;
+}
+
+.paymentStatus.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+/* ==================== NOTES SECTION ==================== */
+.notesSection {
+  background: #fffbeb;
+  padding: var(--space-4);
+  border-radius: 10px;
+  border-left: 4px solid #f59e0b;
+  margin-bottom: var(--space-4);
+}
+
+.notesLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #92400e;
+  text-transform: uppercase;
+  margin: 0 0 var(--space-2) 0;
+}
+
+.notesText {
+  font-size: 0.9375rem;
+  color: #78350f;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ==================== TIMESTAMPS ==================== */
+.timestamps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 2px solid #f0f0f0;
+}
+
+.timestamp {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .mainContent {
+    padding: var(--space-3);
+  }
+
+  .header {
+    padding: var(--space-6);
+  }
+
+  .title {
+    font-size: 1.75rem;
+  }
+
+  .bookingsList {
+    grid-template-columns: 1fr;
+  }
+}
