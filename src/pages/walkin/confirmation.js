@@ -5,6 +5,8 @@ import feedbackStyles from "../../styles/Feedback.module.css";
 import { motion } from "framer-motion";
 import { isAuthenticated } from "@/lib/cookieAuth";
 import { showError, showWarning, showSuccess } from "@/lib/toast";
+import { QRCodeSVG } from "qrcode.react";
+
 // Format time ago
 const formatTimeAgo = (date) => {
   if (!date) return "N/A";
@@ -64,7 +66,8 @@ export default function WalkinConfirmation() {
     remaining: 0,
     isOvertime: false,
   });
-
+  const hasArrived = !!booking?.arrivedAt;
+  const isServing = !!booking?.serviceStartedAt;
   // Feedback state
   const [ratings, setRatings] = useState({
     serviceQuality: 0,
@@ -109,38 +112,21 @@ export default function WalkinConfirmation() {
         // Check if expired
         const now = new Date();
         const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
-        if (
-          bookingData.isExpired ||
-          (bookingData.queueStatus === "RED" &&
-            new Date(bookingData.expiresAt) < bufferTime)
-        ) {
+        const isActuallyExpired =
+          bookingData.queueStatus === "RED" &&
+          !bookingData.arrivedAt &&
+          new Date(bookingData.expiresAt) < bufferTime;
+
+        if (isActuallyExpired) {
           setError("⚠️ This booking has EXPIRED. Please book again.");
           setBooking({ ...bookingData, isExpired: true });
-          setLoading(false); // ✅ ADD THIS
           return;
         }
+
         setBooking({
           ...data.booking,
           barberName: data.booking.barber || data.booking.barberName,
         });
-        // Generate QR Code dynamically
-        if (data.booking?.bookingCode && !qrCodeUrl) {
-          try {
-            const QRCodeModule = await import("qrcode");
-            const qrUrl = await QRCodeModule.default.toDataURL(
-              data.booking.bookingCode,
-              {
-                width: 200,
-                margin: 2,
-                color: { dark: "#1a0f00", light: "#faf6ef" },
-              }
-            );
-            setQrCodeUrl(qrUrl);
-            console.log("✅ QR code generated");
-          } catch (qrErr) {
-            console.error("❌ QR code generation error:", qrErr);
-          }
-        }
 
         // Auto-show feedback if completed and not submitted
         if (
@@ -161,7 +147,12 @@ export default function WalkinConfirmation() {
 
   // 2. Countdown timer (ORIGINAL)
   useEffect(() => {
-    if (!booking?.expiresAt) return;
+    if (
+      booking?.queueStatus !== "RED" ||
+      booking?.arrivedAt ||
+      !booking?.expiresAt
+    )
+      return;
 
     const updateCountdown = () => {
       const remaining = new Date(booking.expiresAt) - new Date();
@@ -191,7 +182,7 @@ export default function WalkinConfirmation() {
     const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
-  }, [booking?.expiresAt]);
+  }, [booking?.expiresAt, booking?.queueStatus, booking?.arrivedAt]);
 
   // ✅ Replace with THIS
   useEffect(() => {
@@ -199,22 +190,33 @@ export default function WalkinConfirmation() {
 
     const pollStatus = async () => {
       try {
-        // ✅ Use lightweight queue-position API
         const res = await fetch(
-          `/api/walkin/queue-position?bookingId=${bookingId}`
+          `/api/walkin/queue-position?bookingId=${bookingId}`,
         );
         if (!res.ok) return;
 
         const data = await res.json();
 
-        // ✅ Update state with lightweight data
         setBooking((prev) => {
           if (!prev) return prev;
+
           return {
             ...prev,
+
+            // always update queue state
             queueStatus: data.status,
             queuePosition: data.position,
             isExpired: data.isExpired,
+
+            // 🔥 MERGE SERVICE DATA IF PRESENT
+            serviceStartedAt: data.serviceStartedAt ?? prev.serviceStartedAt,
+
+            estimatedDuration: data.estimatedDuration ?? prev.estimatedDuration,
+
+            serviceEndedAt: data.serviceEndedAt ?? prev.serviceEndedAt,
+
+            actualServiceMinutes:
+              data.actualServiceMinutes ?? prev.actualServiceMinutes,
           };
         });
 
@@ -225,17 +227,22 @@ export default function WalkinConfirmation() {
           booked: data.booked,
           serving: data.serving,
           status: data.status,
+          estimatedWait: data.estimatedWait, // ✅ ADD THIS
           queueList: data.queueList || [],
         });
 
         // ✅ Auto-show feedback when COMPLETED
-        if (booking?.status === "completed" && !showFeedback) {
+        if (data.status === "COMPLETED" && !showFeedback) {
           setShowFeedback(true);
           showSuccess("Service completed! Please leave feedback.");
         }
 
         // ✅ Handle expiry
-        if (data.isExpired) {
+        if (
+          data.isExpired === true &&
+          data.status === "RED" &&
+          !booking?.arrivedAt
+        ) {
           showError("Your booking has expired");
           router.push("/");
         }
@@ -252,6 +259,12 @@ export default function WalkinConfirmation() {
   // 4. Live service timer - updates every second
   useEffect(() => {
     if (!booking?.serviceStartedAt || booking?.queueStatus !== "GREEN") {
+      setServiceTimer({
+        elapsed: 0,
+        duration: 0,
+        remaining: 0,
+        isOvertime: false,
+      });
       return;
     }
 
@@ -298,7 +311,7 @@ export default function WalkinConfirmation() {
     const fetchBarberQueue = async () => {
       try {
         const res = await fetch(
-          `/api/salons/${booking.salonId}/barber-queue?barberId=${booking.barberId}`
+          `/api/salons/${booking.salonId}/barber-queue?barberId=${booking.barberId}`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -417,12 +430,12 @@ export default function WalkinConfirmation() {
             {value === 1
               ? "Poor"
               : value === 2
-              ? "Fair"
-              : value === 3
-              ? "Good"
-              : value === 4
-              ? "Very Good"
-              : "Excellent"}
+                ? "Fair"
+                : value === 3
+                  ? "Good"
+                  : value === 4
+                    ? "Very Good"
+                    : "Excellent"}
           </span>
         ) : (
           <span className={feedbackStyles.ratingPlaceholder}>Tap to rate</span>
@@ -519,6 +532,23 @@ export default function WalkinConfirmation() {
 
     return (
       <div className={feedbackStyles.pageContainer}>
+        {process.env.NODE_ENV === "development" && (
+          <div
+            style={{
+              background: "#fff3cd",
+              padding: 10,
+              fontSize: 12,
+              marginBottom: 10,
+            }}
+          >
+            <strong>DEBUG:</strong>
+            <div>bookingId: {booking?._id}</div>
+            <div>bookingCode: {booking?.bookingCode}</div>
+            <div>queueStatus: {booking?.queueStatus}</div>
+            <div>isExpired: {String(booking?.isExpired)}</div>
+          </div>
+        )}
+
         <div className={feedbackStyles.content}>
           <div className={feedbackStyles.card}>
             <div className={feedbackStyles.header}>
@@ -646,8 +676,30 @@ export default function WalkinConfirmation() {
               </div>
             )}
           </div>
-          <p className={styles.bookingCode}>{booking.bookingCode}</p>
-          <p className={styles.qrInstruction}>Show this at salon entrance</p>
+          {/* 🔥 QR CODE DISPLAY */}
+          <div className={styles.qrCodeSection}>
+            <div className={styles.qrCodeContainer}>
+              {booking.bookingCode && (
+                <QRCodeSVG
+                  value={booking.bookingCode}
+                  size={200}
+                  level="H"
+                  includeMargin={true}
+                  bgColor="#faf6ef"
+                  fgColor="#1a0f00"
+                />
+              )}
+            </div>
+            <p className={styles.qrCodeLabel}>Scan this at salon entrance</p>
+          </div>
+
+          {/* BOOKING CODE */}
+          <div className={styles.bookingCodeSection}>
+            <p className={styles.codeLabel}>OR show this code:</p>
+            <div className={styles.bookingCodeBox}>
+              <span className={styles.bookingCode}>{booking.bookingCode}</span>
+            </div>
+          </div>
         </div>
 
         {/* Details */}
@@ -679,10 +731,10 @@ export default function WalkinConfirmation() {
             booking.queueStatus === "RED"
               ? styles.red
               : booking.queueStatus === "ORANGE"
-              ? styles.orange
-              : booking.queueStatus === "GREEN"
-              ? styles.green
-              : styles.completed
+                ? styles.orange
+                : booking.queueStatus === "GREEN"
+                  ? styles.green
+                  : styles.completed
           }`}
         >
           <div className={styles.statusBadge}>
@@ -728,7 +780,7 @@ export default function WalkinConfirmation() {
                     >
                       {serviceTimer.isOvertime
                         ? `Overtime by ${Math.abs(
-                            serviceTimer.remaining
+                            serviceTimer.remaining,
                           )} minutes!`
                         : `${serviceTimer.remaining} minutes remaining`}
                     </div>
@@ -738,27 +790,37 @@ export default function WalkinConfirmation() {
             ) : booking.queueStatus === "COMPLETED" ? (
               <div className={styles.completedStatus}>
                 <span className={styles.statusDot}>✅</span>
-                <span>Service Complete</span>
+                <span>Service Completed</span>
+
+                {booking.actualServiceMinutes && (
+                  <div style={{ marginTop: 8, fontWeight: 600 }}>
+                    ⏱ Actual Service Time: {booking.actualServiceMinutes} min
+                  </div>
+                )}
               </div>
-            ) : (
+            ) : booking.queueStatus === "RED" &&
+              !booking.arrivedAt &&
+              booking.isExpired ? (
               <div className={styles.expiredStatus}>
                 <span className={styles.statusDot}>❌</span>
                 <span>Booking Expired</span>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
         {/* Expiry Timer */}
-        {booking.queueStatus === "RED" && (
-          <div className={styles.expiryAlert}>
-            <p>
-              ⏰ Please arrive within:{" "}
-              <strong>{timeLeft || "Calculating..."}</strong>
-            </p>
-            <p className={styles.note}>Booking expires after 45 minutes</p>
-          </div>
-        )}
+        {booking.queueStatus === "RED" &&
+          !booking.arrivedAt &&
+          booking.isExpired !== false && (
+            <div className={styles.expiryAlert}>
+              <p>
+                ⏰ Please arrive within:{" "}
+                <strong>{timeLeft || "Calculating..."}</strong>
+              </p>
+              <p className={styles.note}>Booking expires after 45 minutes</p>
+            </div>
+          )}
         {/* NEW: Queue Visualization */}
         {queueInfo && (
           <div className={styles.queueVisualizationContainer}>
@@ -807,7 +869,7 @@ export default function WalkinConfirmation() {
                     "id:",
                     item.id,
                     "_id:",
-                    item._id
+                    item._id,
                   );
                   // FIX: Compare using booking ID, not position
                   const bookingIdStr = (booking._id || booking.id)?.toString();
@@ -827,24 +889,24 @@ export default function WalkinConfirmation() {
                     "| isYou:",
                     isYou,
                     "| cardId:",
-                    itemIdStr
+                    itemIdStr,
                   );
 
                   const bgColor =
                     item.status === "SERVING"
                       ? "rgba(16, 185, 129, 0.25)" // GREEN - 25% opacity fill
                       : item.status === "ARRIVED"
-                      ? "rgba(245, 158, 11, 0.25)" // ORANGE - 25% opacity fill
-                      : "rgba(156, 163, 175, 0.25)"; // GRAY - 25% opacity fill
+                        ? "rgba(245, 158, 11, 0.25)" // ORANGE - 25% opacity fill
+                        : "rgba(156, 163, 175, 0.25)"; // GRAY - 25% opacity fill
 
                   const borderStyle =
                     item.status === "BOOKED"
                       ? "3px dotted #10b981" // GREEN border for booked
                       : item.status === "SERVING"
-                      ? "3px solid #10b981" // GREEN border for serving
-                      : item.status === "ARRIVED"
-                      ? "3px solid #f59e0b" // ORANGE border for arrived
-                      : "3px solid #9ca3af"; // GRAY border for waiting
+                        ? "3px solid #10b981" // GREEN border for serving
+                        : item.status === "ARRIVED"
+                          ? "3px solid #f59e0b" // ORANGE border for arrived
+                          : "3px solid #9ca3af"; // GRAY border for waiting
 
                   return (
                     <div
@@ -1049,11 +1111,6 @@ export default function WalkinConfirmation() {
                       const customerIdStr =
                         customer._id?.toString() || customer.id?.toString();
                       const isYou = bookingIdStr === customerIdStr;
-                      console.log("🔍 BARBER QUEUE:", customer.customerName, {
-                        myId: bookingIdStr,
-                        customerId: customerIdStr,
-                        isYou: isYou,
-                      });
                       const createdAtDate = customer.createdAt
                         ? new Date(customer.createdAt)
                         : null;
@@ -1064,10 +1121,10 @@ export default function WalkinConfirmation() {
                         pos === 1
                           ? "1st"
                           : pos === 2
-                          ? "2nd"
-                          : pos === 3
-                          ? "3rd"
-                          : `${pos}th`;
+                            ? "2nd"
+                            : pos === 3
+                              ? "3rd"
+                              : `${pos}th`;
 
                       return (
                         <motion.div
@@ -1161,7 +1218,7 @@ export default function WalkinConfirmation() {
                       const isYou = bookingIdStr === customerIdStr;
 
                       const priorityCount = barberQueueData.queue.filter(
-                        (c) => c.queueStatus === "ORANGE"
+                        (c) => c.queueStatus === "ORANGE",
                       ).length;
 
                       return (
@@ -1301,7 +1358,9 @@ export default function WalkinConfirmation() {
 
             {/* Estimated Wait */}
             {booking.queueStatus === "ORANGE" &&
-              barberQueueData.estimatedWait && (
+              hasArrived &&
+              !isServing &&
+              queueInfo?.estimatedWait !== undefined && (
                 <motion.div
                   className={styles.waitTimeCard}
                   initial={{ scale: 0.9, opacity: 0 }}
@@ -1311,7 +1370,7 @@ export default function WalkinConfirmation() {
                   <span className={styles.waitIcon}>⏱️</span>
                   <span className={styles.waitText}>
                     Estimated Wait Time:{" "}
-                    <strong>{barberQueueData.estimatedWait} minutes</strong>
+                    <strong>{queueInfo.estimatedWait} minutes</strong>
                   </span>
                 </motion.div>
               )}
@@ -1337,7 +1396,7 @@ export default function WalkinConfirmation() {
                 const [lng, lat] = booking.salonCoordinates;
                 window.open(
                   `https://maps.google.com/maps?daddr=${lat},${lng}`,
-                  "_blank"
+                  "_blank",
                 );
               }
             }}

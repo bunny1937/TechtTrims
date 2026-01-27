@@ -8,24 +8,34 @@ export default async function handler(req, res) {
   try {
     const client = await clientPromise;
     const db = client.db("techtrims");
-    const now = new Date();
 
+    const now = new Date();
+    const bufferTime = new Date(now.getTime() - 5 * 60 * 1000); // 5 min buffer
+
+    // Mark expired RED bookings
     const result = await db.collection("bookings").updateMany(
       {
         queueStatus: "RED",
-        expiresAt: { $lt: now },
+        expiresAt: { $lt: bufferTime },
         isExpired: false,
+        arrivedAt: { $exists: false }, // 🔥 SAFETY GUARD
       },
       {
         $set: {
           isExpired: true,
-          queueStatus: "EXPIRED",
+          updatedAt: now,
         },
-      }
+      },
     );
 
-    return res.status(200).json({ expired: result.modifiedCount });
+    console.log(`✅ Marked ${result.modifiedCount} bookings as expired`);
+
+    res.status(200).json({
+      success: true,
+      markedExpired: result.modifiedCount,
+    });
   } catch (error) {
-    return res.status(500).json({ message: error.message });
+    console.error("❌ Error marking expired bookings:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 }

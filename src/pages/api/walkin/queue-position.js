@@ -35,7 +35,7 @@ export default async function handler(req, res) {
           barberId: 1,
           isExpired: 1,
         },
-      }
+      },
     );
 
     if (!booking?.barberId) {
@@ -98,13 +98,38 @@ export default async function handler(req, res) {
       isExpired: { $ne: true },
     });
 
+    const AVG_SERVICE_TIME = 45;
+
+    // ✅ DEFINE TOTAL QUEUE COUNT (RED + ORANGE + GREEN, non-expired)
+    const totalQueueCount = await db.collection("bookings").countDocuments({
+      barberId: booking.barberId,
+      queueStatus: { $in: ["RED", "ORANGE", "GREEN"] },
+      isExpired: { $ne: true },
+    });
+
+    const booked = Math.max(totalQueueCount - arrived - serving, 0);
+
+    const estimatedWait =
+      booking.queueStatus === "ORANGE"
+        ? arrived * AVG_SERVICE_TIME
+        : booking.queueStatus === "RED"
+          ? (arrived + booked) * AVG_SERVICE_TIME
+          : 0;
     const response = {
       position,
       arrived,
       serving,
-      booked: Math.max(position - arrived - serving, 0),
+      booked,
       status: booking.queueStatus,
-      isExpired: booking.isExpired || false,
+      estimatedWait,
+      // 🔥 expiry ONLY valid for RED queue
+      isExpired:
+        booking.queueStatus === "RED" ? booking.isExpired || false : false,
+      // 🔥 ADD THESE
+      serviceStartedAt: booking.serviceStartedAt || null,
+      estimatedDuration: booking.estimatedDuration || null,
+      serviceEndedAt: booking.serviceEndedAt || null,
+      actualServiceMinutes: booking.actualServiceMinutes || null,
     };
 
     // ✅ Cache for 5 seconds

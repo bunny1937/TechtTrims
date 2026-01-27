@@ -63,6 +63,19 @@ export default async function handler(req, res) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + estimatedDuration * 60 * 1000);
 
+    // 🔥 GENERATE UNIQUE BOOKING CODE
+    const generateBookingCode = () => {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
+      let code = "ST-";
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+      return code;
+    };
+
+    const bookingCode = generateBookingCode();
+
     const bookingDoc = {
       // Relations
       salonId: new ObjectId(salonId),
@@ -71,18 +84,22 @@ export default async function handler(req, res) {
 
       // Customer
       customerName: customerName.trim(),
-      customerPhone: customerPhone || "",
+      customerPhone: customerPhone,
       customerEmail: customerEmail || "",
       userId: userId ? new ObjectId(userId) : null,
 
       // Service
       service,
       price: Number(price) || 0,
+
+      // 🔥 ADD BOOKING CODE
+      bookingCode,
+
       estimatedDuration,
 
-      // ✅ WALK-IN QUEUE CORE
+      // WALK-IN QUEUE CORE
       bookingType: "WALKIN",
-      queueStatus: "RED", // not arrived yet
+      queueStatus: "RED",
       queuePosition: null,
       isExpired: false,
 
@@ -115,7 +132,7 @@ export default async function handler(req, res) {
           $inc: {
             totalBookings: 1,
           },
-        }
+        },
       );
     }
 
@@ -125,6 +142,7 @@ export default async function handler(req, res) {
       success: true,
       booking: {
         bookingId: result.insertedId.toString(),
+        bookingCode,
         barber: barberName,
         expiresAt: expiresAt.toISOString(),
         queueStatus: "RED",

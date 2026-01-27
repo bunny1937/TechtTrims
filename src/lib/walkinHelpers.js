@@ -128,7 +128,7 @@ export async function updateBarberStatus(db, barberId) {
                 queueStatus: "COMPLETED",
                 serviceEndedAt: now,
               },
-            }
+            },
           );
         }
 
@@ -142,7 +142,7 @@ export async function updateBarberStatus(db, barberId) {
               currentServiceStartTime: null,
               currentServiceEndTime: null,
             },
-          }
+          },
         );
       }
     }
@@ -165,17 +165,18 @@ export async function expireOldBookings(db, barberId) {
         queueStatus: "RED",
         expiresAt: { $lt: bufferTime },
         isExpired: false,
+        arrivedAt: { $exists: false }, // 🔥 DO NOT EXPIRE ARRIVED USERS
       },
       {
         $set: {
           isExpired: true,
           expiredAt: now,
         },
-      }
+      },
     );
 
     console.log(
-      `✅ Expired ${result.modifiedCount} old bookings for barber ${barberId}`
+      `✅ Expired ${result.modifiedCount} old bookings for barber ${barberId}`,
     );
     return result.modifiedCount;
   } catch (error) {

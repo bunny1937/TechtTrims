@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const todayStart = new Date(
       now.getFullYear(),
       now.getMonth(),
-      now.getDate()
+      now.getDate(),
     );
 
     // Get ALL bookings for this barber today
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
     if (serving.length > 0) {
       const customer = serving[0];
       const elapsed = Math.round(
-        (now - new Date(customer.serviceStartedAt || now)) / 60000
+        (now - new Date(customer.serviceStartedAt || now)) / 60000,
       );
       const duration =
         customer.selectedDuration || customer.estimatedDuration || 45;
@@ -114,7 +114,7 @@ export default async function handler(req, res) {
         position: priorityQueue.length + idx + 1, // After all arrived
         queue: "booked", // Grey
         expiresIn: minutesLeft,
-        isExpired: minutesLeft === 0,
+        isExpired: customer.queueStatus === "RED" && minutesLeft === 0,
         isCurrentUser: customerId && customer._id.toString() === customerId,
       };
     });

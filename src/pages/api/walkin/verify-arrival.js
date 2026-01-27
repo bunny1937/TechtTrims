@@ -2,6 +2,8 @@ import clientPromise from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export default async function handler(req, res) {
+  console.log("🔥 VERIFY ARRIVAL BODY:", req.body);
+
   if (req.method !== "POST") {
     return res
       .status(405)
@@ -10,7 +12,19 @@ export default async function handler(req, res) {
 
   try {
     const { bookingCode, salonId } = req.body;
+    if (!bookingCode || !salonId) {
+      return res.status(400).json({
+        success: false,
+        message: "Booking code and salon ID required",
+      });
+    }
 
+    if (!/^ST-[A-Z0-9]{4,8}$/.test(bookingCode)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking QR",
+      });
+    }
     if (!bookingCode || !salonId) {
       return res.status(400).json({
         success: false,
@@ -21,7 +35,7 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db("techtrims");
 
-    // Find booking
+    // Find booking FIRST
     const booking = await db.collection("bookings").findOne({
       bookingCode: bookingCode.toUpperCase(),
       salonId: new ObjectId(salonId),
@@ -31,6 +45,27 @@ export default async function handler(req, res) {
       return res.status(404).json({
         success: false,
         message: "Booking not found",
+      });
+    }
+
+    // NOW it is safe to access booking
+    if (booking.arrivedAt) {
+      return res.status(400).json({
+        success: false,
+        message: "Booking already checked in",
+      });
+    }
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
+    }
+    if (booking.queueStatus === "COMPLETED") {
+      return res.status(400).json({
+        success: false,
+        message: "Service already completed",
       });
     }
 
@@ -73,8 +108,12 @@ export default async function handler(req, res) {
           arrivedAt: now,
           queuePosition: priorityPosition,
           lastUpdated: now,
+
+          // 🔥 FIX: ARRIVAL OVERRIDES EXPIRY
+          isExpired: false,
+          expiredAt: null,
         },
-      }
+      },
     );
 
     // Recalculate positions for ALL ORANGE bookings
@@ -105,7 +144,7 @@ export default async function handler(req, res) {
       .findOne({ _id: booking._id });
 
     console.log(
-      `${booking.customerName}: Position ${finalBooking.queuePosition}/${allOrangeBookings.length}`
+      `${booking.customerName}: Position ${finalBooking.queuePosition}/${allOrangeBookings.length}`,
     );
 
     return res.status(200).json({
