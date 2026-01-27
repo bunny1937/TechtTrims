@@ -1,0 +1,361 @@
+/* Barber Reviews Page */
+
+.dashboardWrapper {
+  display: flex;
+  min-height: 100vh;
+  background: var(--background-secondary);
+}
+
+.mainContent {
+  flex: 1;
+  padding: var(--space-6);
+  overflow-y: auto;
+  margin-left: 0; /* ✅ NO OVERLAP */
+}
+
+@media (min-width: 768px) {
+  .mainContent {
+    margin-left: 0; /* ✅ Sidebar handles its own width */
+  }
+}
+
+/* ==================== HEADER ==================== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 20px;
+  padding: 30px;
+  border: 3px solid #2196f3;
+  box-shadow: 0 8px 24px rgba(33, 150, 243, 0.2);
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1a237e;
+  margin: 0 0 var(--space-2) 0;
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  color: #4a5568;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ==================== STATS GRID ==================== */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+}
+
+.statCard {
+  background: white;
+  border-radius: 16px;
+  padding: var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 3px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  border-color: #2196f3;
+}
+
+.statIcon {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.statInfo {
+  flex: 1;
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 var(--space-2) 0;
+}
+
+.statValue {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #1a237e;
+  margin: 0;
+  line-height: 1;
+}
+
+.statSubtext {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: var(--space-2);
+}
+
+.stars {
+  display: flex;
+  gap: 4px;
+  margin-top: var(--space-2);
+}
+
+/* ==================== DISTRIBUTION CARD ==================== */
+.distributionCard {
+  background: white;
+  border-radius: 20px;
+  padding: var(--space-8);
+  margin-bottom: var(--space-8);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 2px solid #e5e7eb;
+}
+
+.sectionTitle {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a237e;
+  margin: 0 0 var(--space-6) 0;
+}
+
+.distributionBars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.distributionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.ratingLabel {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a237e;
+  min-width: 60px;
+}
+
+.barContainer {
+  flex: 1;
+  height: 32px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.bar {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  border-radius: 8px;
+  transition: width 0.5s ease;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.countLabel {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #64748b;
+  min-width: 50px;
+  text-align: right;
+}
+
+/* ==================== REVIEWS SECTION ==================== */
+.reviewsSection {
+  background: white;
+  border-radius: 20px;
+  padding: var(--space-8);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 2px solid #e5e7eb;
+}
+
+.reviewsList {
+  display: grid;
+  gap: var(--space-6);
+}
+
+/* ==================== REVIEW CARD ==================== */
+.reviewCard {
+  background: #f8f9fa;
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  padding: var(--space-6);
+  transition: all 0.3s ease;
+}
+
+.reviewCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: #2196f3;
+}
+
+.reviewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+}
+
+.customerInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.customerName {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a237e;
+  margin: 0 0 var(--space-1) 0;
+}
+
+.serviceTag {
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 600;
+  margin: 0;
+}
+
+.reviewMeta {
+  text-align: right;
+}
+
+.ratingBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #856404;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+  margin-bottom: var(--space-2);
+}
+
+.reviewDate {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.reviewComment {
+  display: flex;
+  gap: var(--space-3);
+  background: white;
+  padding: var(--space-4);
+  border-radius: 12px;
+  margin-bottom: var(--space-4);
+  border-left: 4px solid #2196f3;
+}
+
+.reviewComment p {
+  font-size: 1rem;
+  color: #475569;
+  margin: 0;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+.reviewFooter {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ==================== EMPTY STATE ==================== */
+.emptyState {
+  text-align: center;
+  padding: var(--space-12) var(--space-6);
+  color: #94a3b8;
+}
+
+.emptyState p {
+  font-size: 1.5rem;
+  margin: var(--space-4) 0 0 0;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.emptyState span {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: 1rem;
+  color: #cbd5e1;
+}
+
+/* ==================== LOADING ==================== */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  font-size: 1.25rem;
+  color: #1a237e;
+  font-weight: 700;
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 1024px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .mainContent {
+    padding: var(--space-4);
+  }
+
+  .header {
+    padding: var(--space-6);
+  }
+
+  .title {
+    font-size: 1.75rem;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .reviewHeader {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .reviewMeta {
+    text-align: left;
+  }
+}
