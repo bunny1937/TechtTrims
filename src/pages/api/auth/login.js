@@ -1,23 +1,8 @@
 // src/pages/api/auth/login.js
-
-import { IdentityService } from "@/lib/auth/identityService";
-import { getRedirectPath, generateJWT } from "@/lib/auth/roleResolver";
-import { checkRateLimit } from "@/lib/rateLimit";
-import { sanitizeInput, validateEmail } from "@/lib/middleware/sanitize";
-
-/**
- * ✅ UNIFIED AUTO-DETECTING LOGIN ENDPOINT
- * Automatically detects if email belongs to USER or SALON
- * 
- * ✅ SECURITY FEATURES:
- * - Rate limiting (5 attempts / 15 min)
- * - Account lockout after failed attempts
- * - HttpOnly cookies (XSS protection)
- * - CSRF protection ready
- * - Timing-safe password comparison
- * - No user enumeration (generic error messages)
- * - Auto role detection (no client-side role parameter needed)
- */
+import { checkRateLimit } from "../../../lib/rateLimit";
+import { sanitizeInput } from "../../../lib/middleware/sanitize";
+import { getRedirectPath, generateJWT } from "../../../lib/auth/roleResolver";
+import { IdentityService } from "../../../lib/auth/identityService";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -25,88 +10,96 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ SECURITY: Rate limiting (IP-based)
-    const clientIP = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+    // ===== RATE LIMITING =====
+    const clientIP =
+      req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
     const rateCheck = await checkRateLimit(
       `login:${clientIP}`,
       5,
-      15 * 60 * 1000
+      15 * 60 * 1000,
     );
 
     if (!rateCheck.allowed) {
       return res.status(429).json({
-        message: `Too many login attempts. Try again in ${
-          rateCheck.resetIn || 1
-        } minutes.`,
+        message: `Too many login attempts. Try again in ${rateCheck.resetIn + 1} minutes.`,
         retryAfter: rateCheck.resetIn * 60,
       });
     }
 
-    // Parse and sanitize input
+    // ===== INPUT VALIDATION =====
     const { identifier, password, rememberMe } = sanitizeInput(req.body);
 
-    // Validate required fields
     if (!identifier || !password) {
-      return res.status(400).json({
-        message: "Email and password are required",
-      });
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
     }
 
-    // Validate email format
-    if (identifier.includes("@") && !validateEmail(identifier)) {
-      return res.status(400).json({ message: "Invalid email format" });
-    }
-
-    // ✅ SECURITY: Verify credentials (auto-detects role from database)
-    const result = await IdentityService.verifyCredentials(
+    // ✅ SECURITY: Verify credentials via IdentityService
+    const verification = await IdentityService.verifyCredentials(
       identifier,
-      password
+      password,
     );
 
-    if (!result.success) {
+    if (!verification.success) {
+      console.log(`[Login Failed] ${verification.error}`);
+
       // Handle specific error cases
-      if (result.error === "ACCOUNT_LOCKED") {
-        return res.status(403).json({
-          message: result.message,
-          code: "ACCOUNT_LOCKED",
+      if (verification.error === "ACCOUNT_LOCKED") {
+        return res.status(423).json({
+          message: verification.message,
+          retryAfter: 15 * 60, // 15 minutes
         });
       }
 
-      if (result.error === "ACCOUNT_DEACTIVATED") {
+      if (verification.error === "ACCOUNT_DEACTIVATED") {
         return res.status(403).json({
-          message: result.message,
-          code: "ACCOUNT_DEACTIVATED",
+          message: verification.message,
         });
       }
 
-      // Generic error (don't reveal if user exists)
+      // Generic invalid credentials
       return res.status(401).json({
-        message: "Invalid email or password",
-        code: "INVALID_CREDENTIALS",
+        message: "Invalid credentials",
       });
     }
 
-    const { identity } = result;
+    const identity = verification.identity;
+    console.log(`[Login Success] ${identity.role} - ${identity.identifier}`);
 
-    // ✅ SECURITY: Check email verification (USER accounts only)
+    // ===== ROLE-SPECIFIC CHECKS =====
+
+    // User email verification check
     if (identity.role === "USER" && !identity.isVerified) {
       return res.status(403).json({
-        message: "Please verify your email first",
+        message: "Please verify your email before logging in.",
         requiresVerification: true,
         email: identity.identifier,
-        code: "EMAIL_NOT_VERIFIED",
       });
+    }
+
+    // Barber availability check
+    if (identity.role === "BARBER") {
+      const barberData = await IdentityService.getDomainData(
+        identity.linkedId,
+        "BARBER",
+      );
+      if (barberData && barberData.isAvailable === false) {
+        return res.status(403).json({
+          message: "Your account has been deactivated. Contact salon owner.",
+        });
+      }
     }
 
     // ✅ SECURITY: Fetch domain data (users/salons/barbers)
     const domainData = await IdentityService.getDomainData(
       identity.linkedId,
-      identity.role
+      identity.role,
     );
 
     if (!domainData) {
       console.error(
-        `❌ Domain data not found: ${identity.role} - ${identity.linkedId}`
+        `❌ Domain data not found: ${identity.role} - ${identity.linkedId}`,
       );
       return res.status(500).json({
         message: "Account data error. Please contact support.",
@@ -116,31 +109,32 @@ export default async function handler(req, res) {
     // ✅ SECURITY: Generate JWT with minimal payload
     const token = generateJWT(identity, rememberMe);
 
-    // ✅ SECURITY: Set HttpOnly cookie (JavaScript cannot access)
+    // ===== SET COOKIES =====
+    const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60;
+
+    // HttpOnly JWT cookie
     const cookieOptions = [
       `authToken=${token}`,
       "Path=/",
-      "HttpOnly", // ✅ XSS Protection
-      "SameSite=Strict", // ✅ CSRF Protection
-      `Max-Age=${(rememberMe ? 7 : 3) * 24 * 60 * 60}`,
+      "HttpOnly",
+      "SameSite=Strict",
+      `Max-Age=${maxAge}`,
     ];
 
-    // ✅ Set role-specific cookie name
-    const authCookieName =
-      identity.role === "USER"
-        ? "userAuth"
-        : identity.role === "SALON"
-        ? "salonAuth"
-        : "barberAuth";
+    // Client-side role cookie
+    const roleMap = {
+      USER: "userAuth",
+      SALON: "salonAuth",
+      BARBER: "barberAuth",
+    };
 
     const clientCookieOptions = [
-      `${authCookieName}=true`,
+      `${roleMap[identity.role]}=true`,
       "Path=/",
       "SameSite=Strict",
-      `Max-Age=${(rememberMe ? 7 : 3) * 24 * 60 * 60}`,
+      `Max-Age=${maxAge}`,
     ];
 
-    // ✅ SECURITY: Force HTTPS in production
     if (process.env.NODE_ENV === "production") {
       cookieOptions.push("Secure");
       clientCookieOptions.push("Secure");
@@ -173,6 +167,21 @@ export default async function handler(req, res) {
           salonName: domainData.salonName,
           services: domainData.services,
           ratings: domainData.ratings,
+        }),
+        ...(identity.role === "BARBER" && {
+          _id: domainData._id.toString(),
+          id: domainData._id.toString(),
+          name: domainData.name,
+          email: domainData.email || "",
+          phone: domainData.phone || "",
+          salonId: domainData.salonId?.toString() || "",
+          photo: domainData.photo || "",
+          skills: domainData.skills || [],
+          rating: domainData.rating || 5.0,
+          totalBookings: domainData.totalBookings || 0,
+          chairNumber: domainData.chairNumber || 1,
+          experience: domainData.experience || 0,
+          bio: domainData.bio || "",
         }),
       },
     });

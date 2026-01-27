@@ -103,6 +103,17 @@ export default function UnifiedLogin() {
           );
           router.push(data.redirectTo || "/salons/dashboard");
         }
+        // ✅ NEW: BARBER role handling
+        else if (data.user && data.role === "BARBER") {
+          // ✅ Save BOTH flags AND the actual barber data
+          sessionStorage.setItem("hasOnboarded", "true");
+          sessionStorage.setItem("barberSession", JSON.stringify(data.user));
+
+          console.log("✅ Barber logged in:", data.user.name);
+
+          showSuccess(`Welcome back, ${data.user.name}!`);
+          router.push("/barber/dashboard");
+        }
       } else {
         const error = await response.json();
 
