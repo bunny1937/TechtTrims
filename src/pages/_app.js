@@ -7,12 +7,14 @@ import "../styles/globals.css";
 import styles from "../styles/Home.module.css";
 import { UserDataManager } from "../lib/userData";
 import { SalonDataManager } from "../lib/salonData";
+import { BarberDataManager } from "@/lib/barberData";
 import NetworkStatus from "../components/NetworkStatus";
 import OnboardingLogoutButton from "../components/OnBoardingLogout";
 import { Toaster } from "react-hot-toast";
 import { showConfirm, showSuccess } from "@/lib/toast";
 import SunIcon from "@/components/ui/sun";
 import MoonIcon from "@/components/ui/moon";
+import Head from "next/head";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -39,24 +41,46 @@ function MyApp({ Component, pageProps }) {
     // Check for userAuth cookie (readable by JavaScript)
     const getCookie = (name) => {
       const matches = document.cookie.match(
-        new RegExp("(?:^|; )" + name + "=([^;]*)"),
+        new RegExp(`(?:^|; )${name}=([^;]*)`),
       );
       return matches ? decodeURIComponent(matches[1]) : null;
     };
 
     const userAuth = getCookie("userAuth");
-    if (userAuth === "true") {
+    const barberAuth = getCookie("barberAuth");
+    const salonAuth = getCookie("salonAuth");
+
+    // Check if ANY auth type exists
+    const isAuthenticated =
+      userAuth === "true" || barberAuth === "true" || salonAuth === "true";
+
+    if (isAuthenticated) {
       // Authenticated users - check if they have completed onboarding
       const hasOnboarded = sessionStorage.getItem("hasOnboarded");
       if (!hasOnboarded) {
         // Force onboarding for authenticated users who haven't completed it
         sessionStorage.setItem("hasOnboarded", "true");
       }
+
+      // If barberAuth cookie exists but no session, redirect to login
+      if (barberAuth === "true" && !sessionStorage.getItem("barberSession")) {
+        console.log(
+          "⚠️ Barber cookie exists but no session data - redirecting to login",
+        );
+        sessionStorage.removeItem("hasOnboarded");
+        document.cookie =
+          "barberAuth=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+        if (!router.pathname.startsWith("/auth")) {
+          router.push("/auth/barber/login");
+        }
+      }
     } else {
-      // Guest users - must complete onboarding
-      const hasOnboarded = sessionStorage.getItem("hasOnboarded");
-      if (!hasOnboarded && router.pathname === "/") {
-        router.push("/onboarding");
+      // Guest users - must complete onboarding (but NOT if on auth pages)
+      if (!router.pathname.startsWith("/auth")) {
+        const hasOnboarded = sessionStorage.getItem("hasOnboarded");
+        if (!hasOnboarded && router.pathname !== "/onboarding") {
+          router.push("/onboarding");
+        }
       }
     }
   }, [router]);
@@ -227,6 +251,13 @@ function MyApp({ Component, pageProps }) {
 
   return (
     <>
+      <Head>
+        {/* CRITICAL: Mobile viewport fix for Chrome/Safari URL bar */}
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+        />
+      </Head>
       <Toaster
         position="top-center"
         toastOptions={{
@@ -350,6 +381,7 @@ function MyApp({ Component, pageProps }) {
 
                 {/* ✅ SHOW DASHBOARD ONLY IF LOGGED IN */}
                 {(UserDataManager.isLoggedIn() ||
+                  BarberDataManager.isLoggedIn() ||
                   SalonDataManager.isLoggedIn()) && (
                   <motion.button
                     className={`${styles.actionButton} ${styles.bookingButton}`}
@@ -359,7 +391,9 @@ function MyApp({ Component, pageProps }) {
                       router.push(
                         UserDataManager.isLoggedIn()
                           ? "/user/dashboard"
-                          : "/salons/dashboard",
+                          : BarberDataManager.isLoggedIn()
+                            ? "/barber/dashboard"
+                            : "/salons/dashboard",
                       )
                     }
                   >
@@ -369,6 +403,7 @@ function MyApp({ Component, pageProps }) {
 
                 {/* SHOW LOGOUT ONLY IF LOGGED IN */}
                 {(UserDataManager.isLoggedIn() ||
+                  BarberDataManager.isLoggedIn() ||
                   SalonDataManager.isLoggedIn()) && (
                   <motion.button
                     className={`${styles.actionButton} ${styles.logoutButton}`}
@@ -388,6 +423,7 @@ function MyApp({ Component, pageProps }) {
                           }
 
                           UserDataManager.clearUserData();
+                          BarberDataManager.clearBarberData();
                           SalonDataManager.clearSalonData();
                           sessionStorage.clear();
                           localStorage.clear();
@@ -403,6 +439,7 @@ function MyApp({ Component, pageProps }) {
 
                 {/* ✅ SHOW REGISTER SALON ONLY IF NOT LOGGED IN */}
                 {!UserDataManager.isLoggedIn() &&
+                  !BarberDataManager.isLoggedIn() &&
                   !SalonDataManager.isLoggedIn() && (
                     <motion.button
                       className={`${styles.actionButton} ${styles.ownerButton}`}
@@ -416,6 +453,7 @@ function MyApp({ Component, pageProps }) {
 
                 {/* ✅ SHOW LOGIN ONLY IF NOT LOGGED IN */}
                 {!UserDataManager.isLoggedIn() &&
+                  !BarberDataManager.isLoggedIn() &&
                   !SalonDataManager.isLoggedIn() && (
                     <div className={styles.loginDropdown}>
                       <motion.button
@@ -549,6 +587,7 @@ function MyApp({ Component, pageProps }) {
 
                   {/* Show Dashboard if logged in */}
                   {(UserDataManager.isLoggedIn() ||
+                    BarberDataManager.isLoggedIn() ||
                     SalonDataManager.isLoggedIn()) && (
                     <button
                       className={styles.mobileNavLink}
@@ -556,7 +595,9 @@ function MyApp({ Component, pageProps }) {
                         router.push(
                           UserDataManager.isLoggedIn()
                             ? "/user/dashboard"
-                            : "/salons/dashboard",
+                            : BarberDataManager.isLoggedIn()
+                              ? "/barber/dashboard"
+                              : "/salons/dashboard",
                         );
                         setIsMobileMenuOpen(false);
                       }}
@@ -566,40 +607,52 @@ function MyApp({ Component, pageProps }) {
                   )}
 
                   {/* Show Login options only if NOT logged in */}
-                  {!UserDataManager.isLoggedIn() && (
-                    <>
-                      <button
-                        className={styles.mobileNavLink}
-                        onClick={() => {
-                          router.push("/auth/login");
-                          setIsMobileMenuOpen(false);
-                        }}
-                      >
-                        👤 User Login
-                      </button>
-                      <button
-                        className={styles.mobileNavLink}
-                        onClick={() => {
-                          navigateToAuth("login", "salon");
-                          setIsMobileMenuOpen(false);
-                        }}
-                      >
-                        🏪 Salon Login
-                      </button>
-                      <button
-                        className={styles.mobileNavLink}
-                        onClick={() => {
-                          navigateToAuth("register", "salon");
-                          setIsMobileMenuOpen(false);
-                        }}
-                      >
-                        🏪 Register Salon
-                      </button>
-                    </>
-                  )}
+                  {!UserDataManager.isLoggedIn() &&
+                    !SalonDataManager.isLoggedIn() &&
+                    !BarberDataManager.isLoggedIn() && (
+                      <>
+                        <button
+                          className={styles.mobileNavLink}
+                          onClick={() => {
+                            router.push("/auth/login");
+                            setIsMobileMenuOpen(false);
+                          }}
+                        >
+                          👤 User Login
+                        </button>
+                        <button
+                          className={styles.mobileNavLink}
+                          onClick={() => {
+                            navigateToAuth("login", "salon");
+                            setIsMobileMenuOpen(false);
+                          }}
+                        >
+                          🏪 Salon Login
+                        </button>
+                        <button
+                          className={styles.mobileNavLink}
+                          onClick={() => {
+                            navigateToAuth("login", "barber");
+                            setIsMobileMenuOpen(false);
+                          }}
+                        >
+                          🏪 Barber Login
+                        </button>
+                        <button
+                          className={styles.mobileNavLink}
+                          onClick={() => {
+                            navigateToAuth("register", "salon");
+                            setIsMobileMenuOpen(false);
+                          }}
+                        >
+                          🏪 Register Salon
+                        </button>
+                      </>
+                    )}
 
                   {/* Show Logout if logged in */}
                   {(UserDataManager.isLoggedIn() ||
+                    BarberDataManager.isLoggedIn() ||
                     SalonDataManager.isLoggedIn()) && (
                     <button
                       className={styles.mobileNavLink}
@@ -618,6 +671,7 @@ function MyApp({ Component, pageProps }) {
 
                             UserDataManager.clearUserData();
                             SalonDataManager.clearSalonData();
+                            BarberDataManager.clearBarberData();
                             sessionStorage.clear();
                             localStorage.clear();
                             showSuccess("Logged out successfully!");
