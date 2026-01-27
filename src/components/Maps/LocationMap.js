@@ -5,7 +5,7 @@ import { showWarning } from "@/lib/toast";
 
 if (typeof window !== "undefined") {
   const loadLeafletFix = async () => {
-    const L = await import("leaflet");
+    const { default: L } = await import("leaflet");
     delete L.Icon.Default.prototype._getIconUrl;
     L.Icon.Default.mergeOptions({
       iconUrl: "",
@@ -115,25 +115,11 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
         };
         setManualLocation(normalized);
         setIsManualMode(true);
-        console.log(
-          "📍 LocationMap loaded manual location from storage:",
-          normalized,
-        );
       } catch (e) {
         console.error("Error loading manual location:", e);
       }
     }
   }, []);
-
-  // Add this right after const effectiveUserLocation line
-  useEffect(() => {
-    console.log("👤 User location changed:", {
-      userLocation,
-      manualLocation,
-      effectiveUserLocation,
-      isManualMode,
-    });
-  }, [userLocation, manualLocation, effectiveUserLocation, isManualMode]);
 
   // Calculate distance
   useEffect(() => {
@@ -182,7 +168,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
 
     // 🔥 CHECK: If marker exists and is on map, just UPDATE position
     if (userMarkerRef.current && map.hasLayer(userMarkerRef.current)) {
-      console.log("📍 Updating existing user marker position");
       userMarkerRef.current.setLatLng([
         effectiveUserLocation.latitude,
         effectiveUserLocation.longitude,
@@ -190,7 +175,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
 
       // Update route line
       if (routeLineRef.current && map.hasLayer(routeLineRef.current)) {
-        console.log("🔄 Updating route line");
         routeLineRef.current.setLatLngs([
           [effectiveUserLocation.latitude, effectiveUserLocation.longitude],
           [lat, lng],
@@ -201,8 +185,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
 
     // 🔥 CREATE user marker ONLY if it doesn't exist
     if (!userMarkerRef.current) {
-      console.log("🆕 Creating user marker");
-
       const userIcon = L.divIcon({
         html: `
         <div style="
@@ -239,13 +221,10 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
         .bindPopup("Your Location");
 
       userMarkerRef.current = userMarker;
-      console.log("✅ User marker created at:", effectiveUserLocation);
     }
 
     // 🔥 CREATE route line ONLY if it doesn't exist
     if (!routeLineRef.current) {
-      console.log("🆕 Creating route line");
-
       const routeLine = L.polyline(
         [
           [effectiveUserLocation.latitude, effectiveUserLocation.longitude],
@@ -260,7 +239,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
       ).addTo(map);
 
       routeLineRef.current = routeLine;
-      console.log("✅ Route line created");
     }
   }, [effectiveUserLocation, location, map]);
 
@@ -344,8 +322,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
       let lat = location.lat || location.latitude;
       let lng = location.lng || location.longitude;
 
-      console.log("🔍 handleLocationSelect received:", { location, lat, lng });
-
       // ✅ Validate before using isNaN
       if (
         lat === undefined ||
@@ -373,12 +349,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
         return;
       }
 
-      console.log("✅ Selecting location:", {
-        lat,
-        lng,
-        address: location.address,
-      });
-
       // ✅ Store location
       setManualLocation(location);
 
@@ -394,8 +364,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
         }),
       );
       sessionStorage.setItem("isManualMode", "true");
-
-      console.log("💾 Manual location saved to sessionStorage");
     } catch (error) {
       console.error("❌ ERROR in handleLocationSelect:", error, error.stack);
     }
@@ -410,7 +378,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
     // ✅ Create handler with proper validation
     const handleMapClick = (e) => {
       if (!e || !e.latlng) {
-        console.error("❌ Invalid click event");
         return;
       }
 
@@ -418,11 +385,8 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
 
       // ✅ Validate coordinates
       if (typeof lat !== "number" || typeof lng !== "number") {
-        console.error("❌ Invalid coordinates:", { lat, lng });
         return;
       }
-
-      console.log("📍 Map clicked at:", { lat, lng });
 
       // ✅ First: Set pin with coordinates
       handleLocationSelect({
@@ -440,8 +404,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
         .then((res) => res.json())
         .then((data) => {
           if (data && data.display_name) {
-            console.log("✅ Geocoded address:", data.display_name);
-
             // ✅ Update with better address
             handleLocationSelect({
               lat: parseFloat(lat.toFixed(6)),
@@ -455,7 +417,7 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
           }
         })
         .catch((err) => {
-          console.log("⚠️ Reverse geocode failed, using coordinates");
+          alert("Error fetching address:", err);
         });
 
       // ✅ Cleanup after pin
@@ -548,7 +510,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === "manualLocation") {
-        console.log("🔄 Manual location updated:", e.newValue);
         if (e.newValue) {
           try {
             const newLocation = JSON.parse(e.newValue);
@@ -558,7 +519,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
           }
         }
       } else if (e.key === "isManualMode") {
-        console.log("🔄 Manual mode changed:", e.newValue);
         if (e.newValue !== "true") {
           setManualLocation(null);
         }

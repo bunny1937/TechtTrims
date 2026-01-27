@@ -101,7 +101,7 @@ const LocationPicker = ({
           try {
             const address = await reverseGeocode(
               pos.coords.latitude,
-              pos.coords.longitude
+              pos.coords.longitude,
             );
             setAddress(address);
           } catch (error) {
@@ -117,7 +117,7 @@ const LocationPicker = ({
           console.error("Geolocation error:", error);
           showError("Unable to get your location");
           setLoading(false);
-        }
+        },
       );
     }
   };
