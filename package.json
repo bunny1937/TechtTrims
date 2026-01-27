@@ -28,6 +28,7 @@
     "framer-motion": "^12.23.16",
     "gsap": "^3.13.0",
     "helmet": "^8.1.0",
+    "html5-qrcode": "^2.3.8",
     "imagekit": "^6.0.0",
     "ioredis": "^5.8.2",
     "isomorphic-dompurify": "^2.30.1",
