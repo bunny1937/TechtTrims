@@ -116,12 +116,7 @@ export default function SalonDetail({ initialSalon }) {
 
         const data = await response.json();
         setCsrfToken(data.csrfToken);
-        console.log(
-          "✅ CSRF token fetched:",
-          data.csrfToken?.substring(0, 8) + "...",
-        );
       } catch (error) {
-        console.error("❌ CSRF token fetch error:", error);
         // Retry after 2 seconds
         setTimeout(fetchCSRFToken, 2000);
       }
@@ -138,7 +133,6 @@ export default function SalonDetail({ initialSalon }) {
         try {
           const parsed = JSON.parse(stored);
           setUserInfo(parsed);
-          console.log("Loaded userInfo from localStorage:", parsed);
         } catch (err) {
           console.error("Failed to parse onboarding data:", err);
         }
@@ -190,7 +184,6 @@ export default function SalonDetail({ initialSalon }) {
         dataCache.current.bookings = activeBookings;
         setAllBookings(activeBookings);
         setLastUpdate(Date.now());
-        console.log("✅ Bookings updated:", new Date().toLocaleTimeString());
       }
     } catch (error) {
       console.error("Error fetching bookings:", error);
@@ -219,10 +212,6 @@ export default function SalonDetail({ initialSalon }) {
       ) {
         dataCache.current.barbers = data.barbers;
         setBarberStates(data.barbers);
-        console.log(
-          "✅ Barber states updated:",
-          new Date().toLocaleTimeString(),
-        );
       }
     } catch (error) {
       console.error("Error fetching barber states:", error);
@@ -289,10 +278,6 @@ export default function SalonDetail({ initialSalon }) {
               ...prevSalon,
               services: data.salon.services,
             }));
-            console.log(
-              "✅ Services refreshed at",
-              new Date().toLocaleTimeString(),
-            );
           }
         }
       } catch (error) {
@@ -304,7 +289,6 @@ export default function SalonDetail({ initialSalon }) {
 
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log("📍 Page visible - refreshing services");
         fetchServices();
       }
     };
@@ -368,11 +352,6 @@ export default function SalonDetail({ initialSalon }) {
             ...prevSalon,
             services: data.salon.services,
           }));
-
-          console.log(
-            "✅ Services refreshed at",
-            new Date().toLocaleTimeString(),
-          );
         }
       } catch (error) {
         console.error("Error polling services:", error);
@@ -385,7 +364,6 @@ export default function SalonDetail({ initialSalon }) {
     // Visibility-aware polling - refresh when user comes back to page
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log("📍 Page visible - refreshing services");
         fetchServices();
       }
     };
@@ -438,15 +416,6 @@ export default function SalonDetail({ initialSalon }) {
     return () => clearInterval(interval);
   }, [pauseInfo?.closingTime, checkSalonStatus]);
 
-  useEffect(() => {
-    console.log(
-      "🔎 Button enable check → Services:",
-      selectedServices,
-      "Time:",
-      selectedTime,
-    );
-  }, [selectedServices, selectedTime]);
-
   const isSalonOpen = () => {
     if (!salon?.operatingHours && !salon?.openingHours) return true; // Default open if no hours
 
@@ -473,7 +442,6 @@ export default function SalonDetail({ initialSalon }) {
         try {
           // Use the first selected service name
           const firstServiceName = selectedServices[0].name;
-          console.log("Fetching barbers for service:", firstServiceName);
 
           // Fetch barbers who can perform the selected service
           const res = await fetch(
@@ -487,7 +455,6 @@ export default function SalonDetail({ initialSalon }) {
           }
 
           const barbers = await res.json();
-          console.log("Available barbers:", barbers);
           setAvailableBarbers(barbers);
 
           // If no barbers available, show a message but don't prevent booking
@@ -516,7 +483,6 @@ export default function SalonDetail({ initialSalon }) {
     if (isManual && manualLocation) {
       try {
         const location = JSON.parse(manualLocation);
-        console.log("📍 Manual location loaded in id page:", location);
       } catch (e) {
         console.error("Error loading manual location:", e);
       }
@@ -529,7 +495,6 @@ export default function SalonDetail({ initialSalon }) {
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === "isManualMode" || e.key === "manualLocation") {
-        console.log("🔄 Manual mode changed in id page:", e.key, e.newValue);
         // Force LocationMap to re-render by updating state
         // If you have a state for this, update it here
       }
@@ -557,12 +522,10 @@ export default function SalonDetail({ initialSalon }) {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      console.log("✅ Back online - resuming polling");
     };
 
     const handleOffline = () => {
       setIsOnline(false);
-      console.log("🔴 Offline - pausing polling");
     };
 
     window.addEventListener("online", handleOnline);
@@ -698,7 +661,6 @@ export default function SalonDetail({ initialSalon }) {
   };
 
   const handleTimeClick = (time) => {
-    console.log("Time selected:", time);
     setSelectedTime(time);
     setSelectedSlot(time); // optional: keep both in sync
   };
@@ -762,16 +724,8 @@ export default function SalonDetail({ initialSalon }) {
     }
 
     try {
-      console.log(
-        "📌 Booking with:",
-        selectedServices,
-        selectedSlot,
-        selectedBarber,
-        userInfo,
-      );
       // ✅ BETTER: Wait for token + retry logic
       if (!csrfToken) {
-        console.log("⏳ Waiting for CSRF token...");
         // Wait max 2 seconds for token
         const startTime = Date.now();
         while (!csrfToken && Date.now() - startTime < 2000) {
@@ -821,8 +775,6 @@ export default function SalonDetail({ initialSalon }) {
           userId: currentUserInfo?._id || currentUserInfo?.id || null,
           estimatedDuration: selectedServices[0]?.duration || 45,
         };
-
-        console.log("✅ Walk-in Booking payload:", walkinPayload);
         const walkinResponse = await fetch("/api/walkin/create-booking", {
           method: "POST",
           headers: {
@@ -838,9 +790,6 @@ export default function SalonDetail({ initialSalon }) {
         if (!walkinResponse.ok) {
           throw new Error(walkinResult.message || "Walk-in booking failed");
         }
-
-        console.log("✅ Walk-in booking confirmed:", walkinResult);
-
         // Refresh all data immediately
         await Promise.all([fetchAllBookings(), fetchBarberStates()]);
 
@@ -880,9 +829,6 @@ export default function SalonDetail({ initialSalon }) {
           user: currentUserInfo,
           userId: currentUserInfo?._id || currentUserInfo?.id || null,
         };
-
-        console.log("✅ Pre-book Booking payload:", prebookPayload);
-
         const makeBookingRequest = async () => {
           try {
             setBookingError(null);
@@ -920,9 +866,6 @@ export default function SalonDetail({ initialSalon }) {
 
         // Make the booking request
         const bookingResult = await makeBookingRequest();
-
-        console.log("✅ Pre-book Booking confirmed:", bookingResult);
-
         // Extract the booking ID correctly
         const bookingId =
           bookingResult.bookingId || bookingResult._id || bookingResult.id;
@@ -2015,9 +1958,7 @@ export default function SalonDetail({ initialSalon }) {
                               selectedSlot === slot.time ? styles.selected : ""
                             } ${!slot.available ? styles.disabled : ""}`}
                             onClick={() => {
-                              console.log("Slot clicked:", slot.time);
                               handleTimeClick(slot.time);
-                              console.log("Current selectedSlot:", slot.time);
                             }}
                             disabled={!slot.available} // ✅ ensure unavailable slots can’t be clicked
                           >
@@ -2035,32 +1976,6 @@ export default function SalonDetail({ initialSalon }) {
           )}
         </AnimatePresence>
       </div>
-
-      {/* Map Section 
-      {salon.location.latitude && salon.location.longitude && (
-        <motion.section
-          className={styles.mapSection}
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
-        >
-          <h3 className={styles.sectionTitle}>Location</h3>
-          <MapContainer
-            center={[salon.location.latitude, salon.location.longitude]}
-            zoom={15}
-            style={{ height: "300px", width: "100%" }}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution="&copy; OpenStreetMap contributors"
-            />
-            <Marker
-              position={[salon.location.latitude, salon.location.longitude]}
-            />
-          </MapContainer>
-        </motion.section>
-      )}*/}
-
       {/* Book Appointment Button */}
 
       {/* Booking Modal */}
