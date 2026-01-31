@@ -2,6 +2,7 @@ import { connectToDatabase, clientPromise } from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
 import { updateSalonStats } from "../../../lib/statsHelper";
 import { csrfMiddleware } from "../../../lib/middleware/csrf";
+import { generateBookingCode } from "../../../lib/bookingCodeGenerator";
 
 async function handler(req, res) {
   if (req.method !== "POST") {
@@ -41,12 +42,14 @@ async function handler(req, res) {
           time,
           status: { $ne: "cancelled" },
         },
-        { session }
+        { session },
       );
 
       if (existingBooking) {
         throw new Error("Time slot already booked");
       }
+
+      const bookingCode = await generateBookingCode(salonId);
 
       const bookingData = {
         salonId: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId,
@@ -57,17 +60,17 @@ async function handler(req, res) {
         time,
         customerName: customerName || user?.name || "Guest",
         customerPhone:
-          customerPhone ||
-          user?.phoneNumber ||
-          user?.phone ||
-          user?.mobile ||
-          "",
+          customerPhone || user?.phoneNumber || user?.phone || user?.mobile,
         customerAge: user?.age || null,
         customerGender: user?.gender || null,
         customerLocation: user?.location || null,
         price: price || 0,
         paymentStatus: "pending",
         status: "confirmed",
+        bookingType: "PREBOOK", // ✅ ADD THIS
+        queueStatus: "PREBOOK_PENDING", // ✅ ADD THIS
+        bookingCode,
+        scheduledFor: new Date(`${date}T${time}:00`), // ✅ ADD THIS
         userId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -81,6 +84,7 @@ async function handler(req, res) {
       const result = await db
         .collection("bookings")
         .insertOne(bookingData, { session });
+
       bookingId = result.insertedId;
 
       // Enhanced user handling - Create or find user
@@ -92,7 +96,7 @@ async function handler(req, res) {
           .updateOne(
             { _id: bookingId },
             { $set: { userId: finalUserId } },
-            { session }
+            { session },
           );
 
         // Update user's booking history
@@ -101,7 +105,7 @@ async function handler(req, res) {
           {
             $push: { bookingHistory: bookingId },
           },
-          { session }
+          { session },
         );
       } else if (user && (user.phone || user.mobile)) {
         // Anonymous user booking - create or find user
@@ -110,7 +114,7 @@ async function handler(req, res) {
           {
             $or: [{ phone: phoneNumber }, { mobile: phoneNumber }],
           },
-          { session }
+          { session },
         );
 
         if (!existingUser) {
@@ -147,7 +151,7 @@ async function handler(req, res) {
                 ...(user.location && { location: user.location }),
               },
             },
-            { session }
+            { session },
           );
         }
 
@@ -157,7 +161,7 @@ async function handler(req, res) {
           .updateOne(
             { _id: bookingId },
             { $set: { userId: finalUserId } },
-            { session }
+            { session },
           );
       }
 
@@ -169,7 +173,7 @@ async function handler(req, res) {
             bookings: { _id: bookingId, date, time, service, barber },
           },
         },
-        { session }
+        { session },
       );
     };
 

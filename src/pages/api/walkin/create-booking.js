@@ -1,5 +1,6 @@
 import clientPromise from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
+import { generateBookingCode } from "@/lib/bookingCodeGenerator";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -63,18 +64,7 @@ export default async function handler(req, res) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + estimatedDuration * 60 * 1000);
 
-    // 🔥 GENERATE UNIQUE BOOKING CODE
-    const generateBookingCode = () => {
-      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
-      let code = "ST-";
-      for (let i = 0; i < 4; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-      return code;
-    };
-
-    const bookingCode = generateBookingCode();
+    const bookingCode = await generateBookingCode(salonId); // ✅ Dynamic
 
     const bookingDoc = {
       // Relations
