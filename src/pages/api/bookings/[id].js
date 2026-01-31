@@ -24,22 +24,28 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // Get salon name
-    if (booking.salonId) {
-      const salon = await db.collection("salons").findOne({
-        _id: new ObjectId(booking.salonId),
-      });
-      booking.salonName = salon?.salonName || "Unknown Salon";
-    }
+    // Get salon details
+    const salon = await db.collection("salons").findOne({
+      _id: booking.salonId,
+    });
 
-    // Convert ObjectId to string
-    booking._id = booking._id.toString();
-    if (booking.salonId) booking.salonId = booking.salonId.toString();
-    if (booking.barberId) booking.barberId = booking.barberId.toString();
+    // Get barber details
+    const barber = booking.barberId
+      ? await db.collection("barbers").findOne({ _id: booking.barberId })
+      : null;
 
-    res.status(200).json({ booking });
+    res.status(200).json({
+      booking: {
+        ...booking,
+        _id: booking._id.toString(),
+        salonId: booking.salonId.toString(),
+        barberId: booking.barberId?.toString(),
+        salonName: salon?.salonName || "Unknown",
+        barberName: barber?.name || booking.barber || "Unassigned",
+      },
+    });
   } catch (error) {
     console.error("Get booking error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: "Internal server error" });
   }
 }

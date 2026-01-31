@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { salonId, date, from } = req.query;
+    const { salonId, date, includeWalkins } = req.query;
 
     if (!salonId) {
       return res.status(400).json({ message: "Salon ID is required" });
@@ -16,23 +16,39 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db("techtrims");
 
-    const query = { salonId: new ObjectId(salonId) };
+    const query = {
+      salonId: new ObjectId(salonId),
+    };
 
-    // ✅ Include walk-ins (they don't have date field)
-    if (date && date !== "all" && !req.query.includeWalkins) {
-      query.date = date;
-    } else if (date && date !== "all" && req.query.includeWalkins) {
-      // For specific date, show both prebook for that date AND walk-ins
-      query.$or = [
-        { date: date },
-        {
-          bookingType: "WALKIN",
-          createdAt: {
-            $gte: new Date(date + "T00:00:00"),
-            $lte: new Date(date + "T23:59:59"),
+    // UPDATED: Handle date filtering for both walkin and prebook
+    if (date && date !== "all") {
+      if (includeWalkins === "true") {
+        // Show both: walkins created on date AND prebooks scheduled for date
+        query.$or = [
+          {
+            // Walkins created on this date
+            bookingType: "WALKIN",
+            createdAt: {
+              $gte: new Date(`${date}T00:00:00`),
+              $lte: new Date(`${date}T23:59:59`),
+            },
           },
-        },
-      ];
+          {
+            // Prebooks scheduled for this date
+            bookingType: "PREBOOK",
+            date: date,
+          },
+        ];
+      } else {
+        // Only prebooks for this date
+        query.date = date;
+        query.bookingType = "PREBOOK";
+      }
+    } else if (date === "all") {
+      // No date filter - show everything
+    } else {
+      // Default: only walkins
+      query.bookingType = "WALKIN";
     }
 
     const bookings = await db
