@@ -549,7 +549,10 @@
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
-  transition: background-color 0.4s ease, color 0.4s ease, box-shadow 0.4s ease,
+  transition:
+    background-color 0.4s ease,
+    color 0.4s ease,
+    box-shadow 0.4s ease,
     border-color 0.4s ease;
 }
 
@@ -802,7 +805,8 @@
 .serviceCard,
 .noSalons {
   border-radius: 16px;
-  box-shadow: 0 4px 32px 0 rgba(34, 34, 80, 0.15),
+  box-shadow:
+    0 4px 32px 0 rgba(34, 34, 80, 0.15),
     0 1.5px 18px 0 rgba(212, 175, 55, 0.05);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
@@ -1247,7 +1251,8 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 25% 25%,
       rgba(212, 175, 55, 0.1) 0%,
       transparent 25%
@@ -1891,7 +1896,8 @@
   margin: 0 auto;
   padding: var(--space-24) var(--space-6);
   border-radius: 16px;
-  box-shadow: 0 4px 32px 0 rgba(34, 34, 80, 0.15),
+  box-shadow:
+    0 4px 32px 0 rgba(34, 34, 80, 0.15),
     0 1.5px 18px 0 rgba(212, 175, 55, 0.05);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
@@ -1909,7 +1915,8 @@
   display: flex;
   gap: var(--space-2);
   border-radius: 16px;
-  box-shadow: 0 4px 32px 0 rgba(34, 34, 80, 0.15),
+  box-shadow:
+    0 4px 32px 0 rgba(34, 34, 80, 0.15),
     0 1.5px 18px 0 rgba(212, 175, 55, 0.05);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
@@ -2047,7 +2054,9 @@
   border: 1px solid #9e9e9e61;
   overflow: hidden;
   border-radius: 8px;
-  box-shadow: 0 1px 1px 0 rgba(0, 0, 0, 0.1), 0 3px 10px 0 rgba(0, 0, 0, 0.29);
+  box-shadow:
+    0 1px 1px 0 rgba(0, 0, 0, 0.1),
+    0 3px 10px 0 rgba(0, 0, 0, 0.29);
 }
 
 .salonImage {
@@ -2339,7 +2348,8 @@
   max-width: 1400px;
   margin: 0 auto;
   border-radius: 16px;
-  box-shadow: 0 4px 32px 0 rgba(34, 34, 80, 0.15),
+  box-shadow:
+    0 4px 32px 0 rgba(34, 34, 80, 0.15),
     0 1.5px 18px 0 rgba(212, 175, 55, 0.05);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
@@ -3092,4 +3102,198 @@
 .retryButton:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+/* ============================= */
+/* LOCATION CHECK OVERLAY */
+/* ============================= */
+
+.locationCheckOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.locationCheckBox {
+  width: 92%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  animation: fadeScale 0.25s ease;
+}
+
+@keyframes fadeScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.locationCheckTitle {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.locationCheckSubtitle {
+  text-align: center;
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 18px;
+}
+
+/* ============================= */
+/* STATUS LIST */
+/* ============================= */
+
+.statusList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.statusItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f3f4f6;
+  font-size: 14px;
+}
+
+.statusSuccess {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.statusPending {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.statusIcon {
+  font-size: 16px;
+}
+
+.statusText {
+  font-weight: 600;
+}
+
+/* ============================= */
+/* COORDS DISPLAY */
+/* ============================= */
+
+.coordsDisplay {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+/* ============================= */
+/* ACTION BUTTONS */
+/* ============================= */
+
+.locationCheckActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.getLocationBtn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.getLocationBtn:hover {
+  background: #1d4ed8;
+}
+
+.manualLocationBtn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px dashed #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.manualLocationBtn:hover {
+  background: rgba(37, 99, 235, 0.15);
+}
+
+.retryBtn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f3f4f6;
+  color: #111827;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.retryBtn:hover {
+  background: #e5e7eb;
+}
+
+.continueBtn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  background: #16a34a;
+  color: #ffffff;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.continueBtn:hover {
+  background: #15803d;
+}
+
+/* ============================= */
+/* HELP TEXT */
+/* ============================= */
+
+.helpText {
+  margin-top: 14px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 13px;
+  color: #9a3412;
+}
+
+.helpSubtext {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #7c2d12;
 }

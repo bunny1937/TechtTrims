@@ -2933,3 +2933,125 @@
 .locationBannerError button:hover {
   background: #dc2626;
 }
+
+/* Prebook Info Banner */
+.prebookInfoBanner {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 16px 20px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 20px 0;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+  animation: slideDown 0.3s ease;
+}
+
+.prebookIcon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.prebookInfo strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.prebookInfo p {
+  font-size: 13px;
+  opacity: 0.95;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Mode Button Subtext */
+.modeSubtext {
+  display: block;
+  font-size: 11px;
+  opacity: 0.8;
+  font-weight: 400;
+  margin-top: 4px;
+}
+
+.modeButton.active .modeSubtext {
+  opacity: 1;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.noSlotsMessage {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-left: 4px solid #f59e0b;
+  padding: 16px;
+  border-radius: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.noSlotsMessage .warningIcon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.noSlotsMessage strong {
+  display: block;
+  color: #78350f;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.noSlotsMessage p {
+  color: #92400e;
+  font-size: 13px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.selectDatePrompt {
+  text-align: center;
+  color: #6b7280;
+  padding: 40px 20px;
+  font-size: 14px;
+}
+
+.stepNavigation {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.prevButton {
+  padding: 12px 24px;
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.prevButton:hover {
+  background: #e5e7eb;
+}
+
+.bookButton.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

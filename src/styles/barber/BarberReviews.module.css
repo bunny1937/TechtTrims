@@ -1,47 +1,34 @@
 /* Barber Reviews Page */
 
-.dashboardWrapper {
-  display: flex;
-  min-height: 100vh;
-  background: var(--background-secondary);
+.mainContentwrapper {
+  margin-left: 270px;
 }
-
 .mainContent {
-  flex: 1;
-  padding: var(--space-6);
-  overflow-y: auto;
-  margin-left: 0; /* ✅ NO OVERLAP */
+  padding: var(--space-4);
 }
-
-@media (min-width: 768px) {
-  .mainContent {
-    margin-left: 0; /* ✅ Sidebar handles its own width */
-  }
-}
-
 /* ==================== HEADER ==================== */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-6);
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: var(--background-primary);
   border-radius: 20px;
   padding: 30px;
-  border: 3px solid #2196f3;
+  border: 3px solid var(--primary);
   box-shadow: 0 8px 24px rgba(33, 150, 243, 0.2);
 }
 
 .title {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #1a237e;
+  color: var(--text-primary);
   margin: 0 0 var(--space-2) 0;
 }
 
 .subtitle {
   font-size: 1.125rem;
-  color: #4a5568;
+  color: var(--text-secondary);
   margin: 0;
   font-weight: 500;
 }
@@ -55,21 +42,21 @@
 }
 
 .statCard {
-  background: white;
+  background: var(--background-primary);
   border-radius: 16px;
   padding: var(--space-6);
   display: flex;
   align-items: center;
   gap: var(--space-5);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 3px solid transparent;
+  border: 2px solid var(--border-color);
   transition: all 0.3s ease;
 }
 
 .statCard:hover {
   transform: translateY(-8px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-  border-color: #2196f3;
+  border-color: var(--primary);
 }
 
 .statIcon {
@@ -79,7 +66,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--background-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -90,7 +77,7 @@
 .statLabel {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0 0 var(--space-2) 0;
@@ -99,14 +86,14 @@
 .statValue {
   font-size: 2.5rem;
   font-weight: 800;
-  color: #1a237e;
+  color: var(--text-primary);
   margin: 0;
   line-height: 1;
 }
 
 .statSubtext {
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-secondary);
   margin-top: var(--space-2);
 }
 
@@ -118,18 +105,18 @@
 
 /* ==================== DISTRIBUTION CARD ==================== */
 .distributionCard {
-  background: white;
+  background: var(--background-primary);
   border-radius: 20px;
   padding: var(--space-8);
   margin-bottom: var(--space-8);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-color);
 }
 
 .sectionTitle {
   font-size: 1.75rem;
   font-weight: 700;
-  color: #1a237e;
+  color: var(--text-primary);
   margin: 0 0 var(--space-6) 0;
 }
 
@@ -148,14 +135,14 @@
 .ratingLabel {
   font-size: 1rem;
   font-weight: 700;
-  color: #1a237e;
+  color: var(--text-primary);
   min-width: 60px;
 }
 
 .barContainer {
   flex: 1;
   height: 32px;
-  background: #f1f5f9;
+  background: var(--background-tertiary);
   border-radius: 8px;
   overflow: hidden;
   position: relative;
@@ -163,7 +150,7 @@
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  background: linear-gradient(90deg, var(--warning), #fbbf24);
   border-radius: 8px;
   transition: width 0.5s ease;
   box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
@@ -172,29 +159,31 @@
 .countLabel {
   font-size: 1rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-secondary);
   min-width: 50px;
   text-align: right;
 }
 
 /* ==================== REVIEWS SECTION ==================== */
 .reviewsSection {
-  background: white;
+  background: var(--background-primary);
   border-radius: 20px;
   padding: var(--space-8);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-color);
 }
 
 .reviewsList {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+
   gap: var(--space-6);
 }
 
 /* ==================== REVIEW CARD ==================== */
 .reviewCard {
-  background: #f8f9fa;
-  border: 2px solid #e5e7eb;
+  background: var(--background-secondary);
+  border: 2px solid var(--border-color);
   border-radius: 16px;
   padding: var(--space-6);
   transition: all 0.3s ease;
@@ -203,7 +192,7 @@
 .reviewCard:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: #2196f3;
+  border-color: var(--primary);
 }
 
 .reviewHeader {
@@ -227,7 +216,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--background-primary);
   font-size: 1.5rem;
   font-weight: 700;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
@@ -236,13 +225,13 @@
 .customerName {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1a237e;
+  color: var(--text-primary);
   margin: 0 0 var(--space-1) 0;
 }
 
 .serviceTag {
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 600;
   margin: 0;
 }
@@ -274,11 +263,11 @@
 .reviewComment {
   display: flex;
   gap: var(--space-3);
-  background: white;
+  background: var(--background-primary);
   padding: var(--space-4);
   border-radius: 12px;
   margin-bottom: var(--space-4);
-  border-left: 4px solid #2196f3;
+  border-left: 4px solid var(--primary);
 }
 
 .reviewComment p {
@@ -305,7 +294,7 @@
   font-size: 1.5rem;
   margin: var(--space-4) 0 0 0;
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .emptyState span {
@@ -322,22 +311,30 @@
   justify-content: center;
   min-height: 400px;
   font-size: 1.25rem;
-  color: #1a237e;
+  color: var(--text-primary);
   font-weight: 700;
 }
 
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1024px) {
+  .mainContentwrapper {
+    margin-left: 210px;
+    padding: var(--space-4);
+  }
   .statsGrid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 768px) {
-  .mainContent {
+  .mainContentwrapper {
+    margin-bottom: 70px;
+
     padding: var(--space-4);
   }
-
+  .mainContent {
+    margin-bottom: 70px;
+  }
   .header {
     padding: var(--space-6);
   }
@@ -345,16 +342,26 @@
   .title {
     font-size: 1.75rem;
   }
-
-  .statsGrid {
-    grid-template-columns: 1fr;
+  .statCard {
+    padding: var(--space-2);
   }
-
+  .statIcon {
+    width: 50px;
+    height: 50px;
+  }
+  .statValue {
+    font-size: 2rem;
+  }
   .reviewHeader {
     flex-direction: column;
     gap: var(--space-3);
   }
-
+  .reviewsSection {
+    padding: var(--space-2);
+  }
+  .reviewsList {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
   .reviewMeta {
     text-align: left;
   }

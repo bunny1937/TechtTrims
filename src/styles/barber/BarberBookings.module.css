@@ -11,42 +11,47 @@
 /* ==================== MAIN CONTENT ==================== */
 .mainContent {
   flex: 1;
+  margin-left: 270px;
   padding: var(--space-4);
   overflow-y: auto;
 }
 
 /* ==================== HEADER ==================== */
 .header {
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(
+    135deg,
+    var(--background-secondary) 0%,
+    var(--background-tertiary) 100%
+  );
   border-radius: 20px;
-  padding: 40px;
-  margin-bottom: var(--space-8);
-  border: 3px solid #2196f3;
+  padding: 20px;
+  margin-bottom: var(--space-6);
+  border: 3px solid var(--primary);
   box-shadow: var(--shadow-luxury);
 }
 
 .title {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #1a237e;
+  color: var(--text-primary);
   margin: 0 0 var(--space-2) 0;
   font-family: var(--font-display);
 }
 
 .subtitle {
   font-size: 1.125rem;
-  color: #4a5568;
+  color: var(--text-secondary);
   margin: 0;
   font-weight: 500;
 }
 
 /* ==================== FILTERS ==================== */
 .filtersSection {
-  background: white;
+  background: var(--background-primary);
   border-radius: 20px;
   padding: var(--space-6);
   margin-bottom: var(--space-6);
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-color);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
@@ -55,14 +60,14 @@
   align-items: center;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
-  color: #1a237e;
+  color: var(--text-primary);
   font-weight: 700;
   font-size: 1.25rem;
 }
 
 .filtersGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-4);
 }
 
@@ -75,7 +80,7 @@
 .filterGroup label {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #1a237e;
+  color: var(--text-primary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -84,7 +89,7 @@
   padding: var(--space-4) var(--space-5);
   border: 2px solid #cbd5e1;
   border-radius: var(--radius-lg);
-  background: white;
+  background: var(--background-primary);
   color: var(--text-primary);
   font-size: 1rem;
   font-weight: 500;
@@ -95,23 +100,23 @@
 
 .filterSelect:focus {
   outline: none;
-  border-color: #2196f3;
+  border-color: var(--primary);
   box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.15);
 }
 
 /* ==================== STATS ROW ==================== */
 .statsRow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   gap: var(--space-4);
   margin-bottom: var(--space-6);
 }
 
 .statBox {
-  background: white;
-  padding: var(--space-6);
+  background: var(--background-primary);
+  padding: var(--space-3);
   border-radius: 16px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-color);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   text-align: center;
 }
@@ -120,7 +125,7 @@
   display: block;
   font-size: 0.875rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: var(--space-2);
@@ -130,7 +135,7 @@
   display: block;
   font-size: 2rem;
   font-weight: 800;
-  color: #1a237e;
+  color: var(--text-primary);
   font-family: var(--font-display);
 }
 
@@ -143,8 +148,8 @@
 
 /* ==================== BOOKING CARD ==================== */
 .bookingCard {
-  background: white;
-  border: 3px solid #e0e0e0;
+  background: var(--background-primary);
+  border: 3px solid var(--border-color);
   border-radius: 16px;
   padding: var(--space-6);
   transition: all var(--transition-luxury);
@@ -154,7 +159,7 @@
 .bookingCard:hover {
   transform: translateY(-8px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-  border-color: #2196f3;
+  border-color: var(--primary);
 }
 
 .bookingHeader {
@@ -176,13 +181,13 @@
   margin: 0 0 var(--space-1) 0;
   font-size: 1.125rem;
   font-weight: 700;
-  color: #1a237e;
+  color: var(--text-primary);
 }
 
 .customerInfo p {
   margin: 0;
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 .statusBadge {
@@ -197,26 +202,26 @@
 
 .statusBadge.confirmed {
   background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-  color: #155724;
+  color: var(--success);
   border-color: #28a745;
 }
 
 .statusBadge.completed {
   background: linear-gradient(135deg, #cce5ff 0%, #b3d9ff 100%);
-  color: #004085;
+  color: var(--primary);
   border-color: #007bff;
 }
 
 .statusBadge.cancelled {
   background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-  color: #721c24;
-  border-color: #dc3545;
+  color: var(--error);
+  border-color: var(--error);
 }
 
 .statusBadge.started {
   background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
   color: #856404;
-  border-color: #ffc107;
+  border-color: var(--warning);
 }
 
 .bookingDetails {
@@ -230,7 +235,7 @@
   align-items: center;
   gap: var(--space-2);
   font-size: 0.9375rem;
-  color: #64748b;
+  color: var(--text-tertiary);
   font-weight: 600;
 }
 
@@ -243,7 +248,7 @@
 .service {
   font-size: 1rem;
   font-weight: 600;
-  color: #1a237e;
+  color: var(--text-primary);
 }
 
 .price {
@@ -252,7 +257,7 @@
   gap: var(--space-1);
   font-size: 1.5rem;
   font-weight: 800;
-  color: #10b981;
+  color: var(--success);
   font-family: var(--font-display);
 }
 
@@ -284,16 +289,16 @@
   justify-content: center;
   min-height: 400px;
   font-size: 1.25rem;
-  color: #1a237e;
+  color: var(--text-primary);
   font-weight: 700;
 }
 /* ==================== SERVICE SECTION ==================== */
 .serviceSection {
-  background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
+  background: var(--background-primary);
   padding: var(--space-5);
   border-radius: 12px;
   margin-bottom: var(--space-4);
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--border-color);
 }
 
 .serviceMain {
@@ -309,7 +314,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
+  background: var(--background-primary);
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -317,7 +322,7 @@
 .serviceName {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1a237e;
+  color: var(--text-primary);
   margin: 0 0 var(--space-2) 0;
 }
 
@@ -325,7 +330,7 @@
   display: flex;
   gap: var(--space-4);
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-tertiary);
   font-weight: 600;
 }
 
@@ -337,7 +342,7 @@
 }
 
 .price {
-  color: #10b981;
+  color: var(--success);
   font-weight: 700;
   font-size: 1rem;
 }
@@ -354,7 +359,7 @@
   height: 50px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: white;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -383,10 +388,11 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3);
-  background: #f8fafc;
+  background: var(--background-primary);
   border-radius: 10px;
+  border: 2px solid var(--border-color);
   font-size: 0.9375rem;
-  color: #1a237e;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -397,7 +403,8 @@
   gap: var(--space-3);
   margin-bottom: var(--space-4);
   padding: var(--space-3);
-  background: #f8fafc;
+  border: 2px solid var(--border-color);
+  background: var(--background-primary);
   border-radius: 10px;
 }
 
@@ -406,11 +413,11 @@
   align-items: center;
   gap: var(--space-2);
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-tertiary);
 }
 
 .contactItem a {
-  color: #2196f3;
+  color: var(--primary);
   text-decoration: none;
   font-weight: 600;
 }
@@ -426,7 +433,7 @@
   gap: var(--space-3);
   padding: var(--space-3);
   background: #f0fdf4;
-  border: 2px solid #10b981;
+  border: 2px solid var(--success);
   border-radius: 10px;
   margin-bottom: var(--space-4);
 }
@@ -448,7 +455,7 @@
 
 .paymentStatus.paid {
   background: #d4edda;
-  color: #155724;
+  color: var(--success);
 }
 
 .paymentStatus.pending {
@@ -495,9 +502,18 @@
   font-weight: 500;
 }
 
+@media (max-width: 1024px) {
+  .mainContent {
+    padding: var(--space-3);
+    margin-left: 210px;
+  }
+}
+
 @media (max-width: 768px) {
   .mainContent {
     padding: var(--space-3);
+    margin-left: 0;
+    margin-bottom: 70px;
   }
 
   .header {
@@ -509,6 +525,19 @@
   }
 
   .bookingsList {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+  .bookingCard {
+    border-radius: 12px;
+    padding: var(--space-4);
+  }
+  .serviceSection {
+    padding: var(--space-3);
+  }
+  .statusBadge {
+    padding: var(--space-2) var(--space-3);
+    border-radius: 16px;
+    font-size: 0.5rem;
+    font-weight: 600;
   }
 }

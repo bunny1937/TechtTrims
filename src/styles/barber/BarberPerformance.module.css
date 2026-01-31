@@ -1,21 +1,7 @@
 /* src/styles/BarberPerformance.module.css */
 
-/* ==================== PAGE LAYOUT ==================== */
-.pageLayout {
-  display: flex;
-  min-height: 100vh;
-  background: var(--background-primary, #0f0f0f);
-}
-
 .mainContent {
-  flex: 1;
-  transition: margin-left var(--transition-normal, 0.3s ease);
-}
-
-@media (max-width: 1024px) {
-  .mainContent {
-    margin-left: 0;
-  }
+  margin-left: 270px;
 }
 
 .container {
@@ -184,6 +170,10 @@
 
 .mainStatContent {
   flex: 1;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .mainStatValue {
@@ -470,8 +460,9 @@
 }
 
 .reviewsList {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+
   gap: 1.5rem;
 }
 
@@ -561,8 +552,8 @@
 
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1024px) {
-  .mainStatsGrid {
-    grid-template-columns: repeat(2, 1fr);
+  .mainContent {
+    margin-left: 200px;
   }
 
   .achievementsGrid {
@@ -571,8 +562,12 @@
 }
 
 @media (max-width: 768px) {
+  .mainContent {
+    margin: 0 0 70px 0;
+  }
   .container {
-    padding: 1rem;
+    padding: 0.6rem;
+    margin: 0 0 70px 0;
   }
 
   .header {
@@ -584,20 +579,15 @@
   }
 
   .mainStatsGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   }
 
   .mainStatCard {
-    flex-direction: column;
+    padding: 1rem;
     text-align: center;
   }
-
-  .periodSelector {
-    flex-direction: column;
-  }
-
-  .achievementsGrid {
-    grid-template-columns: 1fr;
+  .achievementsCard {
+    padding: 1rem;
   }
 
   .chart {
@@ -608,5 +598,48 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+  .reviewsCard {
+    padding: 1rem;
+  }
+  .reviewsList {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+@media (max-width: 488px) {
+  .mainStatsGrid {
+    gap: 0.8rem;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .mainStatIcon {
+    padding: 0.25rem;
+  }
+  .mainStatCard {
+    gap: 0.5rem;
+  }
+  .mainStatValue {
+    font-size: 2rem;
+    font-weight: 600;
+  }
+
+  .outOf {
+    font-size: 1rem;
+  }
+
+  .unit {
+    font-size: 0.6rem;
+  }
+
+  .mainStatLabel {
+    font-size: 0.75rem;
+  }
+
+  .starsContainer {
+    margin-bottom: 0.3rem;
+  }
+
+  .subStat,
+  .reviewCount {
+    font-size: 0.65rem;
   }
 }
