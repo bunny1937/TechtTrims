@@ -46,15 +46,8 @@ export default function BarberDashboard() {
   });
   // ✅ NEW: Absent/Leave Modals
   const [showAbsentModal, setShowAbsentModal] = useState(false);
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [absentReason, setAbsentReason] = useState("");
-  const [leaveData, setLeaveData] = useState({
-    fromDate: "",
-    toDate: "",
-    fromTime: "09:00",
-    toTime: "18:00",
-    reason: "",
-  });
+
   // Filters
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
@@ -295,29 +288,17 @@ export default function BarberDashboard() {
       showError("Network error");
     }
   };
-
-  // ✅ NEW: Apply for Leave
-  const handleApplyLeave = async () => {
-    if (!leaveData.fromDate || !leaveData.toDate || !leaveData.reason.trim()) {
-      showWarning("Please fill all fields");
-      return;
-    }
-
+  // 🔥 NEW: Verify Arrival (Mark customer as arrived)
+  const handleVerifyArrival = async (bookingCode) => {
     try {
-      // Get fresh barber data from session
-      const barberSession = sessionStorage.getItem("barberSession");
-      const barberData = JSON.parse(barberSession);
-
       const payload = {
-        barberId: barberData._id || barberData.id,
-        salonId: barberData.linkedId || barberData.salonId,
-        barberName: barberData.name,
-        ...leaveData,
+        bookingCode,
+        salonId: barber.linkedId || barber.salonId,
       };
 
-      console.log("[Frontend] Leave request payload:", payload);
+      console.log("🚀 SENDING CHECK-IN REQUEST:", payload);
 
-      const res = await fetch("/api/barber/leave/apply", {
+      const res = await fetch("/api/walkin/verify-arrival", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -325,58 +306,19 @@ export default function BarberDashboard() {
 
       const data = await res.json();
 
-      if (res.ok) {
-        showSuccess(
-          "Leave request submitted! Waiting for salon owner approval.",
-        );
-        setShowLeaveModal(false);
-        setLeaveData({
-          fromDate: "",
-          toDate: "",
-          fromTime: "09:00",
-          toTime: "18:00",
-          reason: "",
-        });
-      } else {
-        console.error("[Frontend] Leave error:", data);
-        showError(data.message || "Failed to apply for leave");
-      }
-    } catch (error) {
-      console.error("[Frontend] Leave network error:", error);
-      showError("Network error");
-    }
-  };
-
-  // 🔥 NEW: Verify Arrival (Mark customer as arrived)
-  const handleVerifyArrival = async (bookingCode) => {
-    try {
-      const res = await fetch("/api/walkin/verify-arrival", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingCode,
-          salonId: barber.linkedId || barber.salonId,
-        }),
-      });
-
-      const data = await res.json();
-
-      // 🔥 DEBUG LOG (VISIBLE IN REMOTE DEBUG)
-      console.log("📦 VERIFY ARRIVAL RESPONSE:", {
+      console.log("📦 RESPONSE RECEIVED:", {
         status: res.status,
         ok: res.ok,
-        data,
+        data: data,
       });
 
       if (!res.ok) {
-        // ✅ SHOW REAL MESSAGE FROM BACKEND
+        console.error("❌ CHECK-IN FAILED:", data?.message);
         showError(
           data?.message ||
             data?.error ||
             `Check-in failed (HTTP ${res.status})`,
         );
-
-        // ALSO keep it in UI state if you want
         setScanResult({
           success: false,
           message:
@@ -387,21 +329,18 @@ export default function BarberDashboard() {
         return;
       }
 
-      // ✅ SUCCESS
+      // SUCCESS
+      console.log("✅ CHECK-IN SUCCESS:", data.booking.customerName);
       showSuccess(`${data.booking.customerName} checked in successfully!`);
-
       setScanResult({
         success: true,
         message: "Customer checked in",
         booking: data.booking,
       });
-
-      await loadBookings(barber._id || barber.id, selectedDate, barber);
+      await loadBookings(barber.id || barber._id, selectedDate, barber);
     } catch (err) {
-      console.error("❌ NETWORK / JS ERROR:", err);
-
+      console.error("💥 NETWORK ERROR:", err);
       showError(err.message || "Network error while checking in");
-
       setScanResult({
         success: false,
         message: err.message || "Network error",
@@ -416,6 +355,21 @@ export default function BarberDashboard() {
     estimatedTime = null,
   ) => {
     try {
+      // ✅ VALIDATE BEFORE STARTING SERVICE
+      if (newStatus === "started") {
+        const validateRes = await fetch("/api/barber/validate-start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookingId, barberId: barber.id }),
+        });
+
+        const validateData = await validateRes.json();
+
+        if (!validateData.canStart) {
+          showError(validateData.reason);
+          return; // ❌ BLOCK THE ACTION
+        }
+      }
       const queueStatusMap = {
         confirmed: "RED",
         arrived: "ORANGE",
@@ -625,7 +579,12 @@ export default function BarberDashboard() {
             <p className={styles.title}>Welcome {barber.name}! 👋</p>
           </div>
           {/* 🔥 NEW: Scan/Enter Code Button */}
-          <button onClick={() => setShowScanner(true)}>Scan QR</button>
+          <button
+            className={styles.scannerbtn}
+            onClick={() => setShowScanner(true)}
+          >
+            Scan QR
+          </button>
 
           <div className={styles.attendanceControl}>
             <button
@@ -651,14 +610,6 @@ export default function BarberDashboard() {
               onClick={() => setShowAbsentModal(true)}
             >
               <UserX size={18} /> Mark Absent
-            </button>
-
-            {/* ✅ NEW: Leave Button */}
-            <button
-              className={styles.leaveBtn}
-              onClick={() => setShowLeaveModal(true)}
-            >
-              <CalendarOff size={18} /> Apply Leave
             </button>
           </div>
         </div>
@@ -855,13 +806,15 @@ export default function BarberDashboard() {
 
               // ✅ Status badge text
               const getStatusText = () => {
+                const isPrebook = booking.bookingType === "PREBOOK";
+
                 switch (booking.queueStatus) {
                   case "RED":
-                    return "BOOKED";
+                    return isPrebook ? "PREBOOK - PRIORITY" : "BOOKED";
                   case "ORANGE":
-                    return "WAITING";
+                    return isPrebook ? "PREBOOK - ARRIVED" : "WAITING";
                   case "GREEN":
-                    return "SERVING";
+                    return isPrebook ? "PREBOOK - SERVING" : "SERVING";
                   case "COMPLETED":
                     return "COMPLETED";
                   default:
@@ -874,6 +827,22 @@ export default function BarberDashboard() {
                   key={booking._id}
                   className={`${styles.bookingCard} ${getQueueStatusClass()}`}
                 >
+                  {/* ADD: Prebook Badge */}
+                  {booking.bookingType === "PREBOOK" && (
+                    <div className={styles.prebookBadge}>
+                      📅 PRE-BOOKED
+                      <span className={styles.prebookTime}>
+                        {new Date(booking.scheduledFor).toLocaleTimeString(
+                          "en-IN",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
+                      </span>
+                    </div>
+                  )}
+
                   {/* ✅ TOP ROW: Customer Name + Status Badge */}
                   <div className={styles.cardHeader}>
                     <h3 className={styles.customerName}>
@@ -993,17 +962,6 @@ export default function BarberDashboard() {
                       <span>Completed successfully</span>
                     </div>
                   )}
-                  <div style={{ padding: "10px", background: "yellow" }}>
-                    <p>Status: {booking.queueStatus}</p>
-                    <p>
-                      Should show buttons:{" "}
-                      {booking.queueStatus === "ORANGE"
-                        ? "YES - START"
-                        : booking.queueStatus === "GREEN"
-                          ? "YES - COMPLETE"
-                          : "NO"}
-                    </p>
-                  </div>
 
                   {/* 🔥 ACTION BUTTONS */}
                   <div className={styles.cardActions}>
@@ -1027,25 +985,133 @@ export default function BarberDashboard() {
                       </button>
                     )}
 
-                    {/* ORANGE: Start Service */}
-                    {booking.queueStatus === "ORANGE" && (
-                      <button
-                        onClick={() => {
-                          setBookingToStart(booking);
-                          setTimeEstimate(booking.estimatedDuration || 30);
-                          setShowTimeModal(true);
-                        }}
-                        className={styles.startBtn}
-                        disabled={
-                          !!actionLoading[`start-${booking._id || booking.id}`]
+                    {/* ORANGE - Start Service WITH HARDCORE RESTRICTIONS */}
+                    {booking.queueStatus === "ORANGE" &&
+                      (() => {
+                        // ✅ CHECK 1: Is there already someone being served?
+                        const someoneInService = filteredBookings.some(
+                          (b) => b.queueStatus === "GREEN",
+                        );
+
+                        // ✅ CHECK 2: Get ORANGE queue in correct order
+                        const orangeQueue = filteredBookings
+                          .filter((b) => b.queueStatus === "ORANGE")
+                          .sort((a, b) => {
+                            // Prebook with appointment gets priority
+                            const aIsPrebook = a.bookingType === "PREBOOK";
+                            const bIsPrebook = b.bookingType === "PREBOOK";
+
+                            if (aIsPrebook && !bIsPrebook) return -1;
+                            if (!aIsPrebook && bIsPrebook) return 1;
+
+                            // If both prebook or both walk-in, sort by arrival time
+                            const aTime = new Date(a.arrivedAt || a.createdAt);
+                            const bTime = new Date(b.arrivedAt || b.createdAt);
+                            return aTime - bTime;
+                          });
+
+                        const isFirstInQueue =
+                          (orangeQueue[0]?._id &&
+                            orangeQueue[0]._id === booking._id) ||
+                          (orangeQueue[0]?.id &&
+                            orangeQueue[0].id === booking.id);
+
+                        // ✅ CHECK 3: Prebook arrived too early?
+                        let tooEarly = false;
+                        let minsEarly = 0;
+                        if (
+                          booking.bookingType === "PREBOOK" &&
+                          booking.scheduledFor
+                        ) {
+                          const appointmentTime = new Date(
+                            booking.scheduledFor,
+                          );
+                          const now = new Date();
+                          const minutesUntilAppointment =
+                            (appointmentTime - now) / (60 * 1000);
+                          if (minutesUntilAppointment > 10) {
+                            tooEarly = true;
+                            minsEarly = Math.ceil(minutesUntilAppointment);
+                          }
                         }
-                      >
-                        <PlayCircle size={16} />
-                        {actionLoading[`start-${booking._id || booking.id}`]
-                          ? "Starting..."
-                          : "Start Service"}
-                      </button>
-                    )}
+
+                        // ✅ FINAL DECISION
+                        const canStart =
+                          !someoneInService && isFirstInQueue && !tooEarly;
+
+                        // ✅ ERROR MESSAGE
+                        let disabledReason = "";
+                        if (someoneInService) {
+                          const currentCustomer = filteredBookings.find(
+                            (b) => b.queueStatus === "GREEN",
+                          );
+                          disabledReason = `🚫 ${currentCustomer?.customerName} is being served first`;
+                        } else if (!isFirstInQueue) {
+                          disabledReason = `🚫 ${orangeQueue[0]?.customerName} is #1 in queue`;
+                        } else if (tooEarly) {
+                          disabledReason = `🚫 Appointment in ${minsEarly}m - too early`;
+                        }
+
+                        return (
+                          <div
+                            style={{
+                              position: "relative",
+                              marginBottom: disabledReason ? "30px" : "0",
+                            }}
+                          >
+                            <button
+                              onClick={() => {
+                                if (!canStart) {
+                                  showWarning(disabledReason);
+                                  return;
+                                }
+                                setBookingToStart(booking);
+                                setTimeEstimate(
+                                  booking.estimatedDuration || 30,
+                                );
+                                setShowTimeModal(true);
+                              }}
+                              className={styles.startBtn}
+                              disabled={
+                                !canStart ||
+                                !!actionLoading[
+                                  `start-${booking._id || booking.id}`
+                                ]
+                              }
+                              style={{
+                                opacity: !canStart ? 0.5 : 1,
+                                cursor: !canStart ? "not-allowed" : "pointer",
+                                background: !canStart ? "#9ca3af" : "",
+                              }}
+                            >
+                              <PlayCircle size={16} />
+                              {actionLoading[
+                                `start-${booking._id || booking.id}`
+                              ]
+                                ? "Starting..."
+                                : "Start Service"}
+                            </button>
+
+                            {!canStart && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  bottom: "-25px",
+                                  left: "0",
+                                  right: "0",
+                                  fontSize: "11px",
+                                  color: "#ef4444",
+                                  fontWeight: "600",
+                                  textAlign: "center",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {disabledReason}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                     {/* GREEN: Time Control + Complete */}
                     {booking.queueStatus === "GREEN" && (
@@ -1383,103 +1449,6 @@ export default function BarberDashboard() {
                   ? "Starting..."
                   : `Start Service (${timeEstimate} mins)`}
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* ✅ NEW: Leave Modal */}
-        {showLeaveModal && (
-          <div className={styles.modalOverlay}>
-            <div className={styles.modal}>
-              <h3>Apply for Leave</h3>
-              <p>Your request will be sent to the salon owner for approval.</p>
-
-              <div className={styles.formGrid}>
-                <div className={styles.formField}>
-                  <label>From Date</label>
-                  <input
-                    type="date"
-                    value={leaveData.fromDate}
-                    onChange={(e) =>
-                      setLeaveData({ ...leaveData, fromDate: e.target.value })
-                    }
-                    className={styles.input}
-                  />
-                </div>
-
-                <div className={styles.formField}>
-                  <label>To Date</label>
-                  <input
-                    type="date"
-                    value={leaveData.toDate}
-                    onChange={(e) =>
-                      setLeaveData({ ...leaveData, toDate: e.target.value })
-                    }
-                    className={styles.input}
-                  />
-                </div>
-
-                <div className={styles.formField}>
-                  <label>From Time</label>
-                  <input
-                    type="time"
-                    value={leaveData.fromTime}
-                    onChange={(e) =>
-                      setLeaveData({ ...leaveData, fromTime: e.target.value })
-                    }
-                    className={styles.input}
-                  />
-                </div>
-
-                <div className={styles.formField}>
-                  <label>To Time</label>
-                  <input
-                    type="time"
-                    value={leaveData.toTime}
-                    onChange={(e) =>
-                      setLeaveData({ ...leaveData, toTime: e.target.value })
-                    }
-                    className={styles.input}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.formField}>
-                <label>Reason</label>
-                <textarea
-                  placeholder="Enter reason for leave..."
-                  value={leaveData.reason}
-                  onChange={(e) =>
-                    setLeaveData({ ...leaveData, reason: e.target.value })
-                  }
-                  rows={3}
-                  className={styles.textarea}
-                />
-              </div>
-
-              <div className={styles.modalActions}>
-                <button
-                  onClick={handleApplyLeave}
-                  className={styles.confirmBtn}
-                >
-                  Submit Leave Request
-                </button>
-                <button
-                  onClick={() => {
-                    setShowLeaveModal(false);
-                    setLeaveData({
-                      fromDate: "",
-                      toDate: "",
-                      fromTime: "09:00",
-                      toTime: "18:00",
-                      reason: "",
-                    });
-                  }}
-                  className={styles.cancelBtn}
-                >
-                  Cancel
-                </button>
-              </div>
             </div>
           </div>
         )}

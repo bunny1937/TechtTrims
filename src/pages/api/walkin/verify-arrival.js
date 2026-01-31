@@ -12,6 +12,8 @@ export default async function handler(req, res) {
 
   try {
     const { bookingCode, salonId } = req.body;
+
+    // ✅ VALIDATION
     if (!bookingCode || !salonId) {
       return res.status(400).json({
         success: false,
@@ -19,16 +21,16 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!/^ST-[A-Z0-9]{4,8}$/.test(bookingCode)) {
+    // ✅ Clean and uppercase the booking code
+    const cleanCode = bookingCode.trim().toUpperCase();
+
+    console.log("🔍 Searching for booking code:", cleanCode);
+
+    // ✅ More flexible validation
+    if (cleanCode.length < 5 || !cleanCode.startsWith("ST-")) {
       return res.status(400).json({
         success: false,
-        message: "Invalid booking QR",
-      });
-    }
-    if (!bookingCode || !salonId) {
-      return res.status(400).json({
-        success: false,
-        message: "Booking code and salon ID required",
+        message: "Invalid booking code format",
       });
     }
 
@@ -36,10 +38,16 @@ export default async function handler(req, res) {
     const db = client.db("techtrims");
 
     // Find booking FIRST
+    // ✅ Find booking with case-insensitive search
     const booking = await db.collection("bookings").findOne({
-      bookingCode: bookingCode.toUpperCase(),
+      bookingCode: { $regex: new RegExp(`^${cleanCode}$`, "i") },
       salonId: new ObjectId(salonId),
     });
+
+    console.log(
+      "🔍 Booking found:",
+      booking ? `YES - ${booking.customerName}` : "NO",
+    );
 
     if (!booking) {
       return res.status(404).json({
