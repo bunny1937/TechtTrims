@@ -1,0 +1,898 @@
+/* ============================================
+   PREBOOK CONFIRMATION - COMPLETE CSS
+   ============================================ */
+
+/* Container */
+.container {
+  min-height: 100vh;
+  padding: 20px;
+  background: var(--background-primary);
+  transition: background-color 0.4s ease;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.backButton {
+  background: var(--background-secondary);
+  border: 2px solid var(--border-color);
+  padding: 10px 16px;
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.backButton:hover {
+  background: var(--background-tertiary);
+  border-color: var(--primary);
+  transform: translateX(-4px);
+}
+
+.header h1 {
+  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+  transition: color 0.4s ease;
+}
+
+/* Card */
+.card {
+  background: var(--background-secondary);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  transition:
+    background-color 0.4s ease,
+    box-shadow 0.4s ease;
+  border: 1px solid var(--border-color);
+}
+
+/* QR CODE SECTION */
+.qrCodeSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 24px 0;
+  padding: 24px;
+  background: var(--background-tertiary);
+  border-radius: 16px;
+  border: 2px solid var(--border-color);
+  transition: all 0.4s ease;
+}
+
+.qrCodeContainer {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 12px;
+}
+
+.qrCodeLabel {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+  transition: color 0.4s ease;
+}
+
+/* BOOKING CODE */
+.bookingCodeSection {
+  text-align: center;
+  margin: 24px 0;
+}
+
+.codeLabel {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  font-weight: 600;
+  transition: color 0.4s ease;
+}
+
+.bookingCodeBox {
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 3px dashed #f59e0b;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+.bookingCode {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #92400e;
+  letter-spacing: 4px;
+  font-family: "Courier New", monospace;
+}
+
+/* DETAILS */
+.details {
+  margin-bottom: 30px;
+}
+
+.sectionHeader {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.4s ease;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+  transition: border-color 0.4s ease;
+}
+
+.detailLabel {
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color 0.4s ease;
+}
+
+.detailValue {
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: color 0.4s ease;
+}
+
+/* QUEUE POSITION CARD */
+.queuePositionCard {
+  background: var(--background-tertiary);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 2px solid var(--border-color);
+  transition: all 0.4s ease;
+  margin-bottom: 24px;
+}
+
+/* STATUS BADGES */
+.statusBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.statusBadge.red {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.statusBadge.orange {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.statusBadge.green {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.statusBadge.grey {
+  background: #f5f5f5;
+  color: #616161;
+}
+
+.statusBadge.completed {
+  background: #f3e5f5;
+  color: #6a1b9a;
+}
+
+.statusDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ============================================
+   MODERN QUEUE CONTAINER
+   ============================================ */
+
+.modernQueueContainer {
+  margin-top: 32px;
+  padding: 20px;
+  background: var(--background-tertiary);
+  border-radius: 20px;
+  border: 2px solid var(--border-color);
+  transition: all 0.4s ease;
+}
+
+/* STATS GRID */
+.modernStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.modernStatCard {
+  padding: 20px 6px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  color: white;
+}
+
+.modernStatCard .statIcon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.modernStatCard .statNumber {
+  font-size: 2.5rem;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.modernStatCard .statLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.95;
+}
+
+/* SERVICE TIME CARD */
+.serviceTimeCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 2px solid #10b981;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.timeIcon {
+  font-size: 2rem;
+}
+
+.serviceTime {
+  display: block;
+  font-weight: 700;
+  font-size: 1.125rem;
+  margin-bottom: 4px;
+  color: #065f46;
+}
+
+.serviceLabel {
+  display: block;
+  font-size: 0.875rem;
+  color: #047857;
+}
+
+/* CHAIR CONTAINER */
+.chairContainer {
+  display: flex;
+  gap: 0;
+  margin-bottom: 32px;
+}
+
+.modernChair {
+  background: #eeeeee;
+  border-radius: 18px 18px 0 0;
+  padding: 32px;
+  min-width: 200px;
+  text-align: center;
+  position: relative;
+  transition: all 0.3s ease;
+  color: #1f2937 !important;
+}
+
+.modernChair * {
+  color: #1f2937 !important;
+}
+
+.chairIcon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+.chairLabel {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+/* SERVING CUSTOMER */
+.servingCustomer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.servingCircle {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: 4px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 8px 30px rgba(16, 185, 129, 0.4);
+}
+
+.userIcon {
+  font-size: 3rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.servingName {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.servingBadge {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  color: white;
+}
+
+.emptyText {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+/* QUEUE FLOW CONTAINER */
+.queueFlowContainer {
+  background-color: #eeeeee;
+  display: flex;
+  align-items: center;
+  border-radius: 0 18px 18px 18px;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 20px;
+  flex: 1;
+}
+
+.queueArrow {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.horizontalQueue {
+  display: flex;
+  gap: 16px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: 8px;
+}
+
+/* MODERN QUEUE ITEM */
+.modernQueueItem {
+  min-width: 140px;
+  padding: 20px 16px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+}
+
+.modernQueueItem.highlightMe {
+  border: 3px solid var(--primary) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  transform: scale(1.05);
+}
+
+.positionBadge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 28px;
+  height: 28px;
+  background: #000;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 900;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.customerAvatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.1);
+  border: 3px solid rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #000;
+}
+
+.customerName {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #000;
+  text-align: center;
+  word-break: break-word;
+}
+
+.queueTime {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.youPill {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.highlightMe {
+  border: 3px solid #f59e0b !important;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3) !important;
+  transform: scale(1.05);
+}
+.prebookBadge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  z-index: 10;
+  letter-spacing: 0.5px;
+}
+
+/* LEGEND */
+.modernLegend {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  background: var(--background-secondary);
+  border-radius: 12px;
+  border: 2px solid var(--border-color);
+  transition: all 0.4s ease;
+}
+
+.legendIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  color: white;
+}
+
+/* WAIT TIME CARD */
+.waitTimeCard {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #f59e0b;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.2);
+}
+
+.waitIcon {
+  font-size: 1.5rem;
+}
+
+.waitText {
+  font-size: 1rem;
+  color: #92400e;
+  font-weight: 600;
+  margin: 0;
+}
+
+.waitText strong {
+  font-weight: 800;
+  color: #78350f;
+}
+
+/* ACTIONS */
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.btnPrimary,
+.btnSecondary {
+  flex: 1;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 140px;
+}
+
+.btnPrimary {
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  color: var(--contrast-dark);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btnPrimary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btnSecondary {
+  background: var(--background-tertiary);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+}
+
+.btnSecondary:hover {
+  background: var(--background-secondary);
+  border-color: var(--primary);
+}
+
+/* LOADING & ERROR */
+.loading,
+.error {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  transition: color 0.4s ease;
+}
+
+.spinner {
+  width: 60px;
+  height: 60px;
+  border: 5px solid var(--border-color);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading p,
+.error h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.4s ease;
+}
+
+.homeButton {
+  margin-top: 20px;
+  padding: 14px 28px;
+  background: var(--primary);
+  color: var(--contrast-dark);
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.homeButton:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.successIcon {
+  font-size: 64px;
+  color: var(--primary);
+  margin-bottom: 16px;
+  transition: color 0.4s ease;
+}
+/* APPOINTMENT HIGHLIGHT */
+.appointmentHighlight {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 24px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 3px solid #f59e0b;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+}
+
+.timeBox,
+.countdownBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+}
+
+.timeLabel,
+.countdownLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.timeValue {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #78350f;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.dateValue {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #92400e;
+  text-align: center;
+}
+
+.countdownValue {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #dc2626;
+  line-height: 1;
+}
+
+/* ARRIVAL INFO */
+.arrivalInfo {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  border: 2px solid #0284c7;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.infoIcon {
+  font-size: 2.5rem;
+  flex-shrink: 0;
+}
+
+.arrivalTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0c4a6e;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.arrivalText {
+  font-size: 1rem;
+  color: #075985;
+  margin: 0 0 12px 0;
+  line-height: 1.6;
+}
+
+.arrivalText strong {
+  color: #0c4a6e;
+  font-weight: 800;
+}
+
+.arrivalNote {
+  font-size: 0.9375rem;
+  color: #0c4a6e;
+  font-weight: 600;
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+}
+
+.arrivalNote strong {
+  color: #dc2626;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 24px 16px;
+  }
+
+  .header h1 {
+    font-size: 20px;
+  }
+
+  .modernStatsGrid {
+    gap: 12px;
+  }
+
+  .modernStatCard .statIcon {
+    font-size: 1.5rem !important;
+  }
+
+  .modernStatCard .statNumber {
+    font-size: 2rem !important;
+  }
+
+  .modernQueueItem {
+    min-width: 120px;
+    padding: 16px 12px;
+  }
+
+  .modernChair {
+    min-width: 160px;
+    padding: 24px 16px;
+  }
+  .appointmentHighlight {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .timeValue {
+    font-size: 2rem;
+  }
+
+  .countdownValue {
+    font-size: 1.5rem;
+  }
+
+  .arrivalInfo {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .servingCircle {
+    width: 80px;
+    height: 80px;
+  }
+
+  .userIcon {
+    font-size: 2.5rem;
+  }
+
+  .queueFlowContainer {
+    flex-direction: column;
+    align-items: flex-start;
+    border-radius: 18px;
+  }
+
+  .chairContainer {
+    flex-direction: column;
+  }
+
+  .queueArrow {
+    transform: rotate(90deg);
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .btnPrimary,
+  .btnSecondary {
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .modernStatsGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .bookingCode {
+    font-size: 1.5rem;
+    letter-spacing: 2px;
+  }
+}
