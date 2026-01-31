@@ -7,14 +7,48 @@ export const useLocation = () => {
   const [locationError, setLocationError] = useState(null);
   const watchIdRef = useRef(null);
   const lastUpdateRef = useRef(0);
+  const MANUAL_LOCATION_KEY = "manualLocation";
+  const MANUAL_MODE_KEY = "isManualMode";
 
   // INCREASED THRESHOLDS FOR STABILITY
   const MIN_UPDATE_INTERVAL = 0; // 30 seconds between updates (was 5s)
   const MIN_DISTANCE_DELTA = 0; // ~50m (was 10m - too sensitive)
   const MAX_ACCURACY = 500; // Only accept positions with <100m accuracy
+  const isManualMode = () =>
+    typeof window !== "undefined" &&
+    sessionStorage.getItem(MANUAL_MODE_KEY) === "true";
+
+  const loadManualLocation = () => {
+    try {
+      const isManual = sessionStorage.getItem(MANUAL_MODE_KEY) === "true";
+      const raw = sessionStorage.getItem(MANUAL_LOCATION_KEY);
+
+      if (!isManual || !raw) return null;
+
+      const parsed = JSON.parse(raw);
+
+      return {
+        latitude: parsed.latitude ?? parsed.lat,
+        longitude: parsed.longitude ?? parsed.lng,
+        lat: parsed.latitude ?? parsed.lat,
+        lng: parsed.longitude ?? parsed.lng,
+        accuracy: 0,
+        source: "manual",
+        timestamp: Date.now(),
+      };
+    } catch {
+      return null;
+    }
+  };
 
   // ----------------- START WATCHING -----------------
   const startWatchingLocation = useCallback(() => {
+    const manual = loadManualLocation();
+    if (manual) {
+      console.log("⛔ GPS watch blocked — manual mode active");
+      return;
+    }
+
     if (watchIdRef.current) return; // already active
 
     const handleSuccess = (position) => {
@@ -30,7 +64,7 @@ export const useLocation = () => {
       // ✅ REJECT TERRIBLE ACCURACY (259km+ is device error)
       if (position.coords.accuracy > 5000000) {
         console.log(
-          `⚠️ Position accuracy too low: ${position.coords.accuracy}m - IGNORING`
+          `⚠️ Position accuracy too low: ${position.coords.accuracy}m - IGNORING`,
         );
         return; // ✅ DON'T SAVE THIS
       }
@@ -38,7 +72,7 @@ export const useLocation = () => {
       // Also reject if accuracy check happens in later logic
       if (position.coords.accuracy > MAX_ACCURACY) {
         console.log(
-          `⚠️ Position accuracy poor: ${position.coords.accuracy}m - USING ANYWAY`
+          `⚠️ Position accuracy poor: ${position.coords.accuracy}m - USING ANYWAY`,
         );
         // Don't return - continue to save
       }
@@ -66,8 +100,8 @@ export const useLocation = () => {
       // UPDATE STATE
       console.log(
         `✅ Location updated: ${latitude.toFixed(6)}, ${longitude.toFixed(
-          6
-        )} (±${accuracy.toFixed(0)}m)`
+          6,
+        )} (±${accuracy.toFixed(0)}m)`,
       );
       setUserLocation(newLocation);
       setLocationStatus("granted");
@@ -92,7 +126,7 @@ export const useLocation = () => {
         // TIMEOUT - Only retry if we DON'T have a location
         if (!userLocation) {
           setLocationError(
-            "Location request timed out. Retrying in 5 seconds..."
+            "Location request timed out. Retrying in 5 seconds...",
           );
           setLocationStatus("error");
 
@@ -107,13 +141,13 @@ export const useLocation = () => {
       } else if (error.code === 1) {
         // PERMISSION DENIED
         setLocationError(
-          "Please allow location access in your browser settings to find nearby salons."
+          "Please allow location access in your browser settings to find nearby salons.",
         );
         setLocationStatus("denied");
       } else if (error.code === 2) {
         // POSITION UNAVAILABLE
         setLocationError(
-          "Location unavailable. Please check your device settings."
+          "Location unavailable. Please check your device settings.",
         );
         setLocationStatus("error");
       } else {
@@ -132,9 +166,36 @@ export const useLocation = () => {
         enableHighAccuracy: isMobile, // Only use GPS on mobile
         timeout: isMobile ? 15000 : 60000, // 60 seconds for laptops
         maximumAge: isMobile ? 60000 : 300000, // 5 min cache for laptops
-      }
+      },
     );
   }, []);
+
+  const setManualLocation = (coords) => {
+    if (!coords?.lat || !coords?.lng) return;
+
+    const normalized = {
+      latitude: coords.lat,
+      longitude: coords.lng,
+      lat: coords.lat,
+      lng: coords.lng,
+      accuracy: 0,
+      timestamp: Date.now(),
+    };
+
+    sessionStorage.setItem(MANUAL_LOCATION_KEY, JSON.stringify(normalized));
+    sessionStorage.setItem(MANUAL_MODE_KEY, "true");
+
+    setUserLocation(normalized);
+    setLocationStatus("granted");
+
+    // 🛑 stop GPS watcher if running
+    if (watchIdRef.current) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+
+    console.log("✅ Manual location set & GPS stopped");
+  };
 
   // ----------------- STOP WATCHING -----------------
   const stopWatchingLocation = useCallback(() => {
@@ -147,6 +208,14 @@ export const useLocation = () => {
 
   // ----------------- REQUEST PERMISSION -----------------
   const requestLocationPermission = useCallback(async () => {
+    // 🛑 HARD STOP IF MANUAL LOCATION IS ACTIVE
+    if (isManualMode()) {
+      console.log("🛑 GPS request skipped — manual mode active");
+      setLocationStatus("granted");
+      setLocationError(null);
+      return true;
+    }
+
     if (!navigator.geolocation) {
       setLocationStatus("error");
       setLocationError("Geolocation not supported");
@@ -182,9 +251,12 @@ export const useLocation = () => {
         accuracy: position.coords.accuracy,
         timestamp: position.timestamp,
       };
+      sessionStorage.removeItem(MANUAL_MODE_KEY);
+      sessionStorage.removeItem(MANUAL_LOCATION_KEY);
 
       setUserLocation(newLocation);
       setLocationStatus("granted");
+
       lastUpdateRef.current = Date.now();
 
       // Save to SESSION STORAGE (persists across page refreshes but not logout)
@@ -197,15 +269,46 @@ export const useLocation = () => {
       return true;
     } catch (error) {
       console.error("Location error:", error);
+
+      // 🛑 DO NOT override manual location
+      if (isManualMode()) {
+        console.log("🛑 GPS request skipped — manual mode active");
+        setLocationStatus("granted");
+        setLocationError(null);
+        return true;
+      }
+
       setLocationStatus("denied");
       setLocationError(error.message);
       return false;
     }
   }, [startWatchingLocation]);
 
+  const clearManualLocation = () => {
+    sessionStorage.removeItem(MANUAL_LOCATION_KEY);
+    sessionStorage.removeItem(MANUAL_MODE_KEY);
+  };
+
+  useEffect(() => {
+    const manual = loadManualLocation();
+
+    if (manual?.latitude && manual?.longitude) {
+      console.log("📍 Using MANUAL location");
+
+      setUserLocation(manual);
+      setLocationStatus("granted");
+      setLocationError(null);
+
+      // 🚫 DO NOT start GPS watcher
+      return;
+    }
+  }, []);
+
   // ----------------- SETUP ON MOUNT -----------------
   useEffect(() => {
     // Try localStorage first
+    const manual = loadManualLocation();
+
     const cached = localStorage.getItem("cachedUserLocation");
     if (cached) {
       try {
@@ -216,7 +319,7 @@ export const useLocation = () => {
           console.warn(
             "❌ Cached location has bad accuracy:",
             parsed.accuracy,
-            "- DISCARDING"
+            "- DISCARDING",
           );
           localStorage.removeItem("cachedUserLocation");
           // Don't load bad cache - let requestLocationPermission() get fresh location
@@ -234,7 +337,7 @@ export const useLocation = () => {
           setLocationStatus("granted");
           console.log(
             "📍 Loaded cached location from localStorage",
-            normalized
+            normalized,
           );
         }
       } catch (e) {
@@ -242,8 +345,9 @@ export const useLocation = () => {
       }
     }
 
-    // ALWAYS request fresh location immediately
-    requestLocationPermission();
+    if (!manual) {
+      requestLocationPermission();
+    }
 
     return () => {
       stopWatchingLocation();
@@ -257,5 +361,7 @@ export const useLocation = () => {
     locationError,
     requestLocationPermission,
     stopWatchingLocation,
+    setManualLocation,
+    clearManualLocation,
   };
 };

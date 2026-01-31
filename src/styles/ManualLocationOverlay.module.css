@@ -1,0 +1,150 @@
+/* ============================= */
+/* OVERLAY */
+/* ============================= */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ============================= */
+/* MODAL */
+/* ============================= */
+
+.modal {
+  width: 94%;
+  max-width: 440px;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+  animation: popUp 0.25s ease;
+}
+.leafletMap {
+  height: 100%;
+  width: 100%;
+}
+
+.mapContainer {
+  margin-top: 12px;
+  height: 260px; /* REQUIRED */
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+@keyframes popUp {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ============================= */
+/* SEARCH */
+/* ============================= */
+
+.searchInput {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: #2563eb;
+}
+
+/* ============================= */
+/* SEARCH RESULTS */
+/* ============================= */
+
+.results {
+  margin-top: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+
+.resultItem {
+  padding: 10px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f1f1;
+  background: #ffffff;
+}
+
+.resultItem:hover {
+  background: #f5f7ff;
+}
+
+.resultItem:last-child {
+  border-bottom: none;
+}
+
+/* ============================= */
+/* MAP */
+/* ============================= */
+
+.mapContainer {
+  margin-top: 12px;
+  height: 260px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+/* ============================= */
+/* ACTIONS */
+/* ============================= */
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.confirmBtn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.confirmBtn:hover {
+  background: #1d4ed8;
+}
+
+.cancelBtn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  background: #e5e7eb;
+}

@@ -8,12 +8,16 @@ import styles from "../styles/Home.module.css";
 import { useLocation } from "../hooks/useLocation";
 import { UserDataManager } from "../lib/userData";
 import { getAuthToken, getUserData } from "../lib/cookieAuth";
-
 // Dynamic import for map component
 const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
   ssr: false,
   loading: () => <div className={styles.mapLoading}>Loading map...</div>,
 });
+
+const ManualLocationOverlay = dynamic(
+  () => import("@/components/Maps/ManualLocationOverlay"),
+  { ssr: false },
+);
 
 export default function Home({ initialSalons = [] }) {
   const router = useRouter();
@@ -59,26 +63,8 @@ export default function Home({ initialSalons = [] }) {
   const [salonLoadError, setSalonLoadError] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null);
   const [error, setError] = useState(null);
-  const [showLocationCheck, setShowLocationCheck] = useState(() => {
-    if (typeof window === "undefined") return false;
-
-    // Check if we have valid cached location
-    const cached =
-      sessionStorage.getItem("liveUserLocation") ||
-      localStorage.getItem("cachedUserLocation");
-
-    if (cached) {
-      try {
-        const loc = JSON.parse(cached);
-        // If we have coordinates, skip location check
-        if (loc.lat && loc.lng) {
-          return false;
-        }
-      } catch (e) {}
-    }
-
-    return true;
-  });
+  const [activeOverlay, setActiveOverlay] = useState("location");
+  // "location" | "manual" | null
 
   const [locationCheckStatus, setLocationCheckStatus] = useState({
     deviceLocation: false,
@@ -86,6 +72,7 @@ export default function Home({ initialSalons = [] }) {
     hasCoordinates: false,
     coordinates: null,
   }); // NEW: Track location status
+  const [showManualLocation, setShowManualLocation] = useState(false);
 
   // ADD: Track if salons were loaded
   const salonsLoadedRef = useRef(false);
@@ -166,24 +153,24 @@ export default function Home({ initialSalons = [] }) {
             sessionStorage.removeItem("liveUserLocation");
             sessionStorage.removeItem("userLocation");
             localStorage.removeItem("cachedUserLocation");
-            setShowLocationCheck(true);
+            setActiveOverlay("location");
             return;
           }
 
           if (lat && lng) {
             salonsLoadedRef.current = true;
-            setShowLocationCheck(false);
+            setActiveOverlay(null);
             setIsLoading(true);
             await loadNearbySalons(lat, lng, userOnboarding?.gender || "all");
             setIsLoading(false);
           } else {
-            setShowLocationCheck(true);
+            setActiveOverlay(null);
           }
         } catch (e) {
-          setShowLocationCheck(true);
+          setActiveOverlay(null);
         }
       } else if (!cached) {
-        setShowLocationCheck(true);
+        setActiveOverlay("location");
       }
     };
 
@@ -315,12 +302,39 @@ export default function Home({ initialSalons = [] }) {
       return null;
     }
   };
+  const handleManualLocationConfirm = ({ lat, lng }) => {
+    if (!lat || !lng) return;
+
+    const coords = { lat, lng };
+
+    // ✅ update overlay status
+    setLocationCheckStatus({
+      deviceLocation: true,
+      locationAccuracy: true,
+      hasCoordinates: true,
+      coordinates: coords,
+    });
+
+    // ✅ persist for rest of app
+    sessionStorage.setItem(
+      "manualLocation",
+      JSON.stringify({
+        lat,
+        lng,
+        latitude: lat,
+        longitude: lng,
+      }),
+    );
+    sessionStorage.setItem("isManualMode", "true");
+
+    setShowManualLocation(false);
+  };
 
   // NEW: Handle "Get Location" button
   const handleGetLocation = async () => {
     const coords = await checkLocationStatus();
     if (coords) {
-      setShowLocationCheck(false);
+      setActiveOverlay(null);
       setIsLoading(true);
       await loadNearbySalons(
         coords.lat,
@@ -520,7 +534,7 @@ export default function Home({ initialSalons = [] }) {
   };
 
   const handleRefreshLocation = async () => {
-    if (locationStatus === "denied") {
+    if (locationStatus === "denied" && !isManualMode()) {
       // Request permission from useLocation hook
       const granted = await requestLocationPermission();
 
@@ -720,7 +734,7 @@ export default function Home({ initialSalons = [] }) {
   }
 
   // Location Check Screen - Shows FIRST
-  if (showLocationCheck) {
+  if (activeOverlay === "location") {
     return (
       <div className={styles.locationCheckOverlay}>
         <div className={styles.locationCheckBox}>
@@ -786,6 +800,16 @@ export default function Home({ initialSalons = [] }) {
                 >
                   📍 Get My Location
                 </button>
+
+                <button
+                  onClick={() => {
+                    setActiveOverlay("manual");
+                  }}
+                  className={styles.manualLocationBtn}
+                >
+                  🗺️ Enter Location Manually
+                </button>
+
                 <button onClick={handleRetry} className={styles.retryBtn}>
                   🔄 Retry
                 </button>
@@ -793,7 +817,7 @@ export default function Home({ initialSalons = [] }) {
             ) : (
               <button
                 onClick={() => {
-                  setShowLocationCheck(false);
+                  setActiveOverlay(null);
                   setIsLoading(true);
                   loadNearbySalons(
                     locationCheckStatus.coordinates.lat,
@@ -819,6 +843,17 @@ export default function Home({ initialSalons = [] }) {
           )}
         </div>
       </div>
+    );
+  }
+  if (activeOverlay === "manual") {
+    return (
+      <ManualLocationOverlay
+        onConfirm={({ lat, lng }) => {
+          handleManualLocationConfirm({ lat, lng });
+          setActiveOverlay("location"); // go back to location box WITH coords
+        }}
+        onClose={() => setActiveOverlay("location")}
+      />
     );
   }
 
@@ -1152,7 +1187,7 @@ export default function Home({ initialSalons = [] }) {
           </motion.div>
         )}
 
-        {locationError && locationStatus === "denied" && (
+        {locationError && locationStatus === "denied" && !isManualMode() && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}

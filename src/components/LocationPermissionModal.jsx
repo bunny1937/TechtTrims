@@ -1,7 +1,12 @@
 import { Navigation } from "lucide-react";
 import styles from "../styles/LocationPermissionModal.module.css";
+import { useLocation } from "@/hooks/useLocation";
+import ManualLocationOverlay from "@/components/Maps/ManualLocationOverlay";
 
 export default function LocationPermissionModal({ show, onAllow, onDeny }) {
+  const { setManualLocation } = useLocation();
+  const [showManual, setShowManual] = useState(false);
+
   if (!show) return null;
 
   return (
@@ -20,7 +25,23 @@ export default function LocationPermissionModal({ show, onAllow, onDeny }) {
             Not Now
           </button>
         </div>
+        <button
+          className={styles.manualBtn}
+          onClick={() => setShowManual(true)}
+        >
+          📍 Enter Location Manually
+        </button>
       </div>
+      {showManual && (
+        <ManualLocationOverlay
+          onConfirm={(location) => {
+            setManualLocation(location);
+            setShowManual(false);
+            retryLocation(); // call existing flow
+          }}
+          onClose={() => setShowManual(false)}
+        />
+      )}
     </div>
   );
 }
