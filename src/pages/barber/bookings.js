@@ -159,9 +159,6 @@ export default function BarberBookings() {
         <div className={styles.header}>
           <div>
             <h1 className={styles.title}>All Bookings</h1>
-            <p className={styles.subtitle}>
-              Complete booking history with detailed information
-            </p>
           </div>
         </div>
 

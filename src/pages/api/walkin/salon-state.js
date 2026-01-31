@@ -29,7 +29,7 @@ export default async function handler(req, res) {
           isExpired: true,
           queueStatus: "EXPIRED",
         },
-      }
+      },
     );
 
     // Get all barbers
@@ -73,31 +73,45 @@ export default async function handler(req, res) {
           currentCustomer,
           isPaused: barber.isPaused || false, // ✅ ADD THIS
         };
-      })
+      }),
     );
 
-    // Count RED bookings - Only count non-expired, future expiry
+    // UPDATED: Count RED bookings - Include both walkin AND prebook
+    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+
     const redCount = await db.collection("bookings").countDocuments({
       salonId: new ObjectId(salonId),
-      queueStatus: "RED", // GREY UI - booked but not arrived
-      isExpired: false, // NOT expired yet
-      expiresAt: { $gt: now }, // Expiry time still in future
+      $or: [
+        // Walk-in RED bookings
+        {
+          bookingType: { $ne: "PREBOOK" },
+          queueStatus: "RED",
+          isExpired: false,
+          expiresAt: { $gt: now },
+        },
+        // Prebook bookings that should be visible (within 1 hour of scheduled time)
+        {
+          bookingType: "PREBOOK",
+          scheduledFor: { $lte: oneHourFromNow },
+          queueStatus: { $in: ["PREBOOK_PENDING", "RED"] },
+          status: { $ne: "cancelled" },
+        },
+      ],
     });
 
-    // Count ORANGE bookings - Arrived users in priority queue (GOLDEN UI)
+    // EXISTING: Count ORANGE (arrived) and GREEN (serving) - these work for both
     const orangeCount = await db.collection("bookings").countDocuments({
       salonId: new ObjectId(salonId),
-      queueStatus: "ORANGE", // GOLDEN UI - arrived at salon
+      queueStatus: "ORANGE",
       isExpired: false,
-      arrivedAt: { $exists: true }, // Must have arrival timestamp
+      arrivedAt: { $exists: true },
     });
 
-    // Count GREEN bookings - Currently being served
     const greenCount = await db.collection("bookings").countDocuments({
       salonId: new ObjectId(salonId),
-      queueStatus: "GREEN", // GREEN UI - serving now
+      queueStatus: "GREEN",
       isExpired: false,
-      serviceStartedAt: { $exists: true }, // Service must have started
+      serviceStartedAt: { $exists: true },
     });
 
     const availableCount = barbers.filter((b) => !b.currentBookingId).length;
@@ -118,8 +132,8 @@ export default async function handler(req, res) {
         const timeLeft = Math.max(
           0,
           Math.ceil(
-            (new Date(b.expectedCompletionTime) - new Date()) / 1000 / 60
-          )
+            (new Date(b.expectedCompletionTime) - new Date()) / 1000 / 60,
+          ),
         );
         totalTimeLeft += timeLeft;
       }
@@ -130,8 +144,8 @@ export default async function handler(req, res) {
       greenCount > 0 && orangeCount === 0
         ? Math.round(totalTimeLeft / greenCount) // Only GREEN → avg time left per barber
         : orangeCount > 0
-        ? totalTimeLeft + orangeCount * 30 // GREEN time left + ORANGE waiting time
-        : 0;
+          ? totalTimeLeft + orangeCount * 30 // GREEN time left + ORANGE waiting time
+          : 0;
 
     res.status(200).json({
       barbers: barberStates,

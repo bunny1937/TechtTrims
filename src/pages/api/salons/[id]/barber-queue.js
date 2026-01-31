@@ -41,52 +41,132 @@ export default async function handler(req, res) {
       .collection("bookings")
       .find({
         salonId: salonObjectId,
-        barberId: barberObjectId,
+        $or: [{ barberId: barberObjectId }, { barberId: barberId }],
         isExpired: false,
         queueStatus: { $in: ["RED", "ORANGE", "GREEN"] },
-        $or: [
-          { queueStatus: { $ne: "RED" } },
-          { expiresAt: { $gt: bufferTime } },
+        $and: [
+          {
+            $or: [
+              { queueStatus: { $ne: "RED" } },
+              { expiresAt: { $gt: bufferTime } },
+              { expiresAt: { $exists: false } },
+            ],
+          },
         ],
       })
-      .sort([
-        ["queueStatus", -1], // GREEN first
-        ["arrivedAt", 1], // Then by arrival
-        ["createdAt", 1], // Then by booking
-      ])
       .toArray();
 
-    // Separate by status
-    const serving = bookings.find((b) => b.queueStatus === "GREEN");
-    const orangeBookings = bookings.filter((b) => b.queueStatus === "ORANGE");
-    const redBookings = bookings.filter((b) => b.queueStatus === "RED");
+    // ✅ CALCULATE PRIORITY FOR SMART QUEUE ORDERING
+    const bookingsWithPriority = bookings.map((b) => {
+      let priority = 0;
 
-    // Format queue data with SAFE customerName
-    const queue = bookings.map((booking, index) => ({
-      _id: booking._id.toString(),
-      customerName: booking.customerName || "Guest", // ✅ SAFE DEFAULT
-      queueStatus: booking.queueStatus,
-      queuePosition:
-        booking.queueStatus === "ORANGE"
-          ? orangeBookings.findIndex((b) => b._id.equals(booking._id)) + 1
+      // GREEN status gets highest priority (currently serving)
+      if (b.queueStatus === "GREEN") {
+        priority = 10000;
+      }
+      // ORANGE status - calculate priority based on booking type and appointment time
+      else if (b.queueStatus === "ORANGE") {
+        // PREBOOK gets +1000 base priority
+        if (b.bookingType === "PREBOOK") {
+          priority += 1000;
+
+          // If appointment is within 30 mins, add urgency bonus
+          if (b.scheduledFor) {
+            const timeUntilAppointment = new Date(b.scheduledFor) - now;
+            const minsUntilAppointment = timeUntilAppointment / (60 * 1000);
+
+            if (minsUntilAppointment <= 30 && minsUntilAppointment >= 0) {
+              priority += 500;
+            }
+            // Bonus for appointments happening RIGHT NOW or past due
+            if (minsUntilAppointment <= 0) {
+              priority += 1000;
+            }
+          }
+        }
+
+        // Earlier arrivals get slight priority (fairness)
+        if (b.arrivedAt) {
+          const minutesSinceArrival = (now - new Date(b.arrivedAt)) / (60 * 1000);
+          priority += Math.floor(minutesSinceArrival); // +1 per minute waited
+        }
+      }
+      // RED status - lowest priority (not arrived yet)
+      else if (b.queueStatus === "RED") {
+        priority = -1000;
+      }
+
+      return { ...b, priority };
+    });
+
+    // ✅ SORT BY PRIORITY SCORE
+    bookingsWithPriority.sort((a, b) => b.priority - a.priority);
+
+    // Separate by status AFTER sorting
+    const serving = bookingsWithPriority.find((b) => b.queueStatus === "GREEN");
+    const orangeBookings = bookingsWithPriority.filter(
+      (b) => b.queueStatus === "ORANGE"
+    );
+    const redBookings = bookingsWithPriority.filter(
+      (b) => b.queueStatus === "RED"
+    );
+
+    // ✅ CALCULATE PERSONAL WAIT TIME FOR EACH BOOKING
+    const queue = bookingsWithPriority.map((booking, index) => {
+      let personalWait = 0;
+
+    // If you're in ORANGE, calculate wait based on your position
+if (booking.queueStatus === "ORANGE") {
+  const myPosition = orangeBookings.findIndex((b) =>
+    b._id.equals(booking._id)
+  );
+
+  // Add remaining time of current GREEN customer + 5 min buffer
+  if (serving?.expectedCompletionTime) {
+    const remaining = Math.ceil(
+      (new Date(serving.expectedCompletionTime) - now) / 1000 / 60
+    );
+    personalWait = Math.max(0, remaining) + 5; // ✅ ADD 5 MIN BUFFER
+  } else if (serving) {
+    // If someone is serving but no completion time, assume 15 mins left + buffer
+    personalWait = 20;
+  }
+
+  // Add 35 mins for each person AHEAD of you (30 min service + 5 min buffer)
+  personalWait += myPosition * 35; // ✅ CHANGED FROM 30 TO 35
+}
+
+
+      return {
+        _id: booking._id.toString(),
+        customerName: booking.customerName || "Guest",
+        queueStatus: booking.queueStatus,
+        bookingType: booking.bookingType,
+        scheduledFor: booking.scheduledFor,
+        queuePosition:
+          booking.queueStatus === "ORANGE"
+            ? orangeBookings.findIndex((b) => b._id.equals(booking._id)) + 1
+            : null,
+        arrivedAt: booking.arrivedAt ? booking.arrivedAt.toISOString() : null,
+        expiresAt: booking.expiresAt ? booking.expiresAt.toISOString() : null,
+        expectedCompletionTime: booking.expectedCompletionTime
+          ? booking.expectedCompletionTime.toISOString()
           : null,
-      arrivedAt: booking.arrivedAt ? booking.arrivedAt.toISOString() : null,
-      expiresAt: booking.expiresAt ? booking.expiresAt.toISOString() : null,
-      expectedCompletionTime: booking.expectedCompletionTime
-        ? booking.expectedCompletionTime.toISOString()
-        : null,
-      service: booking.service,
-    }));
+        service: booking.service,
+        createdAt: booking.createdAt,
+        estimatedWait: personalWait, // ✅ PERSONAL WAIT FOR THIS BOOKING
+      };
+    });
 
-    // Calculate estimated wait
-    let estimatedWait = 0;
+    // Calculate GLOBAL estimated wait (for salon-wide display)
+    let globalEstimatedWait = 0;
     if (serving?.expectedCompletionTime) {
       const remaining = Math.ceil(
         (new Date(serving.expectedCompletionTime) - now) / 1000 / 60
       );
-      estimatedWait = Math.max(0, remaining);
+      globalEstimatedWait = Math.max(0, remaining);
     }
-    estimatedWait += orangeBookings.length * 30;
+    globalEstimatedWait += orangeBookings.length * 30;
 
     res.status(200).json({
       success: true,
@@ -94,14 +174,26 @@ export default async function handler(req, res) {
       queue: queue,
       serving: serving
         ? {
-            customerName: serving.customerName || "Guest", // ✅ SAFE DEFAULT
+            customerName: serving.customerName || "Guest",
             expectedCompletionTime:
               serving.expectedCompletionTime?.toISOString(),
+            timeRemaining: serving.expectedCompletionTime
+              ? Math.max(
+                  0,
+                  Math.ceil(
+                    (new Date(serving.expectedCompletionTime) - now) /
+                      1000 /
+                      60
+                  )
+                )
+              : 0,
           }
         : null,
       priorityQueueCount: orangeBookings.length,
       bookedCount: redBookings.length,
-      estimatedWait: estimatedWait,
+      waitingCount: orangeBookings.length,
+      totalRedQueue: redBookings.length,
+      estimatedWait: globalEstimatedWait, // ✅ Global wait for salon display
       totalInQueue: queue.length,
       timestamp: now.toISOString(),
     });
