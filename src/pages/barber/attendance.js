@@ -16,6 +16,7 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  CalendarOff,
 } from "lucide-react";
 import BarberSidebar from "@/components/Barber/BarberSidebar";
 
@@ -23,7 +24,15 @@ export default function BarberAttendance() {
   const router = useRouter();
   const [barber, setBarber] = useState(null);
   const [loading, setLoading] = useState(true);
-
+  // ✅ NEW: Absent/Leave Modals
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaveData, setLeaveData] = useState({
+    fromDate: "",
+    toDate: "",
+    fromTime: "09:00",
+    toTime: "18:00",
+    reason: "",
+  });
   // Today's attendance state
   const [todayStatus, setTodayStatus] = useState({
     clockIn: null,
@@ -187,6 +196,55 @@ export default function BarberAttendance() {
       setMonthlyReport(data);
     } catch (err) {
       console.error("Error loading monthly report:", err);
+    }
+  };
+  const handleApplyLeave = async () => {
+    if (!leaveData.fromDate || !leaveData.toDate || !leaveData.reason.trim()) {
+      showWarning("Please fill all fields");
+      return;
+    }
+
+    try {
+      // Get fresh barber data from session
+      const barberSession = sessionStorage.getItem("barberSession");
+      const barberData = JSON.parse(barberSession);
+
+      const payload = {
+        barberId: barberData._id || barberData.id,
+        salonId: barberData.linkedId || barberData.salonId,
+        barberName: barberData.name,
+        ...leaveData,
+      };
+
+      console.log("[Frontend] Leave request payload:", payload);
+
+      const res = await fetch("/api/barber/leave/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        showSuccess(
+          "Leave request submitted! Waiting for salon owner approval.",
+        );
+        setShowLeaveModal(false);
+        setLeaveData({
+          fromDate: "",
+          toDate: "",
+          fromTime: "09:00",
+          toTime: "18:00",
+          reason: "",
+        });
+      } else {
+        console.error("[Frontend] Leave error:", data);
+        showError(data.message || "Failed to apply for leave");
+      }
+    } catch (error) {
+      console.error("[Frontend] Leave network error:", error);
+      showError("Network error");
     }
   };
 
@@ -399,10 +457,8 @@ export default function BarberAttendance() {
                 onClick={() => router.push("/barber/dashboard")}
               >
                 <ChevronLeft size={20} />
-                Back
               </button>
               <div className={styles.headerTitle}>
-                <Clock className={styles.headerIcon} size={28} />
                 <div>
                   <h1>Attendance</h1>
                   <p>{barber?.name}</p>
@@ -469,6 +525,12 @@ export default function BarberAttendance() {
               {/* Status Card */}
               <div className={styles.statusCard}>
                 <div className={styles.statusHeader}>
+                  <button
+                    className={styles.leaveBtn}
+                    onClick={() => setShowLeaveModal(true)}
+                  >
+                    <CalendarOff size={18} /> Apply Leave
+                  </button>
                   <h2>Current Status</h2>
                   <div
                     className={`${styles.statusBadge} ${
@@ -618,7 +680,104 @@ export default function BarberAttendance() {
               </div>
             </div>
           )}
+          {/* ✅ NEW: Leave Modal */}
+          {showLeaveModal && (
+            <div className={styles.modalOverlay}>
+              <div className={styles.modal}>
+                <h3>Apply for Leave</h3>
+                <p>
+                  Your request will be sent to the salon owner for approval.
+                </p>
 
+                <div className={styles.formGrid}>
+                  <div className={styles.formField}>
+                    <label>From Date</label>
+                    <input
+                      type="date"
+                      value={leaveData.fromDate}
+                      onChange={(e) =>
+                        setLeaveData({ ...leaveData, fromDate: e.target.value })
+                      }
+                      className={styles.input}
+                    />
+                  </div>
+
+                  <div className={styles.formField}>
+                    <label>To Date</label>
+                    <input
+                      type="date"
+                      value={leaveData.toDate}
+                      onChange={(e) =>
+                        setLeaveData({ ...leaveData, toDate: e.target.value })
+                      }
+                      className={styles.input}
+                    />
+                  </div>
+
+                  <div className={styles.formField}>
+                    <label>From Time</label>
+                    <input
+                      type="time"
+                      value={leaveData.fromTime}
+                      onChange={(e) =>
+                        setLeaveData({ ...leaveData, fromTime: e.target.value })
+                      }
+                      className={styles.input}
+                    />
+                  </div>
+
+                  <div className={styles.formField}>
+                    <label>To Time</label>
+                    <input
+                      type="time"
+                      value={leaveData.toTime}
+                      onChange={(e) =>
+                        setLeaveData({ ...leaveData, toTime: e.target.value })
+                      }
+                      className={styles.input}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formField}>
+                  <label>Reason</label>
+                  <textarea
+                    placeholder="Enter reason for leave..."
+                    value={leaveData.reason}
+                    onChange={(e) =>
+                      setLeaveData({ ...leaveData, reason: e.target.value })
+                    }
+                    rows={3}
+                    className={styles.textarea}
+                  />
+                </div>
+
+                <div className={styles.modalActions}>
+                  <button
+                    onClick={handleApplyLeave}
+                    className={styles.confirmBtn}
+                  >
+                    Submit Leave Request
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowLeaveModal(false);
+                      setLeaveData({
+                        fromDate: "",
+                        toDate: "",
+                        fromTime: "09:00",
+                        toTime: "18:00",
+                        reason: "",
+                      });
+                    }}
+                    className={styles.cancelBtn}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* HISTORY TAB */}
           {activeTab === "history" && (
             <div className={styles.historySection}>
