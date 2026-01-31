@@ -320,10 +320,11 @@ export default function WalkinConfirmation() {
           const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
           const activeQueue = (data.queue || []).filter((q) => {
             if (q.isExpired) return false;
-            if (q.queueStatus === "RED") {
+            if (q.queueStatus === "RED" && !q.arrivedAt && q.expiresAt) {
+              // ✅ Only check expiry if expiresAt exists (walk-ins)
               return new Date(q.expiresAt) > bufferTime;
             }
-            return true;
+            return true; // ✅ Include prebooks without expiresAt
           });
 
           setBarberQueueData({
@@ -1015,7 +1016,11 @@ export default function WalkinConfirmation() {
                 <div className={styles.statsRow}>
                   <div className={styles.statIcon}>👥</div>
                   <div className={styles.statNumber}>
-                    {barberQueueData.priorityQueueCount || 0}
+                    <h2>
+                      {(barberQueueData.priorityQueueCount || 0) +
+                        (barberQueueData.bookedCount || 0)}
+                    </h2>
+                    <p>PRIORITY QUEUE</p>{" "}
                   </div>
                 </div>
                 <div className={styles.statLabel}>Priority Queue</div>

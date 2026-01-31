@@ -168,12 +168,13 @@ export default function SalonDetail({ initialSalon }) {
 
       const now = new Date();
       const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
-      const activeBookings = (data.bookings || []).filter((b) => {
+      const activeBookings = data.bookings.filter((b) => {
         if (b.isExpired) return false;
-        if (b.queueStatus === "RED") {
+        if (b.queueStatus === "RED" && b.expiresAt) {
+          // ✅ CHECK IF expiresAt EXISTS
           return new Date(b.expiresAt) > bufferTime;
         }
-        return true;
+        return true; // ✅ INCLUDE PREBOOKS WITHOUT expiresAt
       });
 
       // Only update if changed
@@ -540,16 +541,58 @@ export default function SalonDetail({ initialSalon }) {
   // Client re-fetch (optional, keeps data fresh if user navigates without reload)
   const computeTimeSlotsForDate = useCallback(
     (dateStr) => {
-      if (!dateStr) return [];
-      const slots = [];
-      const today = new Date();
-      const selectedDateObj = new Date(dateStr);
-      const startHour =
-        selectedDateObj.toDateString() === today.toDateString()
-          ? Math.max(9, today.getHours() + 1)
-          : 9;
-      const endHour = 20;
+      if (!dateStr || !salon) return [];
 
+      const slots = [];
+      const now = new Date();
+      const selectedDateObj = new Date(dateStr + "T00:00:00");
+      const isToday = selectedDateObj.toDateString() === now.toDateString();
+
+      // ✅ BLOCK TODAY FOR PREBOOK
+      if (isToday) {
+        return []; // No slots for today - use walk-in!
+      }
+
+      // ... rest of code for future dates
+
+      // ✅ GET ACTUAL SALON HOURS FOR THIS DAY
+      const dayName = selectedDateObj
+        .toLocaleDateString("en-US", { weekday: "long" })
+        .toLowerCase();
+      const dayHours = salon.operatingHours?.[dayName];
+
+      if (!dayHours || dayHours.closed) {
+        return []; // Salon closed this day
+      }
+
+      // ✅ PARSE SALON HOURS
+      const [openHour, openMin] = dayHours.open.split(":").map(Number);
+      const [closeHour, closeMin] = dayHours.close.split(":").map(Number);
+
+      // Handle 24:00 (midnight next day)
+      const actualCloseHour = closeHour === 24 ? 23 : closeHour;
+      const actualCloseMin = closeHour === 24 ? 30 : closeMin;
+
+      // ✅ FOR TODAY: Start from current time + 30min buffer
+      let startHour, startMin;
+      if (isToday) {
+        const bufferTime = new Date(now.getTime() + 30 * 60 * 1000);
+        startHour = bufferTime.getHours();
+        startMin = bufferTime.getMinutes() >= 30 ? 30 : 0;
+
+        // If current time + buffer is past closing, return empty
+        if (
+          startHour > actualCloseHour ||
+          (startHour === actualCloseHour && startMin >= actualCloseMin)
+        ) {
+          return [];
+        }
+      } else {
+        startHour = openHour;
+        startMin = openMin;
+      }
+
+      // ✅ FIX: Get booked times correctly
       const bookedSet = new Set(
         (salon.bookings || [])
           .filter((b) => {
@@ -560,14 +603,19 @@ export default function SalonDetail({ initialSalon }) {
               return false;
             }
           })
-          .map((b) => b.date === selectedDate),
+          .map((b) => b.time), // ✅ FIXED
       );
 
-      for (let hour = startHour; hour < endHour; hour++) {
-        for (let minute = 0; minute < 60; minute += 30) {
+      // ✅ GENERATE SLOTS FROM SALON HOURS
+      for (let hour = startHour; hour <= actualCloseHour; hour++) {
+        const minuteStart = hour === startHour ? startMin : 0;
+        const minuteEnd = hour === actualCloseHour ? actualCloseMin : 60;
+
+        for (let minute = minuteStart; minute < minuteEnd; minute += 30) {
           const hh = String(hour).padStart(2, "0");
           const mm = String(minute).padStart(2, "0");
           const timeString = `${hh}:${mm}`;
+
           slots.push({
             time: timeString,
             available: !bookedSet.has(timeString),
@@ -579,6 +627,7 @@ export default function SalonDetail({ initialSalon }) {
     },
     [salon, selectedDate],
   );
+
   useEffect(() => {
     if (!selectedDate) {
       setTimeSlots([]);
@@ -668,7 +717,7 @@ export default function SalonDetail({ initialSalon }) {
   const makeBookingRequest = async () => {
     try {
       setBookingError(null);
-      const response = await fetch("/api/bookings/create", {
+      const response = await fetch("/api/prebook/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -824,20 +873,42 @@ export default function SalonDetail({ initialSalon }) {
           price: totalPrice,
           customerName: currentUserInfo?.name || "Guest",
           customerPhone:
-            currentUserInfo?.phone || currentUserInfo?.mobile || "",
-          customerAge: currentUserInfo?.age || null,
+            currentUserInfo?.phone ||
+            currentUserInfo?.mobile ||
+            currentUserInfo?.phoneNumber ||
+            "", // ✅ FIXED WITH FALLBACK
+          customerEmail: currentUserInfo?.email || null,
+          customerGender: currentUserInfo?.gender || null,
+          customerLocation: userLocation || null, // ✅ ADD THIS
           user: currentUserInfo,
           userId: currentUserInfo?._id || currentUserInfo?.id || null,
         };
         const makeBookingRequest = async () => {
           try {
             setBookingError(null);
-            const response = await fetch("/api/bookings/create", {
+
+            // ✅ WAIT FOR CSRF TOKEN
+            if (!csrfToken) {
+              const startTime = Date.now();
+              while (!csrfToken && Date.now() - startTime < 2000) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+              }
+              if (!csrfToken) {
+                throw new Error(
+                  "Security check failed. Please refresh the page.",
+                );
+              }
+            }
+            console.log("🔍 Prebook Payload:", prebookPayload); // ✅ ADD THIS
+
+            const response = await fetch("/api/prebook/create", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
+                "X-CSRF-Token": csrfToken, // ✅ ADD THIS
                 ...(userToken && { Authorization: `Bearer ${userToken}` }),
               },
+              credentials: "include", // ✅ ADD THIS
               body: JSON.stringify(prebookPayload),
             });
 
@@ -877,7 +948,7 @@ export default function SalonDetail({ initialSalon }) {
         setSelectedSlot("");
 
         // Redirect to booking confirmation page
-        router.push(`/booking/confirmed?id=${bookingId}`);
+        router.push(`/prebook/confirmation?bookingId=${bookingId}`); // ✅ Match param name
       }
     } catch (error) {
       console.error("❌ Booking error:", error);
@@ -1035,7 +1106,7 @@ export default function SalonDetail({ initialSalon }) {
       )}
       {/* Location Status Feedback */}
 
-      {locationError && locationStatus === "denied" && (
+      {locationError && locationStatus === "denied" && !isManualMode() && (
         <div className={styles.locationBannerError}>
           <span>⚠️</span>
           <div>
@@ -1103,7 +1174,7 @@ export default function SalonDetail({ initialSalon }) {
         </div>
       )}
 
-      {/* ✅ NEW: Mode Toggle */}
+      {/* ✅ Mode Toggle with Prebook Info */}
       <div className={styles.modeToggle}>
         <button
           className={`${styles.modeButton} ${
@@ -1112,6 +1183,7 @@ export default function SalonDetail({ initialSalon }) {
           onClick={() => setBookingMode("prebook")}
         >
           📅 Pre-book
+          <span className={styles.modeSubtext}>Schedule appointment</span>
         </button>
         <button
           className={`${styles.modeButton} ${
@@ -1120,8 +1192,23 @@ export default function SalonDetail({ initialSalon }) {
           onClick={() => setBookingMode("walkin")}
         >
           ⚡ Walk-in
+          <span className={styles.modeSubtext}>Join queue now</span>
         </button>
       </div>
+
+      {/* Prebook Info Banner */}
+      {bookingMode === "prebook" && (
+        <div className={styles.prebookInfoBanner}>
+          <span className={styles.prebookIcon}>📅</span>
+          <div className={styles.prebookInfo}>
+            <strong>Pre-booking Mode</strong>
+            <p>
+              Reserve your spot in advance. You&apos;ll be moved to priority
+              queue 1 hour before your scheduled time.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <motion.section
@@ -1938,39 +2025,86 @@ export default function SalonDetail({ initialSalon }) {
               style={{ transformOrigin: "left center" }}
             >
               <h3 className={styles.sectionTitle}>Select Date & Time</h3>
+
               <div className={styles.dateTimePicker}>
                 <input
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
+                  min={
+                    new Date(Date.now() + 24 * 60 * 60 * 1000)
+                      .toISOString()
+                      .split("T")[0]
+                  }
+                  max={
+                    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                      .toISOString()
+                      .split("T")[0]
+                  }
                   className={styles.dateInput}
                 />
+
                 <div className={styles.timeSlots}>
-                  {selectedDate ? (
-                    timeSlots.length === 0 ? (
-                      <div>No slots available for selected date</div>
-                    ) : (
-                      <div className={styles.timeSlotsWrapper}>
-                        {timeSlots.map((slot, idx) => (
-                          <button
-                            key={idx}
-                            className={`${styles.timeSlot} ${
-                              selectedSlot === slot.time ? styles.selected : ""
-                            } ${!slot.available ? styles.disabled : ""}`}
-                            onClick={() => {
-                              handleTimeClick(slot.time);
-                            }}
-                            disabled={!slot.available} // ✅ ensure unavailable slots can’t be clicked
-                          >
-                            {slot.time}
-                          </button>
-                        ))}
+                  {!selectedDate ? (
+                    <p className={styles.selectDatePrompt}>
+                      Please select a date first
+                    </p>
+                  ) : timeSlots.length === 0 ? (
+                    <div className={styles.noSlotsMessage}>
+                      <span className={styles.warningIcon}>⚠️</span>
+                      <div>
+                        <strong>No slots available for same-day booking</strong>
+                        <p>
+                          Pre-booking is for future appointments. Please select
+                          tomorrow onwards, or switch to{" "}
+                          <strong>Walk-in</strong> mode for same-day bookings.
+                        </p>
                       </div>
-                    )
+                    </div>
                   ) : (
-                    <p>Please select a date</p>
+                    <div className={styles.timeSlotsWrapper}>
+                      {timeSlots.map((slot, idx) => (
+                        <button
+                          key={idx}
+                          className={`${styles.timeSlot} ${
+                            selectedSlot === slot.time ? styles.selected : ""
+                          } ${!slot.available ? styles.disabled : ""}`}
+                          onClick={() => handleTimeClick(slot.time)}
+                          disabled={!slot.available}
+                        >
+                          {slot.time}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
+              </div>
+
+              {/* ✅ ADD NAVIGATION BUTTONS */}
+              <div className={styles.stepNavigation}>
+                <button
+                  className={styles.prevButton}
+                  onClick={() => setCurrentStep(2)}
+                >
+                  ← Back
+                </button>
+
+                <button
+                  onClick={handleBooking}
+                  disabled={
+                    isBooking ||
+                    !selectedDate ||
+                    !selectedSlot ||
+                    timeSlots.length === 0
+                  }
+                  className={`${styles.bookButton} ${
+                    !selectedDate || !selectedSlot || timeSlots.length === 0
+                      ? styles.disabled
+                      : ""
+                  }`}
+                >
+                  {isBooking ? "Booking..." : "Confirm Pre-booking"}
+                </button>
               </div>
             </motion.section>
           )}
