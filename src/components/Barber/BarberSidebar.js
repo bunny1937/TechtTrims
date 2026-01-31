@@ -97,7 +97,7 @@ export default function BarberSidebar({ barber, currentPage = "dashboard" }) {
   return (
     <>
       {/* DESKTOP SIDEBAR - Hidden on mobile */}
-      <aside className={styles.sidebar}>
+      <div className={styles.sidebar}>
         {/* Barber Profile */}
         <div className={styles.profile}>
           <div className={styles.profileImage}>
@@ -146,7 +146,7 @@ export default function BarberSidebar({ barber, currentPage = "dashboard" }) {
           <LogOut size={20} />
           <span>Logout</span>
         </button>
-      </aside>
+      </div>
 
       {/* MOBILE BOTTOM NAVIGATION - Visible only on mobile */}
       <nav className={styles.mobileBottomNav}>

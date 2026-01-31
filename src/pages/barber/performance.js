@@ -132,7 +132,6 @@ export default function BarberPerformance() {
                 onClick={() => router.push("/barber/dashboard")}
               >
                 <ChevronLeft size={20} />
-                Back
               </button>
               <div className={styles.headerTitle}>
                 <BarChart3 className={styles.headerIcon} size={28} />

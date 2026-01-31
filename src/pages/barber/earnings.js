@@ -154,51 +154,49 @@ export default function BarberEarnings() {
         {/* Header */}
         <header className={styles.header}>
           <div className={styles.headerLeft}>
-            <button
-              className={styles.backButton}
-              onClick={() => router.push("/barber/dashboard")}
-            >
-              <ChevronLeft size={20} />
-              Back
-            </button>
             <div className={styles.headerTitle}>
-              <DollarSign className={styles.headerIcon} size={28} />
+              <button
+                className={styles.backButton}
+                onClick={() => router.push("/barber/dashboard")}
+              >
+                <ChevronLeft size={20} />
+              </button>
               <div>
                 <h1>Earnings</h1>
                 <p>{barber?.name}</p>
               </div>
             </div>
+
+            {/* Month Selector */}
+            <div className={styles.monthSelector}>
+              <button
+                className={styles.monthNavButton}
+                onClick={() => changeMonth("prev")}
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <div className={styles.monthDisplay}>
+                {new Date(selectedYear, selectedMonth - 1).toLocaleDateString(
+                  "en-US",
+                  {
+                    month: "long",
+                    year: "numeric",
+                  },
+                )}
+              </div>
+              <button
+                className={styles.monthNavButton}
+                onClick={() => changeMonth("next")}
+                disabled={
+                  selectedYear === new Date().getFullYear() &&
+                  selectedMonth === new Date().getMonth() + 1
+                }
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
           </div>
         </header>
-
-        {/* Month Selector */}
-        <div className={styles.monthSelector}>
-          <button
-            className={styles.monthNavButton}
-            onClick={() => changeMonth("prev")}
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <div className={styles.monthDisplay}>
-            {new Date(selectedYear, selectedMonth - 1).toLocaleDateString(
-              "en-US",
-              {
-                month: "long",
-                year: "numeric",
-              },
-            )}
-          </div>
-          <button
-            className={styles.monthNavButton}
-            onClick={() => changeMonth("next")}
-            disabled={
-              selectedYear === new Date().getFullYear() &&
-              selectedMonth === new Date().getMonth() + 1
-            }
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
 
         {/* Earnings Overview */}
         <div className={styles.overviewGrid}>

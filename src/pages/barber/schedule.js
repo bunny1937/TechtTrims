@@ -165,9 +165,8 @@ export default function BarberSchedule() {
   }
 
   return (
-    <div className={styles.pageLayout}>
+    <>
       <BarberSidebar barber={barber} currentPage="schedule" />
-
       <div className={styles.mainContent}>
         <div className={styles.container}>
           {/* Header */}
@@ -378,6 +377,6 @@ export default function BarberSchedule() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

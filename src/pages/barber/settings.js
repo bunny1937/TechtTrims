@@ -283,16 +283,18 @@ export default function BarberSettings() {
                 onClick={() => router.push("/barber/dashboard")}
               >
                 <ChevronLeft size={20} />
-                Back
               </button>
               <div className={styles.headerTitle}>
-                <SettingsIcon className={styles.headerIcon} size={28} />
                 <div>
                   <h1>Settings</h1>
                   <p>{barber?.name}</p>
                 </div>
-              </div>
+              </div>{" "}
             </div>
+            <button className={styles.logoutButton} onClick={handleLogout}>
+              <LogOut size={20} />
+              Logout
+            </button>
           </header>
 
           {/* Message */}
@@ -347,10 +349,6 @@ export default function BarberSettings() {
                 <Calendar size={20} />
                 Availability
               </button>
-              <button className={styles.logoutButton} onClick={handleLogout}>
-                <LogOut size={20} />
-                Logout
-              </button>
             </div>
 
             {/* Content */}
@@ -362,81 +360,89 @@ export default function BarberSettings() {
                     <User className={styles.tabIcon} />
                     Profile Information
                   </h2>
+                  <div className={styles.formGroupBox}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Name</label>
+                      <input
+                        type="text"
+                        className={styles.input}
+                        value={profileData.name}
+                        onChange={(e) =>
+                          setProfileData({
+                            ...profileData,
+                            name: e.target.value,
+                          })
+                        }
+                        placeholder="Your full name"
+                      />
+                    </div>
 
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Name</label>
-                    <input
-                      type="text"
-                      className={styles.input}
-                      value={profileData.name}
-                      onChange={(e) =>
-                        setProfileData({ ...profileData, name: e.target.value })
-                      }
-                      placeholder="Your full name"
-                    />
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Email</label>
+                      <input
+                        type="email"
+                        className={styles.input}
+                        value={profileData.email}
+                        onChange={(e) =>
+                          setProfileData({
+                            ...profileData,
+                            email: e.target.value,
+                          })
+                        }
+                        placeholder="your@email.com"
+                      />
+                    </div>
+
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Phone</label>
+                      <input
+                        type="tel"
+                        className={styles.input}
+                        value={profileData.phone}
+                        onChange={(e) =>
+                          setProfileData({
+                            ...profileData,
+                            phone: e.target.value,
+                          })
+                        }
+                        placeholder="+91 XXXXX XXXXX"
+                      />
+                    </div>
+
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Bio</label>
+                      <textarea
+                        className={styles.textarea}
+                        value={profileData.bio}
+                        onChange={(e) =>
+                          setProfileData({
+                            ...profileData,
+                            bio: e.target.value,
+                          })
+                        }
+                        placeholder="Tell customers about yourself..."
+                        rows={4}
+                      />
+                    </div>
+
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>
+                        Years of Experience
+                      </label>
+                      <input
+                        type="number"
+                        className={styles.input}
+                        value={profileData.experience}
+                        onChange={(e) =>
+                          setProfileData({
+                            ...profileData,
+                            experience: e.target.value,
+                          })
+                        }
+                        placeholder="5"
+                      />
+                    </div>
                   </div>
-
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Email</label>
-                    <input
-                      type="email"
-                      className={styles.input}
-                      value={profileData.email}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          email: e.target.value,
-                        })
-                      }
-                      placeholder="your@email.com"
-                    />
-                  </div>
-
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Phone</label>
-                    <input
-                      type="tel"
-                      className={styles.input}
-                      value={profileData.phone}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          phone: e.target.value,
-                        })
-                      }
-                      placeholder="+91 XXXXX XXXXX"
-                    />
-                  </div>
-
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Bio</label>
-                    <textarea
-                      className={styles.textarea}
-                      value={profileData.bio}
-                      onChange={(e) =>
-                        setProfileData({ ...profileData, bio: e.target.value })
-                      }
-                      placeholder="Tell customers about yourself..."
-                      rows={4}
-                    />
-                  </div>
-
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Years of Experience</label>
-                    <input
-                      type="number"
-                      className={styles.input}
-                      value={profileData.experience}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          experience: e.target.value,
-                        })
-                      }
-                      placeholder="5"
-                    />
-                  </div>
-
                   <button
                     className={styles.saveButton}
                     onClick={saveProfile}

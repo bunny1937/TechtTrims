@@ -97,7 +97,7 @@ export default function BarberReviews() {
   const distribution = getRatingDistribution();
 
   return (
-    <div className={styles.dashboardWrapper}>
+    <div className={styles.mainContentWrapper}>
       <BarberSidebar barber={barber} currentPage="reviews" />
 
       <main className={styles.mainContent}>
