@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../styles/PrebookConfirmation.module.css";
 import feedbackStyles from "../../styles/Feedback.module.css";
-import { motion } from "framer-motion";
 import { isAuthenticated } from "@/lib/cookieAuth";
 import { showError, showWarning, showSuccess } from "@/lib/toast";
 import { QRCodeSVG } from "qrcode.react";
@@ -161,9 +160,7 @@ export default function PrebookConfirmation() {
     };
 
     fetchBooking();
-  }, [bookingId]);
-
-  // ✅ 2. Poll status every 5s
+  }, [bookingId, router]); // ✅ 2. Poll status every 5s
   useEffect(() => {
     if (!bookingId) return;
 

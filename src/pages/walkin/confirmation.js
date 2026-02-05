@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import styles from "../../styles/WalkinConfirmation.module.css";
 import feedbackStyles from "../../styles/Feedback.module.css";
-import { motion } from "framer-motion";
 import { isAuthenticated } from "@/lib/cookieAuth";
 import { showError, showWarning, showSuccess } from "@/lib/toast";
 import { QRCodeSVG } from "qrcode.react";
@@ -974,26 +973,21 @@ export default function WalkinConfirmation() {
 
         {barberQueueData && (
           <div className={styles.modernQueueContainer}>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={styles.queueHeader}
-            >
+            <div className={styles.queueHeader}>
               <h3>
                 🪑 {booking.barberName}&lsquo;s Queue (Chair #
                 {barberQueueData.chairNumber})
               </h3>
-            </motion.div>
+            </div>
 
             {/* Modern Stats Cards */}
             <div className={styles.modernStatsGrid}>
-              <motion.div
+              <div
                 className={styles.modernStatCard}
                 style={{
                   background:
                     "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                 }}
-                whileHover={{ scale: 1.05 }}
               >
                 <div className={styles.statsRow}>
                   <div className={styles.statIcon}>🟢</div>
@@ -1002,15 +996,14 @@ export default function WalkinConfirmation() {
                   </div>
                 </div>
                 <div className={styles.statLabel}>Now Serving</div>
-              </motion.div>
+              </div>
 
-              <motion.div
+              <div
                 className={styles.modernStatCard}
                 style={{
                   background:
                     "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
                 }}
-                whileHover={{ scale: 1.05 }}
               >
                 {" "}
                 <div className={styles.statsRow}>
@@ -1024,15 +1017,14 @@ export default function WalkinConfirmation() {
                   </div>
                 </div>
                 <div className={styles.statLabel}>Priority Queue</div>
-              </motion.div>
+              </div>
 
-              <motion.div
+              <div
                 className={styles.modernStatCard}
                 style={{
                   background:
                     "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)",
                 }}
-                whileHover={{ scale: 1.05 }}
               >
                 {" "}
                 <div className={styles.statsRow}>
@@ -1042,62 +1034,37 @@ export default function WalkinConfirmation() {
                   </div>
                 </div>
                 <div className={styles.statLabel}>Temporary Queue</div>
-              </motion.div>
+              </div>
             </div>
 
             {/* THE CHAIR - Modern Design */}
             <div className={styles.chairContainer}>
-              <motion.div
-                className={styles.modernChair}
-                animate={{
-                  boxShadow: barberQueueData.serving
-                    ? [
-                        "0 0 20px rgba(16, 185, 129)",
-                        "0 0 40px rgba(16, 185, 129)",
-                        "0 0 20px rgba(16, 185, 129)",
-                      ]
-                    : "0 4px 20px rgba(0,0,0,0)",
-                }}
-              >
+              <div className={styles.modernChair}>
                 <div className={styles.chairIcon}>🪑</div>
                 <div className={styles.chairLabel}>
                   CHAIR #{barberQueueData.chairNumber}
                 </div>
 
                 {barberQueueData.serving ? (
-                  <motion.div
-                    className={styles.servingCustomer}
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 200 }}
-                  >
+                  <div className={styles.servingCustomer}>
                     <div className={styles.servingCircle}>
                       <div className={styles.userIcon}>👤</div>
-                      <motion.div
-                        className={styles.pulseRing}
-                        animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                      />
+                      <div className={styles.pulseRing} />
                     </div>
                     <div className={styles.servingName}>
                       {barberQueueData.serving.customerName}
                     </div>
                     <div className={styles.servingBadge}>NOW SERVING</div>
                     {barberQueueData.serving._id === booking._id && (
-                      <motion.div
-                        className={styles.youPill}
-                        animate={{ scale: [1, 1.1, 1] }}
-                      >
-                        YOU
-                      </motion.div>
+                      <div className={styles.youPill}>YOU</div>
                     )}
-                  </motion.div>
+                  </div>
                 ) : (
                   <div className={styles.emptyChairState}>
                     <div className={styles.emptyText}>Available</div>
                   </div>
                 )}
-              </motion.div>
+              </div>
             </div>
 
             {/* Horizontal Queue Flow */}
@@ -1132,15 +1099,11 @@ export default function WalkinConfirmation() {
                               : `${pos}th`;
 
                       return (
-                        <motion.div
+                        <div
                           key={customer.id}
                           className={`${styles.modernQueueItem} ${
                             styles.orangeCard || ""
                           }`}
-                          initial={{ opacity: 0, x: -50 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: idx * 0.1 }}
-                          whileHover={{ scale: 1.1, zIndex: 10 }}
                           style={{
                             background: "rgba(245, 158, 11, 0.75)", // 25% orange fill instead of gradient
                             border: isYou
@@ -1193,20 +1156,12 @@ export default function WalkinConfirmation() {
                           <div className={styles.queueTime}>
                             {formatTimeAgo(customer.arrivedAt)}
                           </div>
-                          {isYou && (
-                            <motion.div
-                              className={styles.youPill}
-                              animate={{ scale: [1, 1.1, 1] }}
-                              transition={{ duration: 1, repeat: Infinity }}
-                            >
-                              YOU
-                            </motion.div>
-                          )}
+                          {isYou && <div className={styles.youPill}>YOU</div>}
                           <div
                             className={styles.statusDot}
                             style={{ background: "#fbbf24" }}
                           />
-                        </motion.div>
+                        </div>
                       );
                     })}
 
@@ -1227,13 +1182,9 @@ export default function WalkinConfirmation() {
                       ).length;
 
                       return (
-                        <motion.div
+                        <div
                           key={customer._id}
                           className={styles.modernQueueItem}
-                          initial={{ opacity: 0, x: -50 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: (priorityCount + idx) * 0.1 }}
-                          whileHover={{ scale: 1.1, zIndex: 10 }}
                           style={{
                             background:
                               "linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)",
@@ -1267,20 +1218,12 @@ export default function WalkinConfirmation() {
                           >
                             ⏱️ {formatExpiry(customer.expiresAt)}
                           </div>
-                          {isYou && (
-                            <motion.div
-                              className={styles.youPill}
-                              animate={{ scale: [1, 1.1, 1] }}
-                              transition={{ duration: 1, repeat: Infinity }}
-                            >
-                              YOU
-                            </motion.div>
-                          )}
+                          {isYou && <div className={styles.youPill}>YOU</div>}
                           <div
                             className={styles.statusDot}
                             style={{ background: "#9ca3af" }}
                           />
-                        </motion.div>
+                        </div>
                       );
                     })}
               </div>
@@ -1333,12 +1276,7 @@ export default function WalkinConfirmation() {
             </div>
 
             {/* Queue Explanation */}
-            <motion.div
-              className={styles.queueExplanation}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
+            <div className={styles.queueExplanation}>
               <h4>📋 How Queue Works:</h4>
               <ul>
                 <li>
@@ -1359,25 +1297,20 @@ export default function WalkinConfirmation() {
                   green circle on the chair.
                 </li>
               </ul>
-            </motion.div>
+            </div>
 
             {/* Estimated Wait */}
             {booking.queueStatus === "ORANGE" &&
               hasArrived &&
               !isServing &&
               queueInfo?.estimatedWait !== undefined && (
-                <motion.div
-                  className={styles.waitTimeCard}
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  whileHover={{ scale: 1.02 }}
-                >
+                <div className={styles.waitTimeCard}>
                   <span className={styles.waitIcon}>⏱️</span>
                   <span className={styles.waitText}>
                     Estimated Wait Time:{" "}
                     <strong>{queueInfo.estimatedWait} minutes</strong>
                   </span>
-                </motion.div>
+                </div>
               )}
           </div>
         )}
