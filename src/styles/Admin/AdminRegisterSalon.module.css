@@ -59,7 +59,11 @@
 
 .refreshBtn {
   padding: 12px 24px;
-  background: #3b82f6;
+  background: linear-gradient(
+    135deg,
+    #8b6508 0%,
+    #a57507 100%
+  ); /* ✅ Darker gold */
   color: white;
   border: none;
   border-radius: 12px;
