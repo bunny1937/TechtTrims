@@ -1,27 +1,68 @@
 // pages/index.js
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/router";
-import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import styles from "../styles/Home.module.css";
 import { useLocation } from "../hooks/useLocation";
 import { UserDataManager } from "../lib/userData";
 import { getAuthToken, getUserData } from "../lib/cookieAuth";
+import IntroOverlay from "@/components/Intro/IntroOverlay";
+import { getDistanceWorker } from "../utils/distanceWorkerSingleton";
 // Dynamic import for map component
 const SalonMap = dynamic(() => import("../components/Maps/SalonMap"), {
   ssr: false,
-  loading: () => <div className={styles.mapLoading}>Loading map...</div>,
+  loading: () => null,
 });
 
 const ManualLocationOverlay = dynamic(
-  () => import("@/components/Maps/ManualLocationOverlay"),
-  { ssr: false },
+  () => import("../components/Maps/ManualLocationOverlay"),
+  {
+    ssr: false,
+  },
 );
+
+// Add lazy loading for heavy components
+const TestimonialsSection = dynamic(
+  () => import("../components/Testimonials"),
+  {
+    ssr: false,
+    loading: () => null,
+  },
+);
+
+const FooterSection = dynamic(() => import("../components/Footer"), {
+  ssr: false,
+});
 
 export default function Home({ initialSalons = [] }) {
   const router = useRouter();
-  const [salons, setSalons] = useState(initialSalons || []);
+  const {
+    userLocation: liveUserLocation,
+    locationStatus,
+    locationError,
+    requestLocationPermission,
+  } = useLocation();
+
+  // ✅ NEW - Memoize user location to prevent re-render loops
+  const memoizedUserLocation = useMemo(() => {
+    if (!liveUserLocation) return null;
+    return {
+      latitude: liveUserLocation.latitude,
+      longitude: liveUserLocation.longitude,
+      lat: liveUserLocation.lat,
+      lng: liveUserLocation.lng,
+      accuracy: liveUserLocation.accuracy,
+    };
+  }, [
+    liveUserLocation?.latitude,
+    liveUserLocation?.longitude,
+    liveUserLocation?.accuracy,
+  ]);
+  const [salons, setSalons] = useState(
+    Array.isArray(initialSalons) ? initialSalons : [],
+  );
+
   const [userOnboarding, setUserOnboarding] = useState(() => {
     // Load user data IMMEDIATELY from sessionStorage on mount
     if (typeof window === "undefined") return null;
@@ -43,17 +84,20 @@ export default function Home({ initialSalons = [] }) {
   const [showMapView, setShowMapView] = useState(false);
   const [selectedSalon, setSelectedSalon] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Use debouncedSearch in filtering logic instead of searchTerm
   const [selectedService, setSelectedService] = useState("");
-  const [filteredSalons, setFilteredSalons] = useState([]);
   const [isPrebook, setIsPrebook] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
-  const {
-    userLocation: liveUserLocation,
-    locationStatus,
-    locationError,
-    requestLocationPermission,
-  } = useLocation();
-  const [mapKey, setMapKey] = useState(0);
+
   // Radius marks for non-linear slider
   const [searchRadius, setSearchRadius] = useState(10000);
   const radiusMarks = [
@@ -65,7 +109,10 @@ export default function Home({ initialSalons = [] }) {
   const [error, setError] = useState(null);
   const [activeOverlay, setActiveOverlay] = useState("location");
   // "location" | "manual" | null
-
+  // ✅ ADD THESE STATES:
+  const [visibleSalons, setVisibleSalons] = useState(3); // Show 6 initially
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loadMoreRef = useRef(null); // For intersection observer
   const [locationCheckStatus, setLocationCheckStatus] = useState({
     deviceLocation: false,
     locationAccuracy: false,
@@ -73,32 +120,26 @@ export default function Home({ initialSalons = [] }) {
     coordinates: null,
   }); // NEW: Track location status
   const [showManualLocation, setShowManualLocation] = useState(false);
+  const [profileUser, setProfileUser] = useState(null);
 
   // ADD: Track if salons were loaded
   const salonsLoadedRef = useRef(false);
   const initializedRef = useRef(false);
+  const locationSetRef = useRef(false);
   const initialLocationRef = useRef(null);
   const PLACEHOLDER_IMAGE = process.env.NEXT_PUBLIC_PLACEHOLDER_SALON_IMAGE;
+  const [showIntro, setShowIntro] = useState(false);
 
   useEffect(() => {
-    if (salons.length === 0) return;
+    if (typeof window === "undefined") return;
+    const introShown = sessionStorage.getItem("introShown");
+    setShowIntro(introShown !== "true");
+  }, []);
 
-    const isManual = sessionStorage.getItem("isManualMode") === "true";
-
-    const manualDistances = sessionStorage.getItem("manualLocationDistances");
-
-    if (isManual && manualDistances) {
-      try {
-        const distances = JSON.parse(manualDistances);
-        const updatedSalons = salons.map((salon, idx) => ({
-          ...salon,
-          distance:
-            distances[idx] !== undefined ? distances[idx] : salon.distance,
-        }));
-        setSalons(updatedSalons);
-      } catch (e) {}
-    }
-  }, [salons.length]);
+  const handleAnimationEnd = () => {
+    sessionStorage.setItem("introShown", "true");
+    setShowIntro(false);
+  };
 
   useEffect(() => {
     const initializeUser = async () => {
@@ -107,141 +148,162 @@ export default function Home({ initialSalons = [] }) {
         return;
       }
 
-      initializedRef.current = true;
-
       if (typeof window === "undefined") {
-        initializedRef.current = false;
         return;
       }
 
       // Check onboarding
       const hasOnboarded = sessionStorage.getItem("hasOnboarded");
-
       if (!hasOnboarded) {
         router.push("/onboarding");
         return;
       }
 
-      // Load user data from API
+      // Mark as initialized EARLY to prevent double-runs
+      initializedRef.current = true;
+
+      // Fetch user data in parallel
       const userToken = getAuthToken();
       if (userToken) {
-        try {
-          const userData = await UserDataManager.fetchAndStoreUserData();
-          if (userData) {
-            setUserOnboarding(userData);
-          }
-        } catch (error) {}
+        // ✅ 1. Read immediately from sessionStorage
+        const cachedUser = sessionStorage.getItem("userProfile");
+        if (cachedUser) {
+          try {
+            setProfileUser(JSON.parse(cachedUser));
+          } catch {}
+        }
+
+        // ✅ 2. Refresh in background (does NOT block UI)
+        setTimeout(async () => {
+          try {
+            const freshUser = await UserDataManager.fetchAndStoreUserData();
+            if (freshUser) {
+              setProfileUser(freshUser);
+              sessionStorage.setItem("userProfile", JSON.stringify(freshUser));
+            }
+          } catch {}
+        }, 0);
       }
 
-      // Mark user data as ready
       setIsUserDataReady(true);
 
-      // Check for cached location (SINGLE CHECK - no duplicates)
-      const cached =
-        sessionStorage.getItem("liveUserLocation") ||
-        sessionStorage.getItem("userLocation") ||
-        localStorage.getItem("cachedUserLocation");
-
-      if (cached && !salonsLoadedRef.current) {
-        try {
-          const coords = JSON.parse(cached);
-          const lat = coords.lat || coords.latitude;
-          const lng = coords.lng || coords.longitude;
-
-          // Reject bad accuracy
-          if (coords.accuracy && coords.accuracy > 50000) {
-            sessionStorage.removeItem("liveUserLocation");
-            sessionStorage.removeItem("userLocation");
-            localStorage.removeItem("cachedUserLocation");
-            setActiveOverlay("location");
-            return;
-          }
-
-          if (lat && lng) {
-            salonsLoadedRef.current = true;
-            setActiveOverlay(null);
-            setIsLoading(true);
-            await loadNearbySalons(lat, lng, userOnboarding?.gender || "all");
-            setIsLoading(false);
-          } else {
-            setActiveOverlay(null);
-          }
-        } catch (e) {
-          setActiveOverlay(null);
-        }
-      } else if (!cached) {
-        setActiveOverlay("location");
-      }
+      // ✅ DON'T LOAD SALONS HERE - Let the next useEffect handle it
     };
 
     initializeUser();
   }, []);
 
-  // Update location in session storage whenever it changes
+  // ✅ NEW EFFECT - Load salons when memoizedUserLocation becomes available
   useEffect(() => {
-    if (liveUserLocation) {
-      const normalized = {
-        lat: liveUserLocation.latitude || liveUserLocation.lat,
-        lng: liveUserLocation.longitude || liveUserLocation.lng,
-        latitude: liveUserLocation.latitude || liveUserLocation.lat,
-        longitude: liveUserLocation.longitude || liveUserLocation.lng,
-        accuracy: liveUserLocation.accuracy,
-        timestamp: Date.now(),
-      };
-
-      sessionStorage.setItem("userLocation", JSON.stringify(normalized));
+    // Skip if already loaded or no location
+    if (salonsLoadedRef.current || !memoizedUserLocation) {
+      return;
     }
-  }, [liveUserLocation]);
+
+    const loadInitialSalons = async () => {
+      if (!memoizedUserLocation) return;
+
+      // Validate location
+      if (!memoizedUserLocation.latitude || !memoizedUserLocation.longitude) {
+        return;
+      }
+
+      // Check accuracy
+      if (
+        memoizedUserLocation.accuracy &&
+        memoizedUserLocation.accuracy > 50000
+      ) {
+        sessionStorage.removeItem("liveUserLocation");
+        sessionStorage.removeItem("userLocation");
+        localStorage.removeItem("cachedUserLocation");
+        setActiveOverlay("location");
+        return;
+      }
+      setActiveOverlay(null);
+      setIsLoading(true);
+
+      try {
+        const gender =
+          userOnboarding?.gender ||
+          sessionStorage.getItem("selectedGender") ||
+          "all";
+
+        await loadNearbySalons(
+          memoizedUserLocation.latitude,
+          memoizedUserLocation.longitude,
+          gender,
+        );
+        salonsLoadedRef.current = true;
+      } catch (error) {
+        console.error("❌ Error loading initial salons:", error);
+        salonsLoadedRef.current = false; // Reset on error
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialSalons();
+  }, [memoizedUserLocation, userOnboarding?.gender]); // ✅ Run when location OR gender becomes available
 
   // Reset ref if we have location but 0 salons
   useEffect(() => {
-    if (liveUserLocation && salons.length === 0 && salonsLoadedRef.current) {
-      const timeoutId = setTimeout(() => {
-        salonsLoadedRef.current = false;
-      }, 3000); // 3 seconds
-
-      return () => clearTimeout(timeoutId);
+    if (memoizedUserLocation && salons.length === 0) {
+      salonsLoadedRef.current = false;
     }
-  }, [liveUserLocation, salons.length]);
+  }, [memoizedUserLocation, salons.length]);
 
   // Update location in session storage whenever it changes
+
   useEffect(() => {
-    if (liveUserLocation) {
+    if (memoizedUserLocation && !locationSetRef.current) {
+      locationSetRef.current = true; // ← Prevents multiple runs
+
       const normalized = {
-        lat: liveUserLocation.latitude || liveUserLocation.lat,
-        lng: liveUserLocation.longitude || liveUserLocation.lng,
-        latitude: liveUserLocation.latitude || liveUserLocation.lat,
-        longitude: liveUserLocation.longitude || liveUserLocation.lng,
-        accuracy: liveUserLocation.accuracy,
+        lat: memoizedUserLocation.latitude || memoizedUserLocation.lat,
+        lng: memoizedUserLocation.longitude || memoizedUserLocation.lng,
+        latitude: memoizedUserLocation.latitude || memoizedUserLocation.lat,
+        longitude: memoizedUserLocation.longitude || memoizedUserLocation.lng,
+        accuracy: memoizedUserLocation.accuracy,
         timestamp: Date.now(),
       };
 
       sessionStorage.setItem("userLocation", JSON.stringify(normalized));
     }
-  }, [liveUserLocation]);
+  }, [memoizedUserLocation?.latitude, memoizedUserLocation?.longitude]); // ← BETTER: Only re-run if coordinates actually change
 
-  // Listen for gender filter changes from header
+  const genderFetchInProgressRef = useRef(false);
+
   useEffect(() => {
     const handleGenderChange = (event) => {
       const newGender = event.detail;
 
-      // Reload salons with new gender filter
-      if (liveUserLocation?.latitude && liveUserLocation?.longitude) {
-        salonsLoadedRef.current = false;
+      if (
+        genderFetchInProgressRef.current ||
+        !memoizedUserLocation?.latitude ||
+        !memoizedUserLocation?.longitude
+      ) {
+        return;
+      }
+
+      genderFetchInProgressRef.current = true;
+      requestIdleCallback(() => {
         loadNearbySalons(
-          liveUserLocation.latitude,
-          liveUserLocation.longitude,
+          memoizedUserLocation.latitude,
+          memoizedUserLocation.longitude,
           userOnboarding?.gender || "all",
           newGender,
-        );
-        salonsLoadedRef.current = true;
-      }
+        ).finally(() => {
+          genderFetchInProgressRef.current = false;
+        });
+      });
     };
 
     window.addEventListener("genderFilterChange", handleGenderChange);
-    return () =>
+
+    return () => {
       window.removeEventListener("genderFilterChange", handleGenderChange);
-  }, [liveUserLocation, userOnboarding]);
+    };
+  }, [memoizedUserLocation, userOnboarding?.gender]);
 
   // NEW: Check device location status
   const checkLocationStatus = async () => {
@@ -358,9 +420,9 @@ export default function Home({ initialSalons = [] }) {
   ) => {
     // Normalize coordinates
     const normalizedLat =
-      lat || liveUserLocation?.latitude || liveUserLocation?.lat;
+      lat || memoizedUserLocation?.latitude || memoizedUserLocation?.lat;
     const normalizedLng =
-      lng || liveUserLocation?.longitude || liveUserLocation?.lng;
+      lng || memoizedUserLocation?.longitude || memoizedUserLocation?.lng;
 
     if (
       !normalizedLat ||
@@ -396,50 +458,41 @@ export default function Home({ initialSalons = [] }) {
       const response = await fetch(url);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API error: ${response.status} - ${errorText}`);
+        let message = "Unable to load salons right now";
+
+        try {
+          const err = await response.json();
+          message = err.message || message;
+        } catch {}
+
+        setSalonLoadError(message);
+        setIsLoading(false);
+        return; // 👈 STOP retry chain
       }
 
       const data = await response.json();
-      if (data.salons && data.salons.length > 0) {
-        data.salons.forEach((salon, idx) => {
-          const salonLat = salon.location?.coordinates?.latitude;
-          const salonLng = salon.location?.coordinates?.longitude;
-
-          if (salonLat && salonLng) {
-            // Haversine distance calculation
-            const R = 6371; // Earth radius in km
-            const dLat = ((salonLat - lat) * Math.PI) / 180;
-            const dLng = ((salonLng - lng) * Math.PI) / 180;
-            const a =
-              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos((lat * Math.PI) / 180) *
-                Math.cos((salonLat * Math.PI) / 180) *
-                Math.sin(dLng / 2) *
-                Math.sin(dLng / 2);
-
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            const distance = R * c;
-          }
-        });
-      } else {
-        setSalonLoadError(
-          `No salons found within ${searchRadius}km of your location (${lat.toFixed(
-            4,
-          )}, ${lng.toFixed(
-            4,
-          )}). Try increasing search radius or check if salons exist in your area.`,
-        );
-      }
 
       const salonsArray = Array.isArray(data.salons) ? data.salons : [];
 
-      setSalons(salonsArray);
-      setNearbySalons(salonsArray);
-      setFilteredSalons(salonsArray);
+      const normalizedSalons = salonsArray.map((salon) => ({
+        ...salon,
+        operatingHours: salon.operatingHours || salon.openingHours || {},
+        distance: salon.distance || null,
+        topServices: salon.services
+          ? Object.entries(salon.services)
+              .filter(([, s]) => s?.enabled === true || s?.enabled !== false)
+
+              .map(([key, s]) => ({
+                name: s?.name || key,
+              }))
+          : [],
+      }));
+
+      setSalons(normalizedSalons);
+      setNearbySalons(normalizedSalons);
     } catch (error) {
       setSalonLoadError(
-        `Failed to load salons: ${error.message}. Check your internet connection.`,
+        "We’re having trouble connecting right now. Please check your internet or try again shortly.",
       );
       setNearbySalons([]);
     } finally {
@@ -450,48 +503,76 @@ export default function Home({ initialSalons = [] }) {
   // ========================================
   // CHANGE 1: Replace handleLocationChange
   // ========================================
-  // ✅ NEW - Client-side distance calculation ONLY
   const handleLocationChange = (newLocation) => {
     if (!newLocation?.latitude || !newLocation?.longitude) return;
+    if (!salons.length) return;
 
     const userLat = newLocation.latitude || newLocation.lat;
     const userLng = newLocation.longitude || newLocation.lng;
 
-    // Haversine distance calculation (client-side)
-    const updatedSalons = salons.map((salon) => {
-      if (
-        !salon.location?.coordinates ||
-        salon.location.coordinates.length !== 2
-      ) {
-        return salon;
+    // ✅ Create worker once WITH message handler
+    const worker = getDistanceWorker();
+    worker.onmessage = (e) => {
+      const updated = e.data;
+      updated.sort((a, b) => a.distance - b.distance);
+      setSalons(updated);
+    };
+
+    // ✅ Send data to worker
+    worker.postMessage({
+      salons,
+      userLat,
+      userLng,
+      radius: searchRadius,
+    });
+  };
+
+  // ✅ AUTO-CALCULATE DISTANCE WHEN SALONS ARE LOADED
+  useEffect(() => {
+    // Only run when salons are first loaded (not on scroll)
+    if (!salons.length || !memoizedUserLocation) {
+      return;
+    }
+
+    if (!memoizedUserLocation.latitude || !memoizedUserLocation.longitude) {
+      return;
+    }
+
+    // Check if salons already have distances
+    const hasDistances = salons.some(
+      (salon) => salon.distance !== null && salon.distance !== undefined,
+    );
+
+    handleLocationChange({
+      latitude: memoizedUserLocation.latitude,
+      longitude: memoizedUserLocation.longitude,
+    });
+  }, [salons.length, memoizedUserLocation]);
+
+  // ✅ Reset distance flag when location changes
+  useEffect(() => {
+    if (memoizedUserLocation) {
+      const prevLat = initialLocationRef.current?.latitude;
+      const prevLng = initialLocationRef.current?.longitude;
+      const currLat = memoizedUserLocation.latitude;
+      const currLng = memoizedUserLocation.longitude;
+
+      // If location changed significantly (more than 100m)
+      if (prevLat && prevLng) {
+        const latDiff = Math.abs(currLat - prevLat);
+        const lngDiff = Math.abs(currLng - prevLng);
+
+        if (latDiff > 0.001 || lngDiff > 0.001) {
+          console.log("📍 Location changed - will recalculate distances");
+        }
       }
 
-      const [salonLng, salonLat] = salon.location.coordinates;
-      const R = 6371; // Earth radius in km
-
-      const dLat = (salonLat - userLat) * (Math.PI / 180);
-      const dLng = (salonLng - userLng) * (Math.PI / 180);
-
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos((userLat * Math.PI) / 180) *
-          Math.cos((salonLat * Math.PI) / 180) *
-          Math.sin(dLng / 2) *
-          Math.sin(dLng / 2);
-
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distance = R * c;
-
-      return { ...salon, distance: Number(distance.toFixed(2)) };
-    });
-
-    // Sort by distance
-    updatedSalons.sort((a, b) => (a.distance || 999) - (b.distance || 999));
-
-    setSalons(updatedSalons);
-    setNearbySalons(updatedSalons);
-    setFilteredSalons(updatedSalons);
-  };
+      initialLocationRef.current = {
+        latitude: currLat,
+        longitude: currLng,
+      };
+    }
+  }, [memoizedUserLocation]);
 
   // ========================================
   useEffect(() => {
@@ -540,19 +621,19 @@ export default function Home({ initialSalons = [] }) {
 
       // Wait a bit for location to update
       setTimeout(() => {
-        if (liveUserLocation) {
+        if (memoizedUserLocation) {
           loadNearbySalons(
-            liveUserLocation.latitude,
-            liveUserLocation.longitude,
+            memoizedUserLocation.latitude,
+            memoizedUserLocation.longitude,
             userOnboarding?.gender,
           );
         }
       }, 1000);
-    } else if (liveUserLocation) {
+    } else if (memoizedUserLocation) {
       // Just reload with current location
       loadNearbySalons(
-        liveUserLocation.latitude,
-        liveUserLocation.longitude,
+        memoizedUserLocation.latitude,
+        memoizedUserLocation.longitude,
         userOnboarding?.gender,
       );
     }
@@ -560,12 +641,12 @@ export default function Home({ initialSalons = [] }) {
 
   // ADD: Manual refresh function
   const handleRefreshSalons = () => {
-    if (liveUserLocation && userOnboarding) {
+    if (memoizedUserLocation && userOnboarding) {
       salonsLoadedRef.current = false; // Allow reload
       const salonGender = sessionStorage.getItem("selectedGender") || "all";
       loadNearbySalons(
-        liveUserLocation.latitude,
-        liveUserLocation.longitude,
+        memoizedUserLocation.latitude,
+        memoizedUserLocation.longitude,
         userOnboarding?.gender,
         salonGender,
       );
@@ -574,38 +655,83 @@ export default function Home({ initialSalons = [] }) {
     }
   };
 
-  useEffect(() => {
-    if (!salons.length) {
-      setFilteredSalons([]);
-      return;
-    }
+  const filteredSalons = useMemo(() => {
+    if (!salons.length) return [];
 
-    let filtered = salons;
+    let list = [...salons];
 
-    // Filter by selected service
     if (selectedService) {
-      filtered = filtered.filter((salon) =>
-        salon.topServices?.some((service) =>
-          service.name.toLowerCase().includes(selectedService.toLowerCase()),
+      list = list.filter((salon) =>
+        salon.topServices?.some((s) =>
+          s.name.toLowerCase().includes(selectedService.toLowerCase()),
         ),
       );
     }
 
-    // Filter by search term
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      list = list.filter(
         (salon) =>
-          salon.salonName.toLowerCase().includes(searchLower) ||
-          salon.location.address.toLowerCase().includes(searchLower) ||
-          salon.topServices?.some((service) =>
-            service.name.toLowerCase().includes(searchLower),
-          ),
+          salon.salonName.toLowerCase().includes(q) ||
+          salon.location?.address?.toLowerCase().includes(q),
       );
     }
 
-    setFilteredSalons(filtered);
-  }, [nearbySalons, searchTerm, selectedService, salons]);
+    return list;
+  }, [salons, selectedService, debouncedSearch]);
+
+  // Preload ONLY first salon image
+  useEffect(() => {
+    if (salons.length > 0 && salons[0].profilePicture) {
+      const link = document.createElement("link");
+      link.rel = "preload";
+      link.as = "image";
+      link.href = `${salons[0].profilePicture}?tr=w-400,h-250,q-70,f-webp`;
+      document.head.appendChild(link);
+    }
+  }, [salons]);
+  // ✅ NAMED CALLBACK FUNCTIONS
+  useEffect(() => {
+    const currentSalonsList =
+      filteredSalons.length > 0 ? filteredSalons : salons;
+
+    if (visibleSalons >= currentSalonsList.length) {
+      return;
+    }
+
+    function handleIntersection(entries) {
+      const firstEntry = entries[0];
+
+      if (firstEntry.isIntersecting && !isLoadingMore) {
+        setIsLoadingMore(true);
+
+        setTimeout(function loadMoreSalons() {
+          setVisibleSalons((prev) => {
+            const newCount = prev + 6;
+            setIsLoadingMore(false);
+            return newCount;
+          });
+        }, 500);
+      }
+    }
+
+    const observer = new IntersectionObserver(handleIntersection, {
+      root: null,
+      rootMargin: "200px",
+      threshold: 0.1,
+    });
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return function cleanup() {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [visibleSalons, filteredSalons, salons, isLoadingMore]);
 
   // const toggleDarkMode = () => {
   //   const newMode = !isDarkMode;
@@ -621,13 +747,13 @@ export default function Home({ initialSalons = [] }) {
 
   // Function to get salon status based on opening hours and current time
   const getSalonStatus = (salon) => {
-    if (!salon.operatingHours && !salon.openingHours) return "Open Now";
+    if (!salon.operatingHours && !salon.openingHours) return "Closed";
 
     const now = new Date();
     const currentDay = now
       .toLocaleDateString("en-US", { weekday: "long" })
-      .toLowerCase();
-
+      .toLowerCase()
+      .trim();
     const currentTime = now.getHours() * 100 + now.getMinutes(); // e.g., 1430 for 14:30
 
     const hours = salon.operatingHours?.[currentDay] || salon.openingHours;
@@ -658,8 +784,11 @@ export default function Home({ initialSalons = [] }) {
       return "Closed";
     }
 
-    const openTime = parseInt(hours.open?.replace(":", "") || "0900");
-    const closeTime = parseInt(hours.close?.replace(":", "") || "2100");
+    const openTime = parseInt(hours.open?.replace(/:/g, "")) || 900;
+    const closeTime =
+      hours.close === "24:00"
+        ? 2359
+        : parseInt(hours.close?.replace(/:/g, "")) || 2100;
 
     if (currentTime < openTime) {
       const hoursUntil = Math.floor((openTime - currentTime) / 100);
@@ -695,23 +824,13 @@ export default function Home({ initialSalons = [] }) {
   const formatTime = (time) => {
     if (!time) return "";
 
-    // Remove any extra colons and normalize
-    const cleaned = time.replace(/::+/g, ":").trim();
-
-    let hours, mins;
-
-    if (cleaned.includes(":")) {
-      const [h, m] = cleaned.split(":");
-      hours = parseInt(h) || 0;
-      mins = (m || "00").padStart(2, "0");
-    } else {
-      hours = parseInt(cleaned.substring(0, cleaned.length - 2)) || 0;
-      mins = cleaned.substring(cleaned.length - 2).padStart(2, "0");
-    }
+    // Handle "01:00" or "0100" format
+    const cleaned = time.replace(/:/g, "");
+    const hours = parseInt(cleaned.substring(0, cleaned.length - 2)) || 0;
+    const mins = cleaned.substring(cleaned.length - 2) || "00";
 
     const ampm = hours >= 12 ? "PM" : "AM";
     const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-
     return `${displayHours}:${mins} ${ampm}`;
   };
 
@@ -865,14 +984,7 @@ export default function Home({ initialSalons = [] }) {
           <div className={styles.spinnerRing}></div>
           <div className={styles.spinnerCore}></div>
         </div>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className={styles.loadingText}
-        >
-          Crafting your luxury experience...
-        </motion.p>
+        <p>Crafting your luxury experience...</p>
       </div>
     );
   }
@@ -884,463 +996,304 @@ export default function Home({ initialSalons = [] }) {
           <div className={styles.spinnerRing}></div>
           <div className={styles.spinnerCore}></div>
         </div>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className={styles.loadingText}
-        >
-          Loading salon details...
-        </motion.p>
+        <p className={styles.loadingText}>Loading salon details...</p>
       </div>
     );
   }
+  const salonsToRender =
+    Array.isArray(filteredSalons) && filteredSalons.length > 0
+      ? filteredSalons
+      : Array.isArray(salons)
+        ? salons
+        : [];
 
   return (
-    <div className={styles.container}>
-      {/* Enhanced Header */}
-      {/* Hero Section */}
-      <main id="main-content">
-        {/* MOBILE DEBUG PANEL - REMOVE AFTER FIXING */}
+    <>
+      {showIntro ? (
+        <IntroOverlay onAnimationEnd={handleAnimationEnd} />
+      ) : (
+        <div className={styles.container}>
+          {/* Enhanced Header */}
+          {/* Hero Section */}
+          <main id="main-content">
+            <section className={styles.heroSection}>
+              <div className={styles.heroContent}>
+                <div className={styles.heroLeft}>
+                  <div className={styles.heroTextContainer}>
+                    <h1 className={styles.heroTitle}>
+                      Discover Premium Salons Near You ✨
+                    </h1>
+                    <p className={styles.heroGreeting}>
+                      {profileUser ? `Welcome back, ${profileUser.name}` : ""}
+                    </p>
 
-        {/* <div style={{ width: '100%', height: '600px', position: 'relative' }}>
-  <DarkVeil />  
-</div> */}
-        <section className={styles.heroSection}>
-          <div className={styles.heroBackground}></div>
-
-          <div className={styles.heroBackground}>
-            <div className={styles.heroPattern}></div>
-            <div className={styles.floatingElements}>
-              <div className={`${styles.floatingElement} ${styles.element1}`}>
-                ✨
-              </div>
-              <div className={`${styles.floatingElement} ${styles.element2}`}>
-                💎
-              </div>
-              <div className={`${styles.floatingElement} ${styles.element3}`}>
-                👑
-              </div>
-              <div className={`${styles.floatingElement} ${styles.element4}`}>
-                🌟
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.heroContent}>
-            <div className={styles.heroLeft}>
-              <motion.div
-                className={styles.heroTextContainer}
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 1, ease: "easeOut" }}
-              >
-                <motion.h1
-                  className={styles.heroTitle}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1, delay: 0.2 }}
-                >
-                  Welcome back,
-                  <br />
-                  <span className={styles.heroNameHighlight}>
-                    {userOnboarding?.name || "Guest"} ✨{" "}
-                  </span>
-                </motion.h1>
-
-                <motion.p
-                  className={styles.heroSubtitle}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1, delay: 0.4 }}
-                >
-                  Discover luxury salon experiences and premium beauty services
-                  near{" "}
-                  <span className={styles.locationHighlight}>
-                    {userOnboarding?.location?.address || "you"}{" "}
-                  </span>
-                </motion.p>
-                {/* <TextMorph/> */}
-                <motion.div
-                  className={styles.heroStats}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1, delay: 0.6 }}
-                >
-                  <div className={styles.heroStat}>
-                    <div className={styles.statIcon}>
-                      🏪{" "}
-                      <span className={styles.statNumber}>{salons.length}</span>
-                    </div>
-                    <div className={styles.statContent}>
-                      <span className={styles.statLabel}>Premium Salons</span>
-                    </div>
-                  </div>
-                  <div className={styles.heroStat}>
-                    <div className={styles.statIcon}>
-                      💆{" "}
-                      <span className={styles.statNumber}>
-                        {Array.isArray(salons)
-                          ? salons.reduce(
-                              (total, salon) =>
-                                total + (salon.topServices?.length || 0),
-                              0,
-                            )
-                          : 0}
+                    <p className={styles.heroSubtitle}>
+                      Discover luxury salon experiences and premium beauty
+                      services near{" "}
+                      <span className={styles.locationHighlight}>
+                        {userOnboarding?.location?.address || "you"}{" "}
                       </span>
-                    </div>
-                    <div className={styles.statContent}>
-                      <span className={styles.statLabel}>Expert Services</span>
-                    </div>
-                  </div>
-                  <div className={styles.heroStat}>
-                    <div className={styles.statIcon}>
-                      ⭐
-                      <span className={styles.statNumber}>
-                        {Array.isArray(salons)
-                          ? salons.reduce(
-                              (total, salon) =>
-                                total + (salon.stats?.totalBookings || 0),
-                              0,
-                            )
-                          : 0}
-                      </span>
-                    </div>
-                    <div className={styles.statContent}>
-                      <span className={styles.statLabel}>Happy Clients</span>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* <motion.div
-                  className={styles.heroActions}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1, delay: 0.8 }}
-                >
-                  <button className={${styles.heroCta} ${styles.primary}}>
-                    <span className={styles.ctaIcon}>🔍</span>
-                    Find Salons Near Me
-                  </button>
-                  <button className={${styles.heroCta} ${styles.secondary}}>
-                    <span className={styles.ctaIcon}>📅</span>
-                    Book Appointment
-                  </button>
-                </motion.div> */}
-              </motion.div>
-            </div>
-            {/* Login/Onboard Banner */}
-
-            <div className={styles.heroRight}>
-              <motion.div
-                className={styles.heroVisuals}
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 1, delay: 0.3 }}
-              >
-                <div className={styles.visualsContainer}>
-                  <div className={styles.mainImage}>
-                    <img
-                      src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&h=400&fit=crop&crop=face"
-                      alt="Luxury salon interior"
-                      width={600}
-                      height={400}
-                      className={styles.heroImage}
-                      unoptimized
-                    />
-
-                    <div className={styles.imageGradient}></div>
-                  </div>
-
-                  <div className={styles.floatingCards}>
-                    <motion.div
-                      className={`${styles.floatingCard} ${styles.card1}`}
-                      animate={{ y: [0, -10, 0] }}
-                      transition={{ duration: 3, repeat: Infinity }}
-                    >
-                      <div className={styles.cardIcon}>💇‍♀</div>
-                      <div className={styles.cardText}>
-                        <span className={styles.cardTitle}>Hair Styling</span>
-                        <span className={styles.cardPrice}>from ₹299</span>
+                    </p>
+                    <div className={styles.heroStats}>
+                      <div className={styles.heroStat}>
+                        <div className={styles.statIcon}>
+                          🏪{" "}
+                          <span className={styles.statNumber}>
+                            {salons.length}
+                          </span>
+                        </div>
+                        <div className={styles.statContent}>
+                          <span className={styles.statLabel}>
+                            Premium Salons
+                          </span>
+                        </div>
                       </div>
-                    </motion.div>
-
-                    <motion.div
-                      className={`${styles.floatingCard} ${styles.card2}`}
-                      animate={{ y: [0, 10, 0] }}
-                      transition={{ duration: 3, repeat: Infinity, delay: 1 }}
-                    >
-                      <div className={styles.cardIcon}>✨</div>
-                      <div className={styles.cardText}>
-                        <span className={styles.cardTitle}>
-                          Facial Treatment
-                        </span>
-                        <span className={styles.cardPrice}>from ₹599</span>
+                      <div className={styles.heroStat}>
+                        <div className={styles.statIcon}>
+                          💆{" "}
+                          <span className={styles.statNumber}>
+                            {Array.isArray(salons)
+                              ? salons.reduce(
+                                  (total, salon) =>
+                                    total + (salon.topServices?.length || 0),
+                                  0,
+                                )
+                              : 0}
+                          </span>
+                        </div>
+                        <div className={styles.statContent}>
+                          <span className={styles.statLabel}>
+                            Expert Services
+                          </span>
+                        </div>
                       </div>
-                    </motion.div>
-
-                    <motion.div
-                      className={`${styles.floatingCard} ${styles.card3} `}
-                      animate={{ y: [0, -8, 0] }}
-                      transition={{ duration: 3, repeat: Infinity, delay: 2 }}
-                    >
-                      <div className={styles.cardIcon}>💅</div>
-                      <div className={styles.cardText}>
-                        <span className={styles.cardTitle}>Manicure</span>
-                        <span className={styles.cardPrice}>from ₹399</span>
+                      <div className={styles.heroStat}>
+                        <div className={styles.statIcon}>
+                          ⭐
+                          <span className={styles.statNumber}>
+                            {Array.isArray(salons)
+                              ? salons.reduce(
+                                  (total, salon) =>
+                                    total + (salon.stats?.totalBookings || 0),
+                                  0,
+                                )
+                              : 0}
+                          </span>
+                        </div>
+                        <div className={styles.statContent}>
+                          <span className={styles.statLabel}>
+                            Happy Clients
+                          </span>
+                        </div>
                       </div>
-                    </motion.div>
-                  </div>
-
-                  {/* Decorative Elements */}
-                  <div className={styles.decorativeShapes}>
-                    <div className={`${styles.shape} ${styles.shape1}`}></div>
-                    <div className={`${styles.shape} ${styles.shape2}`}></div>
-                    <div className={`${styles.shape} ${styles.shape3}`}></div>
+                    </div>
                   </div>
                 </div>
-              </motion.div>
-            </div>
-          </div>
-        </section>
-        {/* Enhanced Search Section */}
-        <motion.section
-          className={styles.searchSection}
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-        >
-          <div className={styles.searchContainer}>
-            <motion.div
-              className={styles.searchBox}
-              whileHover={{ scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
-              <div className={styles.searchInputWrapper}>
-                <input
-                  type="text"
-                  placeholder="Search for services, salons, or treatments..."
-                  className={styles.searchInput}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <span className={styles.searchIcon}>🔍</span>
-                {/* <motion.button
-                  className={styles.searchButton}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Search
-                </motion.button> */}
+                <div className={styles.heroRight}>
+                  {/* Enhanced Search Section */}
+                  <section className={styles.searchSection}>
+                    <div className={styles.searchContainer}>
+                      <div className={styles.searchBox}>
+                        <div className={styles.searchInputWrapper}>
+                          <input
+                            type="text"
+                            placeholder="Search for services, salons, or treatments..."
+                            className={styles.searchInput}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                          />
+                          <span className={styles.searchIcon}>🔍</span>
+                        </div>
+                      </div>
+
+                      <div className={styles.quickFilters}>
+                        {[
+                          { icon: "💇", label: "Haircut", color: "#FF6B6B" },
+                          { icon: "🧔", label: "Beard Trim", color: "#4ECDC4" },
+                          { icon: "💅", label: "Manicure", color: "#45B7D1" },
+                          { icon: "✨", label: "Facial", color: "#96CEB4" },
+                          { icon: "🎨", label: "Hair Color", color: "#FECA57" },
+                          { icon: "💆", label: "Massage", color: "#FF9FF3" },
+                        ].map((filter, index) => (
+                          <button
+                            key={filter.label}
+                            className={`${styles.filterChip} ${
+                              selectedService === filter.label
+                                ? styles.activeFilter
+                                : ""
+                            }`}
+                            style={{ "--filter-color": filter.color }}
+                            onClick={() => {
+                              if (selectedService === filter.label) {
+                                setSelectedService(""); // Deselect if already selected
+                              } else {
+                                setSelectedService(filter.label);
+                              }
+                            }}
+                          >
+                            <span className={styles.filterIcon}>
+                              {filter.icon}
+                            </span>
+                            {filter.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                </div>
               </div>
-            </motion.div>
+            </section>
 
-            <div className={styles.quickFilters}>
-              <span className={styles.filtersLabel}>Popular:</span>
-              {[
-                { icon: "💇", label: "Haircut", color: "#FF6B6B" },
-                { icon: "🧔", label: "Beard Trim", color: "#4ECDC4" },
-                { icon: "💅", label: "Manicure", color: "#45B7D1" },
-                { icon: "✨", label: "Facial", color: "#96CEB4" },
-                { icon: "🎨", label: "Hair Color", color: "#FECA57" },
-                { icon: "💆", label: "Massage", color: "#FF9FF3" },
-              ].map((filter, index) => (
-                <motion.button
-                  key={filter.label}
-                  className={`${styles.filterChip} ${
-                    selectedService === filter.label ? styles.activeFilter : ""
-                  }`}
-                  style={{ "--filter-color": filter.color }}
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 * index }}
-                  onClick={() => {
-                    if (selectedService === filter.label) {
-                      setSelectedService(""); // Deselect if already selected
-                    } else {
-                      setSelectedService(filter.label);
-                    }
-                  }}
-                >
-                  <span className={styles.filterIcon}>{filter.icon}</span>
-                  {filter.label}
-                </motion.button>
-              ))}
-            </div>
-          </div>
-        </motion.section>
+            {/* Salons Section with Booking Type Tabs */}
+            {/* Location Status Feedback */}
+            {locationStatus === "requesting" && (
+              <div className={styles.locationAlert}>
+                <div className={styles.locationAlertContent}>
+                  <span className={styles.locationIcon}>📍</span>
+                  <p>Getting your location to find nearby salons...</p>
+                </div>
+              </div>
+            )}
 
-        {/* Salons Section with Booking Type Tabs */}
-        {/* Location Status Feedback */}
-        {locationStatus === "requesting" && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={styles.locationAlert}
-          >
-            <div className={styles.locationAlertContent}>
-              <span className={styles.locationIcon}>📍</span>
-              <p>Getting your location to find nearby salons...</p>
-            </div>
-          </motion.div>
-        )}
+            {locationError &&
+              locationStatus === "denied" &&
+              !isManualMode() && (
+                <div className={styles.locationAlertError}>
+                  <div className={styles.locationAlertContent}>
+                    <span className={styles.locationIcon}>⚠</span>
+                    <div>
+                      <p>
+                        <strong>Location Access Needed</strong>
+                      </p>
+                      <p>{locationError}</p>
+                      <button
+                        className={styles.retryButton}
+                        onClick={async () => {
+                          try {
+                            // Clear old cache first
+                            sessionStorage.removeItem("liveUserLocation");
+                            localStorage.removeItem("cachedUserLocation");
 
-        {locationError && locationStatus === "denied" && !isManualMode() && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={styles.locationAlertError}
-          >
-            <div className={styles.locationAlertContent}>
-              <span className={styles.locationIcon}>⚠</span>
-              <div>
-                <p>
-                  <strong>Location Access Needed</strong>
-                </p>
-                <p>{locationError}</p>
+                            // Request fresh location permission
+                            await requestLocationPermission();
+
+                            // Reload after getting permission
+                            window.location.reload();
+                          } catch (error) {
+                            alert("Please enable location in browser settings");
+                          }
+                        }}
+                      >
+                        🔐 Enable Location Access
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            {locationError && locationStatus === "error" && (
+              <div className={styles.locationAlertWarning}>
+                <div className={styles.locationAlertContent}>
+                  <span className={styles.locationIcon}>⏱</span>
+                  <p>{locationError}</p>
+                </div>
+              </div>
+            )}
+
+            <section className={styles.salonsSection}>
+              <div className={styles.sectionHeader}>
+                <div className={styles.sectionTitleContainer}>
+                  <h3 className={styles.sectionTitle}>
+                    Premium Salons Near You
+                  </h3>
+                  <p className={styles.sectionSubtitle}>
+                    Handpicked luxury experiences in your area
+                  </p>
+                </div>
+              </div>
+              {/* ✅ BANNER ABOVE TABS - Show when NO location */}
+              {!memoizedUserLocation && (
+                <div className={styles.fallbackBanner}>
+                  <div className={styles.bannerContent}>
+                    <div className={styles.bannerIcon}>📍</div>
+                    <h3 className={styles.bannerTitle}>
+                      Want to see nearby salons?
+                    </h3>
+
+                    <p className={styles.loginNotice}>
+                      Please login or complete onboarding to view salons near
+                      you
+                    </p>
+                    <div className={styles.bannerActions}>
+                      <button
+                        onClick={() => router.push("/auth/login")}
+                        className={styles.bannerBtnPrimary}
+                      >
+                        Login
+                      </button>
+                      <button
+                        onClick={() => router.push("/onboarding")}
+                        className={styles.bannerBtnSecondary}
+                      >
+                        Complete Onboarding
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Booking Mode Tabs */}
+              <div className={styles.bookingModeToggle}>
                 <button
-                  className={styles.retryButton}
-                  onClick={async () => {
-                    try {
-                      // Clear old cache first
-                      sessionStorage.removeItem("liveUserLocation");
-                      localStorage.removeItem("cachedUserLocation");
-
-                      // Request fresh location permission
-                      await requestLocationPermission();
-
-                      // Reload after getting permission
-                      window.location.reload();
-                    } catch (error) {
-                      alert("Please enable location in browser settings");
-                    }
-                  }}
+                  className={`${styles.modeButton} ${
+                    !isPrebook ? styles.activeModeButton : ""
+                  }`}
+                  onClick={() => setIsPrebook(false)}
                 >
-                  🔐 Enable Location Access
+                  ⚡ Walk-in <span className={styles.modeBadge}>INSTANT</span>
+                </button>
+                <button
+                  className={`${styles.modeButton} ${
+                    isPrebook ? styles.activeModeButton : ""
+                  }`}
+                  onClick={() => setIsPrebook(true)}
+                >
+                  📅 Pre-book <span className={styles.modeBadge}>ADVANCE</span>
                 </button>
               </div>
-            </div>
-          </motion.div>
-        )}
-
-        {locationError && locationStatus === "error" && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={styles.locationAlertWarning}
-          >
-            <div className={styles.locationAlertContent}>
-              <span className={styles.locationIcon}>⏱</span>
-              <p>{locationError}</p>
-            </div>
-          </motion.div>
-        )}
-
-        {/* {liveUserLocation && locationStatus === "granted" && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={styles.locationAlertSuccess}
-          >
-            <div className={styles.locationAlertContent}>
-              <span className={styles.locationIcon}>✅</span>
-              <p>Location detected! Showing salons near you</p>
-            </div>
-          </motion.div>
-        )} */}
-
-        <motion.section
-          className={styles.salonsSection}
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-        >
-          <div className={styles.sectionHeader}>
-            <div className={styles.sectionTitleContainer}>
-              <h3 className={styles.sectionTitle}>Premium Salons Near You</h3>
-              <p className={styles.sectionSubtitle}>
-                Handpicked luxury experiences in your area
-              </p>
-            </div>
-          </div>
-          {/* ✅ BANNER ABOVE TABS - Show when NO location */}
-          {!liveUserLocation && (
-            <div className={styles.fallbackBanner}>
-              <div className={styles.bannerContent}>
-                <div className={styles.bannerIcon}>📍</div>
-                <h3 className={styles.bannerTitle}>
-                  Want to see nearby salons?
-                </h3>
-
-                <p className={styles.loginNotice}>
-                  Please login or complete onboarding to view salons near you
-                </p>
-                <div className={styles.bannerActions}>
-                  <button
-                    onClick={() => router.push("/auth/login")}
-                    className={styles.bannerBtnPrimary}
-                  >
-                    Login
-                  </button>
-                  <button
-                    onClick={() => router.push("/onboarding")}
-                    className={styles.bannerBtnSecondary}
-                  >
-                    Complete Onboarding
-                  </button>
+              {/* Radius Control */}
+              <div className={styles.radiusControl}>
+                <label htmlFor="radiusSlider" className={styles.radiusLabel}>
+                  📍 Search Radius:{" "}
+                  <strong>
+                    {searchRadius >= 1600 ? "1500+ km" : `${searchRadius} km`}
+                  </strong>
+                </label>
+                <input
+                  id="radiusSlider"
+                  type="range"
+                  min="0"
+                  max="25"
+                  value={radiusMarks.indexOf(searchRadius)}
+                  onChange={(e) =>
+                    setSearchRadius(radiusMarks[Number(e.target.value)])
+                  }
+                  step="1"
+                  className={styles.radiusSlider}
+                  aria-label={`Adjust search radius: ${searchRadius >= 1600 ? "1500+ km" : searchRadius + " km"}`}
+                  aria-valuemin="0"
+                  aria-valuemax="25"
+                  aria-valuenow={radiusMarks.indexOf(searchRadius)}
+                  aria-valuetext={`${searchRadius >= 1600 ? "1500+ km" : searchRadius + " km"}`}
+                />
+                <div className={styles.radiusMarkers}>
+                  <span>1km</span>
+                  <span>50km</span>
+                  <span>500km</span>
+                  <span>1500km</span>
                 </div>
               </div>
-            </div>
-          )}
-          {/* Booking Mode Tabs */}
-          <div className={styles.bookingModeToggle}>
-            <button
-              className={`${styles.modeButton} ${
-                !isPrebook ? styles.activeModeButton : ""
-              }`}
-              onClick={() => setIsPrebook(false)}
-            >
-              ⚡ Walk-in <span className={styles.modeBadge}>INSTANT</span>
-            </button>
-            <button
-              className={`${styles.modeButton} ${
-                isPrebook ? styles.activeModeButton : ""
-              }`}
-              onClick={() => setIsPrebook(true)}
-            >
-              📅 Pre-book <span className={styles.modeBadge}>ADVANCE</span>
-            </button>
-          </div>
-          {/* Radius Control */}
-          <div className={styles.radiusControl}>
-            <label className={styles.radiusLabel}>
-              📍 Search Radius:{" "}
-              <strong>
-                {searchRadius >= 1600 ? "1500+ km" : `${searchRadius} km`}
-              </strong>
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={25}
-              value={radiusMarks.indexOf(searchRadius)}
-              onChange={(e) =>
-                setSearchRadius(radiusMarks[Number(e.target.value)])
-              }
-              step={1}
-              className={styles.radiusSlider}
-            />
-            <div className={styles.radiusMarkers}>
-              <span>1km</span>
-              <span>50km</span>
-              <span>500km</span>
-              <span>1500+km</span>
-            </div>
-          </div>
 
-          {/* Walk-in Instruction - ONLY show on Walk-in tab
+              {/* Walk-in Instruction - ONLY show on Walk-in tab
           {!isPrebook && (
             <div className={styles.walkInInstruction}>
               <span className={styles.instructionIcon}>⚡</span>
@@ -1350,457 +1303,304 @@ export default function Home({ initialSalons = [] }) {
               </p>
             </div>
           )} */}
-          <div className={styles.salonsControlsBar}>
-            {/* View toggle (only show for pre-book with location) */}
-            {salons.length > 0 && (
-              <div className={styles.SalonControls}>
-                <div className={styles.viewOptions}>
-                  <motion.button
-                    className={`${styles.viewToggle} ${
-                      !showMapView ? styles.active : ""
-                    }`}
-                    onClick={() => setShowMapView(false)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <span className={styles.viewIcon}>⊞</span>
-                    Grid View
-                  </motion.button>
-
-                  <motion.button
-                    className={`${styles.viewToggle} ${
-                      showMapView ? styles.active : ""
-                    }`}
-                    onClick={() => setShowMapView(true)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <span className={styles.viewIcon}>🗺</span>
-                    Map View
-                  </motion.button>
-                </div>
-              </div>
-            )}
-            <button
-              onClick={handleRefreshSalons}
-              className={styles.refreshButton}
-              disabled={isLoadingSalons}
-            >
-              🔄 Refresh
-            </button>
-          </div>
-          {/* Salons Display */}
-          {isLoadingSalons ? (
-            <div className={styles.loadingSalons}>
-              <div className={styles.luxurySpinner}>
-                <div className={styles.spinnerRing}></div>
-                <div className={styles.spinnerCore}></div>
-              </div>
-              <p>Discovering premium salons near you...</p>
-            </div>
-          ) : salons.length === 0 ? (
-            <div className={styles.errorSection}>
-              <h3>No Salons Found</h3>
-
-              {salonLoadError && (
-                <p className={styles.errorMessage}>{salonLoadError}</p>
-              )}
-
-              {debugInfo && (
-                <details className={styles.debugInfo}>
-                  <summary>🔍 Debug Info (tap to expand)</summary>
-                  <pre>
-                    {`Your Location: ${debugInfo.userLat}, ${debugInfo.userLng}
-${
-  liveUserLocation
-    ? `Accuracy: ${(liveUserLocation.accuracy / 1000).toFixed(1)}km`
-    : ""
-}
-${
-  liveUserLocation
-    ? `Location Type: ${
-        liveUserLocation.accuracy > 50000
-          ? "IP-based (approximate)"
-          : "GPS (precise)"
-      }`
-    : ""
-}
-Time: ${debugInfo.timestamp}`}
-                  </pre>
-                </details>
-              )}
-
-              <div className={styles.suggestions}>
-                <h4>Try this:</h4>
-                <ul>
-                  <li>Check if location permission is enabled for this site</li>
-                  <li>
-                    On mobile: Enable &quot;High accuracy&quot; GPS in phone
-                    settings
-                  </li>
-                  <li>
-                    On desktop: Use the map pin to manually set your location
-                  </li>
-                  <li>Refresh the page to retry location detection</li>
-                </ul>
-              </div>
-
-              <button
-                className={styles.retryButton}
-                onClick={() => {
-                  if (liveUserLocation) {
-                    loadNearbySalons(
-                      liveUserLocation.latitude || liveUserLocation.lat,
-                      liveUserLocation.longitude || liveUserLocation.lng,
-                      userOnboarding?.gender,
-                    );
-                  } else {
-                    requestLocationPermission();
-                  }
-                }}
-              >
-                🔄 Retry Location & Reload Salons
-              </button>
-            </div>
-          ) : showMapView ? (
-            <div className={styles.mapViewWrapper}>
-              <SalonMap
-                key={mapKey}
-                salons={salons}
-                userLocation={liveUserLocation}
-                onRevertToLive={handleRevertToLive}
-                onLocationChange={handleLocationChange}
-                onRefreshSalons={(lat, lng) => {
-                  // This loads fresh salons from API
-                  loadNearbySalons(lat, lng, userOnboarding?.gender);
-                }}
-                selectedSalon={selectedSalon}
-                onSalonSelect={setSelectedSalon}
-                onBookNow={handleSalonCardClick}
-                userGender={userOnboarding?.gender}
-              />
-            </div>
-          ) : (
-            <div className={styles.salonsGrid}>
-              {(Array.isArray(filteredSalons) && filteredSalons.length > 0
-                ? filteredSalons
-                : Array.isArray(salons)
-                  ? salons
-                  : []
-              ).map(
-                // ✅ CHANGE nearbySalons to salons
-                (salon, index) => (
-                  <motion.div
-                    key={String(salon._id)}
-                    className={styles.salonCard}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.1 * index }}
-                    whileHover={{ y: -12, scale: 1.02 }}
-                    onClick={() => {
-                      const salonId = salon._id?.oid || salon._id;
-                      handleSalonCardClick(
-                        salonId,
-                        isPrebook ? "prebook" : "walkin",
-                      );
-                    }}
-                  >
-                    {/* Salon Image */}
-                    <div className={styles.salonImageContainer}>
-                      <img
-                        src={salon.profilePicture || PLACEHOLDER_IMAGE}
-                        alt={salon.salonName}
-                        width={400}
-                        height={250}
-                        style={{ objectFit: "cover", borderRadius: "8px" }}
-                        unoptimized
-                      />
-                      <div className={styles.salonImageOverlay}></div>
-
-                      {/* Badges */}
-                      <div className={styles.salonBadges}>
-                        {!isPrebook ? (
-                          <span
-                            className={`${styles.salonBadge} ${styles.walkInBadge}`}
-                          >
-                            ⚡ Walk-in Ready
-                          </span>
-                        ) : (
-                          <>
-                            <span
-                              className={`${styles.salonBadge} ${styles.primaryBadge}`}
-                            >
-                              {salon.distance < 2
-                                ? "Very Close"
-                                : salon.isVerified
-                                  ? "Verified"
-                                  : "Popular"}
-                            </span>
-                            <span
-                              className={`${styles.salonBadge} ${styles.distanceBadge}`}
-                            >
-                              {salon.distance}km away
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Salon Info */}
-                    <div className={styles.salonInfo}>
-                      <div className={styles.salonHeader}>
-                        <h4 className={styles.salonName}>{salon.salonName}</h4>
-                        <div className={styles.salonRating}>
-                          <span className={styles.ratingStars}>⭐</span>
-                          <span className={styles.ratingNumber}>
-                            {salon.ratings?.overall ?? salon.rating ?? 4.5}
-                          </span>
-                        </div>
-                      </div>
-
-                      <p className={styles.salonLocation}>
-                        {salon.location?.address}
-                      </p>
-
-                      <div className={styles.salonMetrics}>
-                        <div className={styles.metric}>
-                          <span className={styles.metricIcon}>📍</span>
-                          <span className={styles.metricValue}>
-                            {salon.distance
-                              ? salon.distance < 1
-                                ? `${Math.round(salon.distance * 10000)}m away`
-                                : `${salon.distance}km away`
-                              : "N/A"}
-                          </span>
-                        </div>
-                        <div className={styles.metric}>
-                          <span className={styles.metricIcon}>🕐</span>
-                          <span className={styles.metricValue}>
-                            {getSalonStatus(salon)}
-                          </span>
-                        </div>
-                        <div className={styles.metric}>
-                          <span className={styles.metricIcon}>⭐</span>
-                          <span className={styles.metricValue}>
-                            {salon.ratings?.totalReviews || 0} reviews
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className={styles.salonServices}>
-                        {salon.topServices?.slice(0, 3).map((service, idx) => (
-                          <span key={idx} className={styles.serviceTag}>
-                            {service.name}
-                          </span>
-                        ))}
-                      </div>
-
-                      {isPrebook && (
-                        <div className={styles.salonServices}>
-                          {salon.topServices
-                            ?.slice(0, 3)
-                            .map((service, idx) => (
-                              <span key={idx} className={styles.serviceTag}>
-                                {service.name}
-                              </span>
-                            ))}
-                        </div>
-                      )}
-
-                      <motion.button
-                        className={
-                          !isPrebook ? styles.walkInButton : styles.bookButton
-                        }
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.98 }}
+              <div className={styles.salonsControlsBar}>
+                {/* View toggle (only show for pre-book with location) */}
+                {salons.length > 0 && (
+                  <div className={styles.SalonControls}>
+                    <div className={styles.viewOptions}>
+                      <button
+                        className={`${styles.viewToggle} ${
+                          !showMapView ? styles.active : ""
+                        }`}
+                        onClick={() => setShowMapView(false)}
                       >
-                        {!isPrebook ? "View Live Availability" : "Book Now"}
-                      </motion.button>
+                        <span className={styles.viewIcon}>⊞</span>
+                        Grid View
+                      </button>
+
+                      <button
+                        className={`${styles.viewToggle} ${
+                          showMapView ? styles.active : ""
+                        }`}
+                        onClick={() => setShowMapView(true)}
+                      >
+                        <span className={styles.viewIcon}>🗺</span>
+                        Map View
+                      </button>
                     </div>
-                  </motion.div>
-                ),
+                  </div>
+                )}
+                <button
+                  onClick={handleRefreshSalons}
+                  className={styles.refreshButton}
+                  disabled={isLoadingSalons}
+                  aria-label="Refresh salon list"
+                >
+                  <span aria-hidden="true">🔄</span> Refresh
+                </button>
+              </div>
+              {/* Salons Display */}
+              {isLoadingSalons ? (
+                <div className={styles.loadingSalons}>
+                  <div className={styles.luxurySpinner}>
+                    <div className={styles.spinnerRing}></div>
+                    <div className={styles.spinnerCore}></div>
+                  </div>
+                  <p>Discovering premium salons near you...</p>
+                </div>
+              ) : salonLoadError ? (
+                <div className={styles.errorSection}>
+                  <h3>Service temporarily unavailable</h3>
+                  <p className={styles.errorMessage}>{salonLoadError}</p>
+                  <button
+                    className={styles.retryButton}
+                    onClick={handleRefreshSalons}
+                  >
+                    🔄 Retry
+                  </button>
+                </div>
+              ) : salons.length === 0 ? (
+                <div className={styles.errorSection}>
+                  <h3>No Salons Found</h3>
+                  <button
+                    className={styles.retryButton}
+                    onClick={handleRefreshSalons}
+                  >
+                    🔄 Retry Location & Reload Salons
+                  </button>
+                </div>
+              ) : showMapView ? (
+                <div className={styles.mapViewWrapper}>
+                  {typeof window !== "undefined" && (
+                    <SalonMap
+                      salons={salons}
+                      userLocation={memoizedUserLocation}
+                      onRevertToLive={handleRevertToLive}
+                      onLocationChange={handleLocationChange}
+                      onRefreshSalons={(lat, lng) => {
+                        // This loads fresh salons from API
+                        loadNearbySalons(lat, lng, userOnboarding?.gender);
+                      }}
+                      selectedSalon={selectedSalon}
+                      onSalonSelect={setSelectedSalon}
+                      onBookNow={handleSalonCardClick}
+                      userGender={userOnboarding?.gender}
+                    />
+                  )}
+                </div>
+              ) : (
+                <div className={styles.salonsGrid}>
+                  {salonsToRender
+                    .slice(0, visibleSalons)
+                    .map((salon, index) => {
+                      // ✅ LOGS GO HERE BEFORE THE RETURN
+                      if (index === 1) {
+                        console.log("🎨 RENDER DATA:", {
+                          salonName: salon.salonName,
+                          distance: salon.distance,
+                          "stats.rating": salon.stats?.rating,
+                          "stats.totalRatings": salon.stats?.totalRatings,
+                          "ratings.overall": salon.ratings?.overall,
+                          "ratings.totalReviews": salon.ratings?.totalReviews,
+                          operatingHours: salon.operatingHours,
+                        });
+
+                        console.log("💎 COMPUTED:", {
+                          rating:
+                            salon.stats?.rating || salon.ratings?.overall || 0,
+                          reviews:
+                            salon.stats?.totalRatings ||
+                            salon.ratings?.totalReviews ||
+                            0,
+                          distance: salon.distance,
+                          status: getSalonStatus(salon),
+                        });
+                      }
+
+                      return (
+                        <div
+                          key={String(salon._id)}
+                          className={styles.salonCard}
+                          onClick={() => {
+                            const salonId = salon._id?.oid || salon._id;
+                            handleSalonCardClick(
+                              salonId,
+                              isPrebook ? "prebook" : "walkin",
+                            );
+                          }}
+                        >
+                          {/* Salon Image */}
+                          <div className={styles.salonImageContainer}>
+                            <img
+                              src={`${salon.profilePicture || PLACEHOLDER_IMAGE}?tr=w-400,h-250,q-75,f-webp,fo-auto`}
+                              alt={salon.salonName || "Salon"}
+                              width="400"
+                              height="250"
+                              style={{
+                                objectFit: "cover",
+                                borderRadius: "8px",
+                              }}
+                              loading={index < 3 ? "eager" : "lazy"}
+                              decoding="async"
+                              fetchpriority={index < 3 ? "high" : "auto"}
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = PLACEHOLDER_IMAGE;
+                              }}
+                            />
+                            <div className={styles.salonImageOverlay}></div>
+
+                            {/* Badges */}
+                            <div className={styles.salonBadges}>
+                              {!isPrebook ? (
+                                <span
+                                  className={`${styles.salonBadge} ${styles.walkInBadge}`}
+                                >
+                                  ⚡ Walk-in Ready
+                                </span>
+                              ) : (
+                                <>
+                                  <span
+                                    className={`${styles.salonBadge} ${styles.primaryBadge}`}
+                                  >
+                                    {salon.distance < 2
+                                      ? "Very Close"
+                                      : salon.isVerified
+                                        ? "Verified"
+                                        : "Popular"}
+                                  </span>
+                                  <span
+                                    className={`${styles.salonBadge} ${styles.distanceBadge}`}
+                                  >
+                                    {salon.distance}Km away
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Salon Info */}
+                          <div className={styles.salonInfo}>
+                            <div className={styles.salonHeader}>
+                              <h4 className={styles.salonName}>
+                                {salon.salonName}
+                              </h4>
+                              <div className={styles.salonRating}>
+                                <span className={styles.ratingStars}>⭐</span>
+                                <span className={styles.ratingNumber}>
+                                  {salon.ratings?.overall ||
+                                    salon.stats?.rating ||
+                                    0}
+                                </span>
+                              </div>
+                            </div>
+
+                            <p className={styles.salonLocation}>
+                              {salon.location?.address}
+                            </p>
+
+                            <div className={styles.salonMetrics}>
+                              <div className={styles.metric}>
+                                <span className={styles.metricIcon}>📍</span>
+                                <span className={styles.metricValue}>
+                                  {salon.distance
+                                    ? salon.distance < 1
+                                      ? `${Math.round(salon.distance * 1000)}m away`
+                                      : `${salon.distance.toFixed(1)}km away`
+                                    : "Calculating..."}{" "}
+                                </span>
+                              </div>
+                              <div className={styles.metric}>
+                                <span className={styles.metricIcon}>🕐</span>
+                                <span className={styles.metricValue}>
+                                  {getSalonStatus(salon)}
+                                </span>
+                              </div>
+                              <div className={styles.metric}>
+                                <span className={styles.metricIcon}>⭐</span>
+                                <span className={styles.metricValue}>
+                                  {(salon.ratings?.totalReviews ||
+                                    salon.stats?.totalRatings ||
+                                    0) > 0
+                                    ? `${salon.ratings?.totalReviews || salon.stats?.totalRatings} reviews`
+                                    : "New"}
+                                </span>
+                              </div>{" "}
+                            </div>
+
+                            <div className={styles.salonServices}>
+                              {salon.topServices.map((service, idx) => (
+                                <span key={idx} className={styles.serviceTag}>
+                                  {service.name}
+                                </span>
+                              ))}
+                            </div>
+
+                            {isPrebook && (
+                              <div className={styles.salonServices}>
+                                {salon.topServices.map((service, idx) => (
+                                  <span key={idx} className={styles.serviceTag}>
+                                    {service.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            <button
+                              className={
+                                !isPrebook
+                                  ? styles.walkInButton
+                                  : styles.bookButton
+                              }
+                              onClick={() =>
+                                handleSalonCardClick(
+                                  salon._id,
+                                  isPrebook ? "prebook" : "walkin",
+                                )
+                              }
+                            >
+                              {!isPrebook
+                                ? "View Live Availability"
+                                : "Book Now"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
               )}
-            </div>
-          )}
-        </motion.section>
-
-        {/* Testimonials Section */}
-        <motion.section
-          className={styles.testimonialsSection}
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
-        >
-          <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>What Our Clients Say</h3>
-            <p className={styles.sectionSubtitle}>
-              Real experiences from real people
-            </p>
-          </div>
-
-          <div className={styles.testimonialsGrid}>
-            {[
-              {
-                name: "Priya Sharma",
-                service: "Hair Styling & Color",
-                rating: 5,
-                text: "Absolutely amazing experience! The staff was professional and the results exceeded my expectations.",
-                image:
-                  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&h=80&fit=crop&crop=face",
-              },
-              {
-                name: "Rajesh Kumar",
-                service: "Beard Styling",
-                rating: 5,
-                text: "Best grooming experience I've had in Mumbai. Clean, professional, and great attention to detail.",
-                image:
-                  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&crop=face",
-              },
-              {
-                name: "Anita Patel",
-                service: "Facial & Manicure",
-                rating: 5,
-                text: "Such a relaxing and luxurious experience. I feel completely refreshed and beautiful!",
-                image:
-                  "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face",
-              },
-            ].map((testimonial, index) => (
-              <motion.div
-                key={testimonial.name}
-                className={styles.testimonialCard}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.1 * index }}
-                whileHover={{ y: -5, scale: 1.02 }}
-              >
-                <div className={styles.testimonialHeader}>
-                  <img
-                    src={testimonial.image}
-                    alt={testimonial.name}
-                    width={80}
-                    height={80}
-                    className={styles.testimonialAvatar}
-                    unoptimized
-                  />
-                  <div className={styles.testimonialMeta}>
-                    <h5 className={styles.testimonialName}>
-                      {testimonial.name}
-                    </h5>
-                    <p className={styles.testimonialService}>
-                      {testimonial.service}
-                    </p>
-                    <div className={styles.testimonialRating}>
-                      {"⭐".repeat(testimonial.rating)}
+              {/* ✅ INVISIBLE TRIGGER ELEMENT FOR INFINITE SCROLL */}
+              {visibleSalons <
+                (filteredSalons.length > 0 ? filteredSalons : salons)
+                  .length && (
+                <div
+                  ref={loadMoreRef}
+                  style={{
+                    height: "100px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "20px 0",
+                  }}
+                >
+                  {isLoadingMore && (
+                    <div className={styles.loadingMore}>
+                      <div className={styles.spinner}></div>
+                      <p>Loading more salons...</p>
                     </div>
-                  </div>
+                  )}
                 </div>
-                <p className={styles.testimonialText}>
-                  &quot;{testimonial.text}&quot;
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
-        {/* Enhanced Footer */}
-        <footer className={styles.footer}>
-          <div className={styles.footerContent}>
-            <div className={styles.footerMain}>
-              <div className={styles.footerBrand}>
-                <div className={styles.footerLogo}>
-                  <div className={styles.footerLogoIcon}>✨</div>
-                  <h4>TechTrims</h4>
-                </div>
-                <p className={styles.footerTagline}>
-                  Elevating beauty experiences through technology and luxury
-                </p>
-                <div className={styles.footerSocials}>
-                  <button className={styles.socialButton}>📘</button>
-                  <button className={styles.socialButton}>📸</button>
-                  <button className={styles.socialButton}>🐦</button>
-                  <button className={styles.socialButton}>💼</button>
-                </div>
-              </div>
+              )}
+            </section>
 
-              <div className={styles.footerLinks}>
-                <div className={styles.footerColumn}>
-                  <h5 className={styles.footerColumnTitle}>Services</h5>
-                  <ul className={styles.footerList}>
-                    <li>
-                      <a href="#haircut">Hair Styling</a>
-                    </li>
-                    <li>
-                      <a href="#facial">Facial Treatments</a>
-                    </li>
-                    <li>
-                      <a href="#manicure">Nail Care</a>
-                    </li>
-                    <li>
-                      <a href="#massage">Spa & Massage</a>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className={styles.footerColumn}>
-                  <h5 className={styles.footerColumnTitle}>For Business</h5>
-                  <ul className={styles.footerList}>
-                    <li>
-                      <a href="#register">Register Your Salon</a>
-                    </li>
-                    <li>
-                      <a href="#partner">Partner with Us</a>
-                    </li>
-                    <li>
-                      <a href="#business">Business Solutions</a>
-                    </li>
-                    <li>
-                      <a href="#support">Business Support</a>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className={styles.footerColumn}>
-                  <h5 className={styles.footerColumnTitle}>Support</h5>
-                  <ul className={styles.footerList}>
-                    <li>
-                      <a href="#help">Help Center</a>
-                    </li>
-                    <li>
-                      <a href="#contact">Contact Us</a>
-                    </li>
-                    <li>
-                      <a href="#terms">Terms of Service</a>
-                    </li>
-                    <li>
-                      <a href="#privacy">Privacy Policy</a>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className={styles.footerColumn}>
-                  <h5 className={styles.footerColumnTitle}>Connect</h5>
-                  <div className={styles.footerContact}>
-                    <p>📞 +91 98765 43210</p>
-                    <p>✉ hello@techtrims.com</p>
-                    <p>📍 Mumbai, Maharashtra</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.footerBottom}>
-              <div className={styles.footerBottomContent}>
-                <p>&copy; 2025 TechTrims. All rights reserved.</p>
-                <div className={styles.footerBadges}>
-                  <span className={styles.footerBadge}>🔒 Secure</span>
-                  <span className={styles.footerBadge}>⭐ Verified</span>
-                  <span className={styles.footerBadge}>💎 Premium</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </footer>
-      </main>
-    </div>
+            {/* Testimonials Section */}
+            <TestimonialsSection />
+            {/* Enhanced Footer */}
+            <FooterSection />
+          </main>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1820,36 +1620,11 @@ function highlightText(text, highlight) {
   );
 }
 
+// ✅ Remove static props - salons are loaded client-side based on user location
 export async function getStaticProps() {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-    const response = await fetch(
-      `${baseUrl}/api/salons/nearby?latitude=28.6139&longitude=77.2090&radius=50&static=true`,
-    );
-
-    if (!response.ok) {
-      return {
-        props: {
-          initialSalons: [], // ✅ Empty array
-        },
-        revalidate: 300,
-      };
-    }
-
-    const data = await response.json();
-    return {
-      props: {
-        initialSalons: Array.isArray(data.salons) ? data.salons : [], // ✅ Safe check
-      },
-      revalidate: 300,
-    };
-  } catch (error) {
-    console.error("SSG fetch error:", error);
-    return {
-      props: {
-        initialSalons: [], // ✅ Empty array
-      },
-      revalidate: 300,
-    };
-  }
+  return {
+    props: {
+      initialSalons: [], // Always empty - salons loaded client-side
+    },
+  };
 }
