@@ -187,15 +187,25 @@ export default function DashboardPage() {
 
   // Notification helpers
   const playNotificationSound = () => {
-    const audio = new Audio("/notification.mp3"); // Add notification sound to public folder
-    audio.play().catch((e) => console.log("Audio play failed:", e));
+    // Remove audio notification or add the actual file to public/sounds/notification.mp3
+    try {
+      if ("vibrate" in navigator) {
+        navigator.vibrate(200); // Use vibration instead
+      }
+    } catch (e) {
+      console.log("Vibration not supported", e);
+    }
   };
 
   const showNotification = (title, body) => {
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/logo.png" });
+      new Notification(title, {
+        body,
+        icon: "/favicon.ico", // ✅ Use existing favicon
+        badge: "/favicon.ico",
+      });
     } else {
-      showWarning(`${title}\n${body}`);
+      showWarning(`${title}: ${body}`);
     }
   };
 

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { motion } from "framer-motion";
 import styles from "../styles/Onboarding.module.css";
 import { showError, showSuccess, showWarning } from "@/lib/toast";
 
@@ -326,15 +325,7 @@ export default function Onboarding() {
           </div>
         </div>
 
-        <motion.div
-          key={currentStep}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          variants={stepVariants}
-          transition={{ duration: 0.3 }}
-          className={styles.stepContent}
-        >
+        <div key={currentStep} className={styles.stepContent}>
           {currentStep === 1 && (
             <div className={styles.step}>
               <div className={styles.stepIcon}>👋</div>
@@ -566,7 +557,7 @@ export default function Onboarding() {
               </div>
             </div>
           )}
-        </motion.div>
+        </div>
 
         <div className={styles.navigation}>
           {currentStep > 1 && (
