@@ -45,7 +45,6 @@ export const useLocation = () => {
   const startWatchingLocation = useCallback(() => {
     const manual = loadManualLocation();
     if (manual) {
-      console.log("⛔ GPS watch blocked — manual mode active");
       return;
     }
 
@@ -56,28 +55,43 @@ export const useLocation = () => {
 
       // IGNORE UPDATES TOO SOON
       if (now - lastUpdateRef.current < MIN_UPDATE_INTERVAL) {
-        console.log("⏱️ Ignoring location update (too soon)");
         return;
       }
 
       // Only accept high-accuracy positions
       // ✅ REJECT TERRIBLE ACCURACY (259km+ is device error)
       if (position.coords.accuracy > 5000000) {
-        console.log(
-          `⚠️ Position accuracy too low: ${position.coords.accuracy}m - IGNORING`,
+        console.warn(
+          `❌ Position accuracy extremely poor: ${position.coords.accuracy}m - REJECTING`,
         );
         return; // ✅ DON'T SAVE THIS
       }
 
       // Also reject if accuracy check happens in later logic
       if (position.coords.accuracy > MAX_ACCURACY) {
-        console.log(
+        console.warn(
           `⚠️ Position accuracy poor: ${position.coords.accuracy}m - USING ANYWAY`,
         );
         // Don't return - continue to save
       }
 
       const { latitude, longitude, accuracy } = position.coords;
+      // Check if location has actually changed enough to warrant an update
+      if (userLocation) {
+        const latDiff = Math.abs(userLocation.latitude - latitude);
+        const lngDiff = Math.abs(userLocation.longitude - longitude);
+        const accDiff = Math.abs((userLocation.accuracy || 0) - accuracy);
+
+        // ✅ PREVENT DUPLICATE UPDATES - Check lat, lng AND accuracy
+        if (
+          latDiff < MIN_DISTANCE_DELTA &&
+          lngDiff < MIN_DISTANCE_DELTA &&
+          accDiff < 5
+        ) {
+          return; // ✅ EXIT EARLY - NO UPDATE
+        }
+      }
+
       const newLocation = {
         latitude,
         longitude,
@@ -86,31 +100,21 @@ export const useLocation = () => {
         accuracy,
       };
 
-      // Check if location has actually changed enough to warrant an update
-      if (userLocation) {
-        const latDiff = Math.abs(userLocation.latitude - latitude);
-        const lngDiff = Math.abs(userLocation.longitude - longitude);
-
-        if (latDiff < MIN_DISTANCE_DELTA && lngDiff < MIN_DISTANCE_DELTA) {
-          console.log("📍 Location unchanged (within threshold)");
-          return;
+      // ✅ USE FUNCTIONAL UPDATE TO PREVENT STALE CLOSURES
+      setUserLocation((prev) => {
+        // Double-check one more time before updating
+        if (
+          prev &&
+          Math.abs(prev.latitude - latitude) < MIN_DISTANCE_DELTA &&
+          Math.abs(prev.longitude - longitude) < MIN_DISTANCE_DELTA
+        ) {
+          return prev; // Return same reference = no re-render
         }
-      }
-
-      // UPDATE STATE
-      console.log(
-        `✅ Location updated: ${latitude.toFixed(6)}, ${longitude.toFixed(
-          6,
-        )} (±${accuracy.toFixed(0)}m)`,
-      );
-      setUserLocation(newLocation);
+        return newLocation;
+      });
       setLocationStatus("granted");
       setLocationError(null);
       lastUpdateRef.current = now;
-
-      // SAVE TO STORAGE - both session and local for persistence
-      sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
-      localStorage.setItem("cachedUserLocation", JSON.stringify(newLocation));
     };
 
     const handleError = (error) => {
@@ -118,7 +122,6 @@ export const useLocation = () => {
 
       // ✅ IF WE ALREADY HAVE LOCATION, DON'T RETRY
       if (userLocation && error.code === 3) {
-        console.log("⚠️ Timeout but we already have location - ignoring");
         return; // ✅ DON'T RETRY - We already have good location
       }
 
@@ -131,7 +134,6 @@ export const useLocation = () => {
           setLocationStatus("error");
 
           setTimeout(() => {
-            console.log("🔄 Retrying location fetch...");
             if (watchIdRef.current) {
               navigator.geolocation.clearWatch(watchIdRef.current);
             }
@@ -168,7 +170,7 @@ export const useLocation = () => {
         maximumAge: isMobile ? 60000 : 300000, // 5 min cache for laptops
       },
     );
-  }, []);
+  }, [userLocation]);
 
   const setManualLocation = (coords) => {
     if (!coords?.lat || !coords?.lng) return;
@@ -193,8 +195,6 @@ export const useLocation = () => {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
-
-    console.log("✅ Manual location set & GPS stopped");
   };
 
   // ----------------- STOP WATCHING -----------------
@@ -202,7 +202,6 @@ export const useLocation = () => {
     if (watchIdRef.current) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
-      console.log("🛑 Stopped watching location");
     }
   }, []);
 
@@ -210,7 +209,6 @@ export const useLocation = () => {
   const requestLocationPermission = useCallback(async () => {
     // 🛑 HARD STOP IF MANUAL LOCATION IS ACTIVE
     if (isManualMode()) {
-      console.log("🛑 GPS request skipped — manual mode active");
       setLocationStatus("granted");
       setLocationError(null);
       return true;
@@ -259,9 +257,9 @@ export const useLocation = () => {
 
       lastUpdateRef.current = Date.now();
 
-      // Save to SESSION STORAGE (persists across page refreshes but not logout)
-      sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
-      localStorage.setItem("cachedUserLocation", JSON.stringify(newLocation)); // ADD THIS LINE
+      // ✅ REMOVED - Storage saving now handled by useEffect
+      // sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
+      // localStorage.setItem("cachedUserLocation", JSON.stringify(newLocation));
 
       // Start continuous monitoring
       startWatchingLocation();
@@ -272,7 +270,6 @@ export const useLocation = () => {
 
       // 🛑 DO NOT override manual location
       if (isManualMode()) {
-        console.log("🛑 GPS request skipped — manual mode active");
         setLocationStatus("granted");
         setLocationError(null);
         return true;
@@ -293,8 +290,6 @@ export const useLocation = () => {
     const manual = loadManualLocation();
 
     if (manual?.latitude && manual?.longitude) {
-      console.log("📍 Using MANUAL location");
-
       setUserLocation(manual);
       setLocationStatus("granted");
       setLocationError(null);
@@ -335,10 +330,6 @@ export const useLocation = () => {
           };
           setUserLocation(normalized);
           setLocationStatus("granted");
-          console.log(
-            "📍 Loaded cached location from localStorage",
-            normalized,
-          );
         }
       } catch (e) {
         console.error("Error parsing cached location", e);
@@ -354,6 +345,30 @@ export const useLocation = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // ✅ EMPTY DEPS - Run ONCE
+
+  // ✅ NEW EFFECT - Save location to storage when it changes
+  useEffect(() => {
+    if (!userLocation) return;
+
+    // Only save if we have valid coordinates
+    if (!userLocation.latitude || !userLocation.longitude) return;
+
+    // Skip saving if this is a manual location (already saved)
+    if (userLocation.source === "manual") return;
+
+    const locationData = {
+      latitude: userLocation.latitude,
+      longitude: userLocation.longitude,
+      lat: userLocation.latitude,
+      lng: userLocation.longitude,
+      accuracy: userLocation.accuracy,
+      timestamp: Date.now(),
+    };
+
+    // ✅ Save to both storages ONCE per location change
+    sessionStorage.setItem("userLocation", JSON.stringify(locationData));
+    localStorage.setItem("cachedUserLocation", JSON.stringify(locationData));
+  }, [userLocation?.latitude, userLocation?.longitude, userLocation?.accuracy]); // Only re-run if coords change
 
   return {
     userLocation,

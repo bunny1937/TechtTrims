@@ -158,7 +158,7 @@ const MapUpdater = ({ selectedSalon, salons }) => {
       if (salon && salon.location?.coordinates) {
         map.setView(
           [salon.location.coordinates[1], salon.location.coordinates[0]],
-          16
+          16,
         );
       }
     }
@@ -197,8 +197,8 @@ const LocationSearch = ({
         // Use your backend API proxy
         const response = await fetch(
           `/api/geocode?query=${encodeURIComponent(
-            query + ", Maharashtra, India"
-          )}`
+            query + ", Maharashtra, India",
+          )}`,
         );
 
         if (!response.ok) throw new Error("Search failed");
@@ -238,7 +238,7 @@ const LocationSearch = ({
         setLoading(false);
       }
     },
-    [userLocation]
+    [userLocation],
   );
 
   const handleInputChange = (e) => {
@@ -276,7 +276,6 @@ const LocationSearch = ({
       return;
     }
 
-    console.log("✅ Enabling click mode");
     setClickMode(true);
     setSearchQuery("");
     setSearchResults([]);
@@ -292,11 +291,9 @@ const LocationSearch = ({
     // Change cursor
     const container = mapRef.getContainer();
     container.style.cursor = "crosshair";
-    console.log("🎯 Cursor changed to crosshair");
 
     // Create click handler
     const handleMapClick = (e) => {
-      console.log("🖱️ Map clicked!", e.latlng);
       const { lat, lng } = e.latlng;
 
       // Set location immediately with coordinates
@@ -310,7 +307,6 @@ const LocationSearch = ({
         address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
       };
 
-      console.log("📍 Setting location:", location);
       onLocationSelect(location);
 
       // ✅ USE YOUR BACKEND API (not OpenStreetMap directly)
@@ -322,10 +318,7 @@ const LocationSearch = ({
             onLocationSelect(location);
           }
         })
-        .catch((err) =>
-          console.log("Reverse geocode failed, using coordinates")
-        );
-
+        .catch((err) => console.error("Reverse geocoding error:", err));
       // Cleanup
       disableClickMode();
       setIsSearching(false);
@@ -334,13 +327,11 @@ const LocationSearch = ({
     // Store reference and attach
     mapClickHandlerRef.current = handleMapClick;
     mapRef.on("click", handleMapClick);
-    console.log("✅ Click handler attached");
   };
 
   const disableClickMode = () => {
     if (!mapRef) return;
 
-    console.log("🔄 Disabling click mode");
     setClickMode(false);
 
     // Re-enable all map interactions
@@ -358,7 +349,6 @@ const LocationSearch = ({
     if (mapClickHandlerRef.current) {
       mapRef.off("click", mapClickHandlerRef.current);
       mapClickHandlerRef.current = null;
-      console.log("✅ Click handler removed");
     }
   };
 
@@ -416,17 +406,17 @@ const LocationSearch = ({
 
                     sessionStorage.setItem(
                       "liveUserLocation",
-                      JSON.stringify(coords)
+                      JSON.stringify(coords),
                     );
                     localStorage.setItem(
                       "cachedUserLocation",
-                      JSON.stringify(coords)
+                      JSON.stringify(coords),
                     );
 
                     if (mapInstanceRef.current) {
                       mapInstanceRef.current.setView(
                         [coords.lat, coords.lng],
-                        15
+                        15,
                       );
                     }
 
@@ -439,11 +429,11 @@ const LocationSearch = ({
                   (error) => {
                     if (error.code === 1) {
                       alert(
-                        "⚠️ Location permission denied. Please enable in settings."
+                        "⚠️ Location permission denied. Please enable in settings.",
                       );
                     } else if (error.code === 2) {
                       alert(
-                        "⚠️ Location unavailable. Please turn on location services."
+                        "⚠️ Location unavailable. Please turn on location services.",
                       );
                     } else {
                       alert("⚠️ Could not get location. Please try again.");
@@ -453,7 +443,7 @@ const LocationSearch = ({
                     enableHighAccuracy: true,
                     timeout: 10000,
                     maximumAge: 0,
-                  }
+                  },
                 );
               }}
             >
@@ -657,7 +647,6 @@ const SalonMap = ({
     if (defaultCenter) {
       mapRef.setView(defaultCenter, 15);
       hasInitialized.current = true;
-      console.log("🗺️ Map initialized at:", defaultCenter);
     }
   }, [mapRef, defaultCenter]); // No dependency on userLocation
 
@@ -673,13 +662,10 @@ const SalonMap = ({
 
     // Only update if moved significantly
     if (latDiff > MIN_UPDATE_DISTANCE || lngDiff > MIN_UPDATE_DISTANCE) {
-      console.log("📍 Updating user marker position");
       userMarkerRef.current.setLatLng([
         effectiveUserLocation.latitude,
         effectiveUserLocation.longitude,
       ]);
-    } else {
-      console.log("📍 Skipping minor position update");
     }
   }, [effectiveUserLocation, mapRef]);
 
@@ -694,8 +680,6 @@ const SalonMap = ({
     if (!lat || !lng) return;
 
     if (!userMarkerRef.current) {
-      console.log("📍 Creating user marker at:", [lat, lng]);
-
       const userIcon = L.icon({
         iconUrl:
           "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234285F4'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3C/svg%3E",
@@ -704,10 +688,8 @@ const SalonMap = ({
       });
 
       userMarkerRef.current = L.marker([lat, lng], { icon: userIcon }).addTo(
-        mapRef
+        mapRef,
       );
-
-      console.log("✅ User marker created");
     } else {
       // Update existing marker position
       const lat = effectiveUserLocation.latitude ?? effectiveUserLocation.lat;
@@ -715,7 +697,6 @@ const SalonMap = ({
       if (lat && lng) {
         userMarkerRef.current.setLatLng([lat, lng]);
       }
-      console.log("📍 User marker updated");
     }
   }, [effectiveUserLocation, mapRef, isManualMode]);
 
@@ -723,7 +704,6 @@ const SalonMap = ({
   useEffect(() => {
     const stored = sessionStorage.getItem("manualLocation");
     const isManual = sessionStorage.getItem("isManualMode") === "true";
-
     if (stored && isManual) {
       try {
         const parsed = JSON.parse(stored);
@@ -733,7 +713,6 @@ const SalonMap = ({
         }
         setManualLocation(parsed);
         setIsManualMode(true);
-        console.log("📍 Loaded manual location from session storage");
       } catch (e) {
         console.error("Error parsing stored manual location", e);
       }
@@ -748,8 +727,6 @@ const SalonMap = ({
       console.error("❌ Invalid location:", location);
       return;
     }
-
-    console.log("📍 Pinning location:", location);
 
     const normalizedLocation = {
       lat: location.lat,
@@ -767,7 +744,7 @@ const SalonMap = ({
 
     sessionStorage.setItem(
       "manualLocation",
-      JSON.stringify(normalizedLocation)
+      JSON.stringify(normalizedLocation),
     );
     sessionStorage.setItem("isManualMode", "true");
 
@@ -781,7 +758,6 @@ const SalonMap = ({
           animate: true,
           duration: 1.5,
         });
-        console.log("🗺️ Map flew to:", normalizedLocation);
       } catch (e) {
         console.error("❌ Fly error:", e);
       }
@@ -789,13 +765,10 @@ const SalonMap = ({
 
     // ✅ CRITICAL: Call parent to calculate distances
     if (onLocationChange) {
-      console.log("📍 Calling onLocationChange with new pin");
       onLocationChange(normalizedLocation);
     }
   };
   const handleRevertToLive = async () => {
-    console.log("📍 Reverted to live location");
-
     // ✅ Clear manual mode
     setIsManualMode(false);
     sessionStorage.removeItem("manualLocation");
@@ -815,7 +788,7 @@ const SalonMap = ({
     if (!lat || !lng) {
       console.error(
         "❌ Cannot flyTo - coordinates still undefined",
-        userLocation
+        userLocation,
       );
       return;
     }
@@ -826,7 +799,6 @@ const SalonMap = ({
           animate: true,
           duration: 1.5,
         });
-        console.log("✅ Flew to live location:", [lat, lng]);
       } catch (err) {
         console.error("❌ flyTo error:", err);
       }
@@ -872,11 +844,8 @@ const SalonMap = ({
   };
 
   const handleLiveLocationClick = async () => {
-    console.log("🔴 Live location button clicked, isManualMode:", isManualMode);
-
     // ✅ If in manual mode, switch to live
     if (isManualMode) {
-      console.log("🔄 Switching from manual to live mode");
       setIsManualMode(false);
       setManualLocation(null);
 
@@ -884,8 +853,6 @@ const SalonMap = ({
       sessionStorage.removeItem("isManualMode");
       sessionStorage.removeItem("manualLocation");
       sessionStorage.removeItem("manualLocationDistances");
-
-      console.log("✅ Manual mode cleared, switching to live GPS");
 
       // ✅ Callback to parent with current userLocation
       if (onLocationChange && userLocation) {
@@ -908,7 +875,6 @@ const SalonMap = ({
     if (storedLocation) {
       try {
         const locationData = JSON.parse(storedLocation);
-        console.log("✅ Using stored location from session", locationData);
 
         // Use stored location
         if (onLocationChange) {
@@ -930,8 +896,6 @@ const SalonMap = ({
 
     // USE THE EXISTING liveUserLocation FROM HOOK!
     if (userLocation) {
-      console.log("✅ Using live location from hook", userLocation);
-
       // Store in session
       sessionStorage.setItem(
         "userLocation",
@@ -940,7 +904,7 @@ const SalonMap = ({
           lng: userLocation.longitude,
           accuracy: userLocation.accuracy,
           timestamp: Date.now(),
-        })
+        }),
       );
 
       if (onLocationChange) {
@@ -962,19 +926,15 @@ const SalonMap = ({
       } else {
         console.warn(
           "⚠️ Cannot flyTo - userLocation coordinates invalid:",
-          userLocation
+          userLocation,
         );
       }
 
       return;
     }
-
-    // NO LOCATION FOUND - FORCE REQUEST
-    console.log("❌ No location found - requesting from browser");
-
     if (!navigator.geolocation) {
       showWarning(
-        "⚠️ Geolocation Not Supported\n\nYour browser doesn't support location services. Please use the 'Search Location' button to set your location manually."
+        "⚠️ Geolocation Not Supported\n\nYour browser doesn't support location services. Please use the 'Search Location' button to set your location manually.",
       );
       return;
     }
@@ -996,8 +956,6 @@ const SalonMap = ({
         accuracy: position.coords.accuracy,
         timestamp: Date.now(),
       };
-
-      console.log("✅ Location obtained:", newLocation);
 
       // Store in session immediately
       sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
@@ -1029,7 +987,7 @@ const SalonMap = ({
             "1. Click the lock icon (🔒) in your browser's address bar\n" +
             "2. Allow location access for this site\n" +
             "3. Refresh the page\n\n" +
-            "Or use the 'Search Location' button to set manually."
+            "Or use the 'Search Location' button to set manually.",
         );
       } else if (error.code === 2) {
         // POSITION_UNAVAILABLE
@@ -1039,20 +997,20 @@ const SalonMap = ({
             "Please check:\n" +
             "• Location services are enabled on your device\n" +
             "• You have a stable internet connection\n\n" +
-            "Or use the 'Search Location' button."
+            "Or use the 'Search Location' button.",
         );
       } else if (error.code === 3) {
         // TIMEOUT
         showWarning(
           "⏱️ Location Request Timeout\n\n" +
             "Taking too long to get your location.\n\n" +
-            "Please try again or use the 'Search Location' button."
+            "Please try again or use the 'Search Location' button.",
         );
       } else {
         showError(
           "❌ Unable to Get Location\n\n" +
             "Something went wrong while getting your location.\n\n" +
-            "Please use the 'Search Location' button to set manually."
+            "Please use the 'Search Location' button to set manually.",
         );
       }
     }
@@ -1069,8 +1027,8 @@ const SalonMap = ({
     try {
       const response = await fetch(
         `/api/geocode?query=${encodeURIComponent(
-          query + ", Maharashtra, India"
-        )}`
+          query + ", Maharashtra, India",
+        )}`,
       );
       if (!response.ok) throw new Error("Search failed");
 
@@ -1140,7 +1098,7 @@ const SalonMap = ({
               setSearching(true);
               searchTimeoutRef.current = setTimeout(
                 () => searchLocation(value),
-                1000
+                1000,
               );
             } else {
               setSearchResults([]);
@@ -1192,7 +1150,7 @@ const SalonMap = ({
                     });
                   }
                 })
-                .catch(() => console.log("Using coordinates"));
+                .catch(() => console.error("Using coordinates"));
 
               // Reset
               mapRef.getContainer().style.cursor = "";
@@ -1418,7 +1376,7 @@ const SalonMap = ({
                         const lng = salon.location.coordinates[0];
                         window.open(
                           `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`,
-                          "_blank"
+                          "_blank",
                         );
                       }}
                     >
@@ -1429,7 +1387,7 @@ const SalonMap = ({
                       onClick={(e) => {
                         e.stopPropagation();
                         window.open(
-                          `https://maps.google.com/maps?daddr=${salon.location.coordinates[1]},${salon.location.coordinates[0]}`
+                          `https://maps.google.com/maps?daddr=${salon.location.coordinates[1]},${salon.location.coordinates[0]}`,
                         );
                       }}
                     >
