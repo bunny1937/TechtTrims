@@ -1,46 +1,42 @@
 "use client";
 import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
-import { motion, useAnimation } from "framer-motion";
 import clsx from "clsx";
-
-const MotionSvg = motion.svg;
-const MotionPath = motion.path;
-
-const pathVariants = {
-  normal: { opacity: 1 },
-  animate: (i) => ({
-    opacity: [0, 1],
-    transition: { delay: i * 0.1, duration: 0.3 },
-  }),
-};
 
 const SunIcon = forwardRef(
   ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
-    const controls = useAnimation();
+    const svgRef = useRef(null);
     const isControlledRef = useRef(false);
+
+    const start = () => {
+      svgRef.current?.classList.add("sun-animate");
+    };
+
+    const stop = () => {
+      svgRef.current?.classList.remove("sun-animate");
+    };
 
     useImperativeHandle(ref, () => {
       isControlledRef.current = true;
       return {
-        startAnimation: () => controls.start("animate"),
-        stopAnimation: () => controls.start("normal"),
+        startAnimation: start,
+        stopAnimation: stop,
       };
     });
 
     const handleMouseEnter = useCallback(
       (e) => {
-        if (!isControlledRef.current) controls.start("animate");
+        if (!isControlledRef.current) start();
         else onMouseEnter?.(e);
       },
-      [controls, onMouseEnter]
+      [onMouseEnter],
     );
 
     const handleMouseLeave = useCallback(
       (e) => {
-        if (!isControlledRef.current) controls.start("normal");
+        if (!isControlledRef.current) stop();
         else onMouseLeave?.(e);
       },
-      [controls, onMouseLeave]
+      [onMouseLeave],
     );
 
     return (
@@ -50,7 +46,22 @@ const SunIcon = forwardRef(
         onMouseLeave={handleMouseLeave}
         {...props}
       >
-        <MotionSvg
+        <style>{`
+          .sun-ray {
+            opacity: 1;
+          }
+          .sun-animate .sun-ray {
+            opacity: 0;
+            animation: sun-ray-fade 0.3s ease forwards;
+          }
+          @keyframes sun-ray-fade {
+            to { opacity: 1; }
+          }
+        `}</style>
+
+        <svg
+          ref={svgRef}
+          className="sun-icon"
           xmlns="http://www.w3.org/2000/svg"
           width={size}
           height={size}
@@ -72,19 +83,18 @@ const SunIcon = forwardRef(
             "m6.34 17.66-1.41 1.41",
             "M2 12h2",
             "m4.93 4.93 1.41 1.41",
-          ].map((d, index) => (
-            <MotionPath
+          ].map((d, i) => (
+            <path
               key={d}
               d={d}
-              variants={pathVariants}
-              animate={controls}
-              custom={index + 1}
+              className="sun-ray"
+              style={{ animationDelay: `${(i + 1) * 0.1}s` }}
             />
           ))}
-        </MotionSvg>
+        </svg>
       </div>
     );
-  }
+  },
 );
 
 SunIcon.displayName = "SunIcon";

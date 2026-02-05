@@ -1,48 +1,42 @@
 "use client";
 import { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
-import { motion, useAnimation } from "framer-motion";
 import clsx from "clsx";
-
-const MotionSvg = motion.svg;
-const MotionPath = motion.path;
-
-const svgVariants = {
-  normal: { rotate: 0 },
-  animate: { rotate: [0, -10, 10, -5, 5, 0] },
-};
-
-const svgTransition = {
-  duration: 1.2,
-  ease: "easeInOut",
-};
 
 const MoonIcon = forwardRef(
   ({ onMouseEnter, onMouseLeave, className, size = 28, ...props }, ref) => {
-    const controls = useAnimation();
+    const svgRef = useRef(null);
     const isControlledRef = useRef(false);
+
+    const start = () => {
+      svgRef.current?.classList.add("moon-animate");
+    };
+
+    const stop = () => {
+      svgRef.current?.classList.remove("moon-animate");
+    };
 
     useImperativeHandle(ref, () => {
       isControlledRef.current = true;
       return {
-        startAnimation: () => controls.start("animate"),
-        stopAnimation: () => controls.start("normal"),
+        startAnimation: start,
+        stopAnimation: stop,
       };
     });
 
     const handleMouseEnter = useCallback(
       (e) => {
-        if (!isControlledRef.current) controls.start("animate");
+        if (!isControlledRef.current) start();
         else onMouseEnter?.(e);
       },
-      [controls, onMouseEnter]
+      [onMouseEnter],
     );
 
     const handleMouseLeave = useCallback(
       (e) => {
-        if (!isControlledRef.current) controls.start("normal");
+        if (!isControlledRef.current) stop();
         else onMouseLeave?.(e);
       },
-      [controls, onMouseLeave]
+      [onMouseLeave],
     );
 
     return (
@@ -52,7 +46,26 @@ const MoonIcon = forwardRef(
         onMouseLeave={handleMouseLeave}
         {...props}
       >
-        <MotionSvg
+        <style>{`
+          .moon-icon {
+            transform-origin: center;
+          }
+          .moon-animate {
+            animation: moon-wobble 1.2s ease-in-out;
+          }
+          @keyframes moon-wobble {
+            0% { transform: rotate(0deg); }
+            20% { transform: rotate(-10deg); }
+            40% { transform: rotate(10deg); }
+            60% { transform: rotate(-5deg); }
+            80% { transform: rotate(5deg); }
+            100% { transform: rotate(0deg); }
+          }
+        `}</style>
+
+        <svg
+          ref={svgRef}
+          className="moon-icon"
           xmlns="http://www.w3.org/2000/svg"
           width={size}
           height={size}
@@ -62,15 +75,12 @@ const MoonIcon = forwardRef(
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          variants={svgVariants}
-          animate={controls}
-          transition={svgTransition}
         >
-          <MotionPath d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-        </MotionSvg>
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+        </svg>
       </div>
     );
-  }
+  },
 );
 
 MoonIcon.displayName = "MoonIcon";
