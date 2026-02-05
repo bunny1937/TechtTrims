@@ -1,82 +1,52 @@
 import { useState, useEffect } from "react";
 
-export default function useNetworkStatus() {
+export function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState(true);
   const [isSlowConnection, setIsSlowConnection] = useState(false);
-  const [connectionType, setConnectionType] = useState("unknown");
+  const [connectionType, setConnectionType] = useState("4g");
 
   useEffect(() => {
-    setIsOnline(navigator.onLine);
-
-    const connection =
-      navigator.connection ||
-      navigator.mozConnection ||
-      navigator.webkitConnection;
-
-    const updateConnectionInfo = () => {
-      if (connection) {
-        setConnectionType(connection.effectiveType || "unknown");
-        setIsSlowConnection(
-          ["2g", "slow-2g"].includes(connection.effectiveType) ||
-            connection.downlink < 1.5
-        );
-      }
+    const updateOnlineStatus = () => {
+      setIsOnline(navigator.onLine);
     };
 
-    const testConnectionSpeed = async () => {
-      if (!navigator.onLine) return;
-      try {
-        const samples = [];
-        for (let i = 0; i < 2; i++) {
-          const start = Date.now();
-          const response = await fetch("/api/ping", {
-            method: "HEAD",
-            cache: "no-cache",
-          });
-          const latency = Date.now() - start;
-          if (!response.ok) throw new Error();
-          samples.push(latency);
+    const checkConnectionSpeed = () => {
+      if ("connection" in navigator) {
+        // @ts-ignore
+        const connection = navigator.connection || navigator.webkitConnection;
+
+        if (connection) {
+          const effectiveType = connection.effectiveType || "4g";
+          setConnectionType(effectiveType);
+
+          // ONLY 2G OR SLOWER - NOT 3G
+          setIsSlowConnection(["slow-2g", "2g"].includes(effectiveType));
         }
-        const avgLatency = samples.reduce((a, b) => a + b, 0) / samples.length;
-        setIsSlowConnection(avgLatency > 5000);
-      } catch {
-        setIsSlowConnection(true);
       }
     };
 
-    const handleOnline = () => {
-      setIsOnline(true);
-      setTimeout(testConnectionSpeed, 3000); // delay first test
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-      setIsSlowConnection(false);
-    };
+    updateOnlineStatus();
+    checkConnectionSpeed();
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
 
+    // @ts-ignore
+    const connection = navigator.connection || navigator.webkitConnection;
     if (connection) {
-      connection.addEventListener("change", updateConnectionInfo);
+      connection.addEventListener("change", checkConnectionSpeed);
     }
 
-    updateConnectionInfo();
-    setTimeout(() => {
-      if (navigator.onLine) testConnectionSpeed();
-    }, 3000);
-
-    const interval = setInterval(() => {
-      if (navigator.onLine) testConnectionSpeed();
-    }, 30000);
-
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-      if (connection)
-        connection.removeEventListener("change", updateConnectionInfo);
-      clearInterval(interval);
+      window.removeEventListener("online", updateOnlineStatus);
+      window.removeEventListener("offline", updateOnlineStatus);
+      if (connection) {
+        connection.removeEventListener("change", checkConnectionSpeed);
+      }
     };
   }, []);
 
   return { isOnline, isSlowConnection, connectionType };
 }
+
+export default useNetworkStatus;
