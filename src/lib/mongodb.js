@@ -1,15 +1,15 @@
-// lib/mongodb.js
 import { MongoClient, ServerApiVersion } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
-
 const options = {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
   },
-  maxPoolSize: 10,
+  maxPoolSize: 50, // ✅ Increased from 10,
+  family: 4,
+
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
   connectTimeoutMS: 5000,
@@ -18,7 +18,7 @@ const options = {
 };
 
 if (!uri) {
-  throw new Error("Please add your Mongo URI to .env.local (MONGODB_URI)");
+  throw new Error("Please add your Mongo URI to .env.local");
 }
 
 let client;
@@ -35,6 +35,7 @@ if (process.env.NODE_ENV === "development") {
   clientPromise = client.connect();
 }
 
+// ✅ Export both client promise and helper function
 export default clientPromise;
 
 export async function connectToDatabase() {
@@ -51,8 +52,8 @@ export async function connectToDatabase() {
     } catch (error) {
       retries++;
       console.error(
-        `❌ Database connection failed (attempt ${retries}/${MAX_RETRIES}):`,
-        error.message
+        `❌ MongoDB connection attempt ${retries}/${MAX_RETRIES} failed:`,
+        error.message,
       );
 
       if (process.env.NODE_ENV === "development") {
@@ -63,7 +64,7 @@ export async function connectToDatabase() {
         throw new Error(`Failed to connect after ${MAX_RETRIES} attempts`);
       }
 
-      // Wait before retry (exponential backoff)
+      // Exponential backoff
       await new Promise((resolve) => setTimeout(resolve, 1000 * retries));
     }
   }

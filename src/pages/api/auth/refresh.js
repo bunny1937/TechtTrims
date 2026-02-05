@@ -5,9 +5,6 @@ import clientPromise from "../../../lib/mongodb";
 import crypto from "crypto";
 
 export default async function handler(req, res) {
-  console.log("🔥 REFRESH API CALLED");
-  console.log("🔥 Cookies received:", req.cookies);
-
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
@@ -27,7 +24,7 @@ export default async function handler(req, res) {
     try {
       decoded = jwt.verify(
         refreshToken,
-        process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
+        process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
       );
     } catch (e) {
       console.error("❌ Refresh token verification failed:", e.message);
@@ -94,7 +91,7 @@ export default async function handler(req, res) {
         type: "access",
       },
       process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "15m" },
     );
 
     // 🔥 ROTATE REFRESH TOKEN (Generate new one)
@@ -104,7 +101,7 @@ export default async function handler(req, res) {
         type: "refresh",
       },
       process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
-      { expiresIn: session.rememberMe ? "30d" : "7d" }
+      { expiresIn: session.rememberMe ? "30d" : "7d" },
     );
 
     // 🔥 Update DB with new refresh token hash
@@ -124,7 +121,7 @@ export default async function handler(req, res) {
           lastRefreshedAt: new Date(),
           expiresAt: new Date(Date.now() + refreshTtlSeconds * 1000),
         },
-      }
+      },
     );
 
     const isProd = process.env.NODE_ENV === "production";

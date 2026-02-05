@@ -1,7 +1,6 @@
 "use client";
 
 import { Html5Qrcode } from "html5-qrcode";
-import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
 export default function LiveQrScanner({ salonId, onClose, onVerified }) {
@@ -15,7 +14,7 @@ export default function LiveQrScanner({ salonId, onClose, onVerified }) {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    audioRef.current = new Audio("/sounds/scan-success.mp3");
+    audioRef.current = null;
   }, []);
 
   const startScanner = async () => {
@@ -92,9 +91,10 @@ export default function LiveQrScanner({ salonId, onClose, onVerified }) {
 
       // ✅ VERIFIED BY SERVER
       setState("success");
-
-      audioRef.current?.play().catch(() => {});
-      navigator.vibrate?.(150);
+      // Use vibration instead of audio
+      if ("vibrate" in navigator) {
+        navigator.vibrate([100, 50, 100]); // Double vibration pattern
+      }
 
       await scannerRef.current?.stop();
 
@@ -117,17 +117,8 @@ export default function LiveQrScanner({ salonId, onClose, onVerified }) {
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        style={overlay}
-      >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          style={card}
-        >
+      <div style={overlay}>
+        <div style={card}>
           <h3 style={title}>Scan Booking QR</h3>
 
           <div style={frame}>
@@ -140,13 +131,7 @@ export default function LiveQrScanner({ salonId, onClose, onVerified }) {
           )}
 
           {state === "success" && (
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              style={successBox}
-            >
-              ✅ Booking Verified
-            </motion.div>
+            <div style={successBox}>✅ Booking Verified</div>
           )}
 
           {state === "offline" && <p style={errorText}>📴 You are offline</p>}
@@ -162,8 +147,8 @@ export default function LiveQrScanner({ salonId, onClose, onVerified }) {
           <button style={secondaryBtn} onClick={close}>
             Close
           </button>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
     </AnimatePresence>
   );
 }
