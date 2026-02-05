@@ -1,8 +1,12 @@
 import clientPromise from "../../../lib/mongodb";
 import { brevoClient } from "../../../lib/brevo_email/brevoConfig";
 import { ObjectId } from "mongodb";
+import { verifySignatureAppRouter } from "@upstash/qstash/nextjs";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
   // Verify cron authorization
   const authHeader = req.headers.authorization;
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -184,6 +188,7 @@ export default async function handler(req, res) {
       successCount,
       failedCount,
       timestamp: now.toISOString(),
+      message: "Reminders sent successfully",
     });
   } catch (error) {
     console.error("[Prebook Cron Error]:", error);
@@ -192,3 +197,11 @@ export default async function handler(req, res) {
       .json({ error: "Internal server error", message: error.message });
   }
 }
+// ✅ ADD THIS - Wraps your handler with QStash signature verification
+export default verifySignatureAppRouter(handler);
+
+export const config = {
+  api: {
+    bodyParser: false, // Required for QStash signature verification
+  },
+};

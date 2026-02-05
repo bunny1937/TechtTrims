@@ -1,6 +1,9 @@
 import clientPromise from "../../../lib/mongodb";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
   // Protect with secret key
   if (req.headers["x-api-key"] !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -40,7 +43,7 @@ export default async function handler(req, res) {
               autoCompleted: true,
               reason: "Auto-completed by cron job",
             },
-          }
+          },
         );
 
         console.log("🔴 [AUTO-CRON] Auto-completed:", {
@@ -57,9 +60,18 @@ export default async function handler(req, res) {
       success: true,
       autoCompleted,
       timestamp: now,
+      message: "Bookings auto-completed successfully",
     });
   } catch (error) {
     console.error("❌ Cron error:", error);
     res.status(500).json({ error: error.message });
   }
 }
+// ADD THIS
+export default verifySignatureAppRouter(handler);
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
