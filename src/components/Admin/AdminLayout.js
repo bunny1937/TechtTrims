@@ -33,6 +33,7 @@ export default function AdminLayout({ children }) {
     { name: "Analytics", path: "/admin/analytics", icon: "📈" },
     { name: "Reports", path: "/admin/reports", icon: "📄" },
     { name: "Audit Logs", path: "/admin/audit-logs", icon: "📝" },
+    { name: "Images", path: "/admin/images", icon: "🖼️" },
   ];
 
   return (

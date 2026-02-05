@@ -32,7 +32,7 @@ export default function UploadImageButton({
     for (const file of files) {
       if (!ALLOWED_TYPES.includes(file.type)) {
         setError(
-          `Invalid file type: ${file.type}. Only JPEG, PNG, and WebP allowed.`
+          `Invalid file type: ${file.type}. Only JPEG, PNG, and WebP allowed.`,
         );
         return;
       }
@@ -40,8 +40,8 @@ export default function UploadImageButton({
       if (file.size > MAX_FILE_SIZE) {
         setError(
           `File too large: ${(file.size / 1024 / 1024).toFixed(
-            1
-          )}MB. Max 5MB allowed.`
+            1,
+          )}MB. Max 5MB allowed.`,
         );
         return;
       }
@@ -78,32 +78,39 @@ export default function UploadImageButton({
         formData.append("fileName", `${Date.now()}-${file.name}`);
         formData.append(
           "publicKey",
-          process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY
+          process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY,
         );
         formData.append("signature", signature);
         formData.append("expire", expire);
         formData.append("token", token);
 
-        // 👇 Create unique salon folder dynamically
-        formData.append("folder", `/salons/${folderName}`);
+        // ✅ FIX: Proper folder structure
+        const folder = `salons/${salonName || "admin-platform"}/${endpoint || "general"}`;
+        formData.append("folder", folder);
+
+        // ✅ FIX: Use proper filename without special characters
+        const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+        formData.append("fileName", `${Date.now()}-${cleanFileName}`);
 
         const uploadResponse = await axios.post(
           "https://upload.imagekit.io/api/v1/files/upload",
           formData,
-          { headers: { "Content-Type": "multipart/form-data" } }
+          { headers: { "Content-Type": "multipart/form-data" } },
         );
 
         results.push({ url: uploadResponse.data.url });
       }
+      const data = await uploadResponse.json();
 
       setImages(results);
       if (multiple) onUploaded(results.map((r) => r.url));
       else onUploaded(results[0]?.url);
+      return data.url;
     } catch (err) {
       console.error("Upload Error:", err.response?.data || err.message);
       setError(
         err.response?.data?.message ||
-          "Upload failed. Please try again or check credentials."
+          "Upload failed. Please try again or check credentials.",
       );
     } finally {
       setUploading(false);

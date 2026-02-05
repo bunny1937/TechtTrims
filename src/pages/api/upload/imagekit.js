@@ -26,14 +26,21 @@ export const config = {
 export default async function handler(req, res) {
   if (req.method === "GET") {
     try {
+      // ✅ Generate fresh auth params with expiration
       const authParams = imagekit.getAuthenticationParameters();
+
+      console.log("ImageKit auth params generated:", {
+        token: authParams.token.substring(0, 10) + "...",
+        expire: authParams.expire,
+        signature: authParams.signature.substring(0, 10) + "...",
+      });
+
       return res.status(200).json(authParams);
     } catch (error) {
-      console.error("❌ ImageKit Auth Error:", error);
+      console.error("ImageKit Auth Error:", error);
       return res.status(500).json({
-        error:
-          error.message ||
-          "Server Error while generating ImageKit authentication params",
+        error: error.message || "Failed to generate auth params",
+        details: error.toString(),
       });
     }
   }
