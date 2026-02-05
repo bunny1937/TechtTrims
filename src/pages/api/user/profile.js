@@ -8,18 +8,30 @@ async function handler(req, res) {
   }
 
   try {
+    // ✅ Add cache headers - profile changes rarely
+    res.setHeader(
+      "Cache-Control",
+      "private, s-maxage=30, stale-while-revalidate=60",
+    );
+
     // req.user is already set by withAuth middleware
     const { userId } = req.user;
 
     const client = await clientPromise;
     const db = client.db("techtrims");
 
-    const user = await db
-      .collection("users")
-      .findOne(
-        { _id: new ObjectId(userId) },
-        { projection: { hashedPassword: 0 } }
-      );
+    const user = await db.collection("users").findOne(
+      { _id: new ObjectId(userId) },
+      {
+        projection: {
+          hashedPassword: 0,
+          resetToken: 0,
+          otp: 0,
+          verificationToken: 0,
+        },
+        maxTimeMS: 2000,
+      },
+    );
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });

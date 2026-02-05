@@ -9,6 +9,8 @@ async function handler(req, res) {
   }
 
   try {
+    // ✅ Add cache headers
+    res.setHeader("Cache-Control", "no-store");
     // ✅ req.user is already set by withAuth middleware
     const { userId } = req.user;
 
@@ -32,6 +34,9 @@ async function handler(req, res) {
           { customerName: { $regex: user.name, $options: "i" } },
         ],
       })
+      .limit(50) // ✅ Don't fetch more than last 50 bookings
+      .sort({ createdAt: -1 }) // ✅ Get most recent first
+      .maxTimeMS(5000) // ✅ Add timeout
       .toArray();
 
     // Update bookings with userId if not set
@@ -41,7 +46,7 @@ async function handler(req, res) {
         .collection("bookings")
         .updateMany(
           { _id: { $in: bookingsToUpdate.map((b) => b._id) } },
-          { $set: { userId: new ObjectId(userId) } }
+          { $set: { userId: new ObjectId(userId) } },
         );
     }
 
@@ -53,7 +58,7 @@ async function handler(req, res) {
         $set: {
           bookingHistory: bookingIds,
         },
-      }
+      },
     );
 
     res.status(200).json({

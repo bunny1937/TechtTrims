@@ -18,9 +18,6 @@ async function handler(req, res) {
     const user = await db
       .collection("users")
       .findOne({ _id: new ObjectId(userId) });
-    console.log("User bookings API - Found user:", user ? "YES" : "NO");
-    console.log("User phone:", user?.phone);
-    console.log("User name:", user?.name);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -28,8 +25,6 @@ async function handler(req, res) {
 
     // Debug: Check all bookings first
     const allBookings = await db.collection("bookings").find({}).toArray();
-    console.log("Total bookings in database:", allBookings.length);
-    console.log("Sample booking:", allBookings[0]);
 
     // Try multiple search strategies
     const searchQueries = [
@@ -37,8 +32,6 @@ async function handler(req, res) {
       { customerPhone: user.phone },
       { customerName: user.name },
     ];
-
-    console.log("Search queries:", searchQueries);
 
     // Get bookings by phone number or userId
     const bookings = await db
@@ -49,31 +42,22 @@ async function handler(req, res) {
       .sort({ createdAt: -1 })
       .toArray();
 
-    console.log("Found bookings for user:", bookings.length);
-    console.log("Bookings:", bookings);
-
     // Get salon names for bookings
     // If no bookings found, try fallback searches
     let finalBookings = bookings;
 
     if (bookings.length === 0) {
-      console.log(
-        "No bookings found with standard search, trying fallback searches..."
-      );
-
       // Try searching by partial phone match
       const phoneSearch = await db
         .collection("bookings")
         .find({ customerPhone: { $regex: user.phone.slice(-10) } })
         .toArray();
-      console.log("Phone fallback search found:", phoneSearch.length);
 
       // Try searching by partial name match
       const nameSearch = await db
         .collection("bookings")
         .find({ customerName: { $regex: user.name, $options: "i" } })
         .toArray();
-      console.log("Name fallback search found:", nameSearch.length);
 
       finalBookings = [...phoneSearch, ...nameSearch];
 
@@ -81,7 +65,7 @@ async function handler(req, res) {
       finalBookings = finalBookings.filter(
         (booking, index, self) =>
           index ===
-          self.findIndex((b) => b._id.toString() === booking._id.toString())
+          self.findIndex((b) => b._id.toString() === booking._id.toString()),
       );
     }
 
@@ -104,7 +88,7 @@ async function handler(req, res) {
               .collection("salons")
               .findOne(
                 { _id: salonObjectId },
-                { projection: { salonName: 1, "salonDetails.name": 1 } }
+                { projection: { salonName: 1, "salonDetails.name": 1 } },
               );
             salonName =
               salon?.salonName || salon?.salonDetails?.name || "Unknown Salon";
@@ -112,7 +96,7 @@ async function handler(req, res) {
             console.error(
               "Error fetching salon for booking:",
               booking._id,
-              error
+              error,
             );
           }
         }
@@ -133,7 +117,7 @@ async function handler(req, res) {
             console.error(
               "Error fetching barber for booking:",
               booking._id,
-              error
+              error,
             );
           }
         }
@@ -149,10 +133,9 @@ async function handler(req, res) {
           salonName,
           barberName,
         };
-      })
+      }),
     );
 
-    console.log("Final bookings with salon names:", bookingsWithSalons.length);
     res.status(200).json(bookingsWithSalons);
   } catch (error) {
     console.error("User bookings API error:", error);

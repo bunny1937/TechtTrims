@@ -13,22 +13,18 @@ let refreshPromise = null;
 // 🔥 NEW: Automatic Token Refresh Helper with retry prevention
 async function tryRefreshToken() {
   if (isRefreshing) {
-    console.log("⏳ Already refreshing, waiting...");
     return refreshPromise;
   }
 
   isRefreshing = true;
   refreshPromise = (async () => {
     try {
-      console.log("🔄 Calling /api/auth/refresh...");
       const res = await fetch("/api/auth/refresh", {
         method: "POST",
         credentials: "include",
       });
 
-      console.log("🔄 Refresh response status:", res.status);
       const data = await res.json();
-      console.log("🔄 Refresh response data:", data);
 
       if (!res.ok) {
         console.warn(`❌ Refresh failed: ${data.code || data.message}`);
@@ -44,15 +40,12 @@ async function tryRefreshToken() {
             "USER_INACTIVE",
           ].includes(data.code)
         ) {
-          console.log("❌ Fatal auth error, clearing and redirecting...");
           await UserDataManager.clearUserData();
           window.location.href = "/auth/login";
         }
 
         return false;
       }
-
-      console.log("✅ Token refreshed successfully");
       return true;
     } catch (err) {
       console.error("❌ Refresh request failed:", err);
@@ -174,9 +167,11 @@ export class UserDataManager {
             };
           } catch {}
         }
-
         setUserData(mergedData);
-        await this.syncBookingHistory();
+        // ✅ Defer sync - don't block page load
+        setTimeout(() => {
+          this.syncBookingHistory().catch(console.error);
+        }, 3000); // Sync after 3 seconds
         return mergedData;
       }
 
