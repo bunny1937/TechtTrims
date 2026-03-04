@@ -1,23 +1,41 @@
-// This runs in a separate thread
+// public/distanceWorker.js
+
+// Process in batches for faster initial render
 self.onmessage = function (e) {
-  const { salons, userLat, userLng, radius } = e.data;
+  const { salons, userLat, userLng } = e.data;
 
-  const updated = salons.map((salon) => {
-    if (!salon.location || !Array.isArray(salon.location.coordinates)) {
-      return salon;
+  const BATCH_SIZE = 10;
+  const results = [];
+
+  // Process in batches
+  for (let i = 0; i < salons.length; i += BATCH_SIZE) {
+    const batch = salons.slice(i, i + BATCH_SIZE);
+
+    const processed = batch.map((salon) => {
+      if (!salon.location || !Array.isArray(salon.location.coordinates)) {
+        return { ...salon, distance: 999 };
+      }
+
+      const [salonLng, salonLat] = salon.location.coordinates;
+      const distance = calculateDistance(userLat, userLng, salonLat, salonLng);
+
+      return {
+        ...salon,
+        distance: Number(distance.toFixed(2)),
+      };
+    });
+
+    results.push(...processed);
+
+    // Send intermediate results for faster initial render
+    if (i === 0) {
+      self.postMessage(results.slice().sort((a, b) => a.distance - b.distance));
     }
+  }
 
-    const [salonLng, salonLat] = salon.location.coordinates;
-
-    const distance = calculateDistance(userLat, userLng, salonLat, salonLng);
-
-    return {
-      ...salon,
-      distance: Number(distance.toFixed(2)),
-    };
-  });
-
-  self.postMessage(updated);
+  // Send final sorted results
+  results.sort((a, b) => a.distance - b.distance);
+  self.postMessage(results);
 };
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
