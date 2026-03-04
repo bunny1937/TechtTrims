@@ -334,7 +334,6 @@
   justify-content: center;
   gap: 24px;
   margin-bottom: 24px;
-  flex-wrap: wrap;
 }
 
 .legendItem {
@@ -419,52 +418,6 @@
   color: #78350f;
 }
 
-/* Mobile Responsive */
-@media (max-width: 768px) {
-  .modernStatsGrid {
-    gap: 12px;
-  }
-  .modernStatCard,
-  .statIcon {
-    font-size: 1.5rem !important;
-  }
-  .statNumber {
-    font-size: 2rem !important;
-  }
-  .modernQueueItem {
-    min-width: 120px;
-  }
-
-  .modernChair {
-    min-width: 160px;
-    padding: 20px;
-  }
-
-  .servingCircle {
-    width: 80px;
-    height: 80px;
-  }
-
-  .userIcon {
-    font-size: 2.5rem;
-  }
-
-  .queueFlowContainer {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .queueArrow {
-    transform: rotate(90deg);
-  }
-}
-
-@media (max-width: 640px) {
-  .modernStatsGrid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-}
 .title {
   font-size: 28px;
   font-weight: 700;
@@ -480,6 +433,12 @@
   transition: color 0.4s ease;
 }
 
+.qrCodeWrapper {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  align-items: center;
+}
 /* QR CODE SECTION */
 .qrCodeSection {
   display: flex;
@@ -592,7 +551,6 @@
   gap: 10px;
   padding: 15px;
   border-radius: 10px;
-  margin-bottom: 20px;
   font-weight: 500;
 }
 
@@ -739,16 +697,6 @@
   font-size: 16px;
 }
 
-/* Mobile */
-@media (max-width: 768px) {
-  .card {
-    padding: 30px 20px;
-  }
-
-  .actions {
-    flex-direction: column;
-  }
-}
 .sectionHeader {
   font-size: 18px;
   font-weight: 700;
@@ -942,21 +890,6 @@
   box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
 }
 
-@media (max-width: 768px) {
-  .controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .sortDropdown {
-    justify-content: space-between;
-  }
-
-  .sortDropdown select {
-    flex: 1;
-  }
-}
-
 /* Filter Pills */
 .filterPills {
   display: flex;
@@ -1137,16 +1070,79 @@
   }
 }
 
+@media (max-width: 768px) {
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .modernStatsGrid {
+    gap: 12px;
+  }
+  .modernStatCard,
+  .statIcon {
+    font-size: 1.5rem !important;
+  }
+  .statNumber {
+    font-size: 2rem !important;
+  }
+  .modernQueueItem {
+    min-width: 120px;
+  }
+
+  .modernChair {
+    min-width: 160px;
+    padding: 20px;
+  }
+
+  .servingCircle {
+    width: 80px;
+    height: 80px;
+  }
+
+  .userIcon {
+    font-size: 2.5rem;
+  }
+
+  .queueFlowContainer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .queueArrow {
+    transform: rotate(90deg);
+  }
+  .sortDropdown {
+    justify-content: space-between;
+  }
+
+  .sortDropdown select {
+    flex: 1;
+  }
+  .card {
+    padding: 30px 20px;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 640px) {
   .reviewsContainer {
     flex-direction: column;
   }
-
+  .modernStatsGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
   .breakdownRow {
     grid-template-columns: 80px 1fr 40px 50px;
     gap: 8px;
   }
-
+  .qrCodeContainer svg {
+    width: 140px;
+    height: 140px;
+  }
   .label {
     font-size: 0.8125rem;
   }
@@ -1288,7 +1284,6 @@
 
 .legend {
   display: flex;
-  flex-direction: column;
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid #d1d5db;

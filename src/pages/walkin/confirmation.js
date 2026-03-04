@@ -658,44 +658,26 @@ export default function WalkinConfirmation() {
     <div className={styles.container}>
       <div className={styles.card}>
         <h1 className={styles.title}>✅ Booking Confirmed!</h1>
-
+        <p className={styles.codeLabel}>
+          {" "}
+          Scan this at salon entrance OR show this code
+        </p>
         {/* QR Code */}
-        <div className={styles.qrSection}>
-          <div className={styles.qrCodeWrapper}>
-            {qrCodeUrl ? (
-              <img
-                src={qrCodeUrl}
-                alt="Booking QR Code"
-                width={200}
-                height={200}
-                className={styles.qrCode}
+        <div className={styles.qrCodeWrapper}>
+          <div className={styles.qrCodeContainer}>
+            {booking.bookingCode && (
+              <QRCodeSVG
+                value={booking.bookingCode}
+                size={200}
+                level="H"
+                includeMargin={true}
+                bgColor="#faf6ef"
+                fgColor="#1a0f00"
               />
-            ) : (
-              <div className={styles.qrPlaceholder}>
-                <span>Generating QR Code...</span>
-              </div>
             )}
           </div>
-          {/* 🔥 QR CODE DISPLAY */}
-          <div className={styles.qrCodeSection}>
-            <div className={styles.qrCodeContainer}>
-              {booking.bookingCode && (
-                <QRCodeSVG
-                  value={booking.bookingCode}
-                  size={200}
-                  level="H"
-                  includeMargin={true}
-                  bgColor="#faf6ef"
-                  fgColor="#1a0f00"
-                />
-              )}
-            </div>
-            <p className={styles.qrCodeLabel}>Scan this at salon entrance</p>
-          </div>
-
           {/* BOOKING CODE */}
           <div className={styles.bookingCodeSection}>
-            <p className={styles.codeLabel}>OR show this code:</p>
             <div className={styles.bookingCodeBox}>
               <span className={styles.bookingCode}>{booking.bookingCode}</span>
             </div>
@@ -818,7 +800,7 @@ export default function WalkinConfirmation() {
                 ⏰ Please arrive within:{" "}
                 <strong>{timeLeft || "Calculating..."}</strong>
               </p>
-              <p className={styles.note}>Booking expires after 45 minutes</p>
+              <p className={styles.note}>Booking expires after 30 minutes</p>
             </div>
           )}
         {/* NEW: Queue Visualization */}
@@ -965,7 +947,7 @@ export default function WalkinConfirmation() {
                     borderRadius: 4,
                   }}
                 ></div>
-                <span>⚫ Booked (Expires 45 min)</span>
+                <span>⚫ Booked (Expires 30 min)</span>
               </div>
             </div>
           </div>
@@ -1010,10 +992,8 @@ export default function WalkinConfirmation() {
                   <div className={styles.statIcon}>👥</div>
                   <div className={styles.statNumber}>
                     <h2>
-                      {(barberQueueData.priorityQueueCount || 0) +
-                        (barberQueueData.bookedCount || 0)}
+                      <h2>{barberQueueData.priorityQueueCount || 0}</h2>
                     </h2>
-                    <p>PRIORITY QUEUE</p>{" "}
                   </div>
                 </div>
                 <div className={styles.statLabel}>Priority Queue</div>
@@ -1270,7 +1250,7 @@ export default function WalkinConfirmation() {
                   }}
                 />
                 <span>
-                  <strong>Temporary Queue</strong> - Booked (45 min expiry)
+                  <strong>Temporary Queue</strong> - Booked (30 min expiry)
                 </span>
               </div>
             </div>
@@ -1281,7 +1261,7 @@ export default function WalkinConfirmation() {
               <ul>
                 <li>
                   💻 <strong>Book Online:</strong> Enter temporary queue (grey
-                  dotted). Arrive within 45 min.
+                  dotted). Arrive within 30 min.
                 </li>
                 <li>
                   🚪 <strong>Arrive at Salon:</strong> Show booking code → Move
