@@ -116,7 +116,7 @@ export default function LiveQrScanner({ salonId, onClose, onVerified }) {
   };
 
   return (
-    <AnimatePresence>
+    <>
       <div style={overlay}>
         <div style={card}>
           <h3 style={title}>Scan Booking QR</h3>
@@ -149,7 +149,7 @@ export default function LiveQrScanner({ salonId, onClose, onVerified }) {
           </button>
         </div>
       </div>
-    </AnimatePresence>
+    </>
   );
 }
 

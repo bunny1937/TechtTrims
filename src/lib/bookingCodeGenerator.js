@@ -15,6 +15,11 @@ export async function generateBookingCode(salonId) {
     const client = await clientPromise;
     const db = client.db("techtrims");
 
+    // Validate salonId format before use
+    if (!ObjectId.isValid(salonId)) {
+      console.warn("Invalid salonId format:", salonId);
+      return generateRandomCode("ST");
+    }
     // Get salon name
     const salon = await db.collection("salons").findOne({
       _id: new ObjectId(salonId),

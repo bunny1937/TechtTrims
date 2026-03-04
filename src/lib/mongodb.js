@@ -23,6 +23,7 @@ if (!uri) {
 
 let client;
 let clientPromise;
+let isConnected = false;
 
 if (process.env.NODE_ENV === "development") {
   if (!global._mongoClientPromise) {
@@ -46,8 +47,12 @@ export async function connectToDatabase() {
     try {
       const client = await clientPromise;
       const db = client.db(process.env.MONGODB_DB);
-      await client.db("admin").command({ ping: 1 });
-      console.log("✅ Connected to MongoDB!");
+      // ✅ Only log FIRST connection, not every call
+      if (!isConnected) {
+        console.log("✅ Connected to MongoDB!");
+        isConnected = true;
+      }
+
       return { client, db };
     } catch (error) {
       retries++;

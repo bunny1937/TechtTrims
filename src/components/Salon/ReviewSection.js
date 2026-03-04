@@ -16,7 +16,7 @@ export default function ReviewsSection({ salonId }) {
     const fetchReviews = async () => {
       try {
         const response = await fetch(
-          `/api/salons/${salonId}/reviews-paginated?page=${currentPage}&limit=${REVIEWS_PER_PAGE}&filter=${filter}&sort=${sortBy}`
+          `/api/salons/${salonId}/reviews-paginated?page=${currentPage}&limit=${REVIEWS_PER_PAGE}&filter=${filter}&sort=${sortBy}`,
         );
 
         if (response.ok) {
@@ -59,7 +59,7 @@ export default function ReviewsSection({ salonId }) {
 
     // Detailed ratings bonus (10%)
     const ratingsCount = Object.values(review.ratings || {}).filter(
-      (r) => r > 0
+      (r) => r > 0,
     ).length;
     score += ratingsCount * 2.5;
 
@@ -76,7 +76,7 @@ export default function ReviewsSection({ salonId }) {
     } else {
       // Sort by relevance score (highest first)
       sorted.sort(
-        (a, b) => calculateRelevanceScore(b) - calculateRelevanceScore(a)
+        (a, b) => calculateRelevanceScore(b) - calculateRelevanceScore(a),
       );
     }
 
@@ -114,6 +114,8 @@ export default function ReviewsSection({ salonId }) {
     );
   }
 
+  const rating = Number(stats?.overall ?? 0);
+
   return (
     <div className={styles.reviewsSection}>
       <h2 className={styles.mainTitle}>Customer Reviews & Ratings</h2>
@@ -122,14 +124,14 @@ export default function ReviewsSection({ salonId }) {
           {/* Compact Stats Header */}
           <div className={styles.statsHeader}>
             {/* Overall Rating */}
+
             <div className={styles.overallBox}>
-              <div className={styles.bigRating}>
-                {Number(stats.averageRating || 0).toFixed(1)}
-              </div>
+              <div className={styles.bigRating}>{rating.toFixed(1)}</div>
 
               <div className={styles.stars}>
-                {"⭐".repeat(Math.round(stats.averageRating))}
+                {"⭐".repeat(Math.round(rating))}
               </div>
+
               <div className={styles.reviewCount}>
                 {stats.totalReviews} reviews
               </div>

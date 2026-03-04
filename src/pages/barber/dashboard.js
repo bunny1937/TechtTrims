@@ -28,6 +28,10 @@ const LiveQrScanner = dynamic(() => import("../../components/LiveQrScanner"), {
 });
 
 export default function BarberDashboard() {
+  const renderCount = useRef(0);
+  renderCount.current++;
+  console.log(`🔴 RENDER #${renderCount.current}`, Date.now());
+
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [barber, setBarber] = useState(null);
@@ -94,12 +98,6 @@ export default function BarberDashboard() {
       if (!barberId) {
         throw new Error("Invalid barber data - no ID found");
       }
-
-      console.log("[Dashboard] Loaded barber:", {
-        id: barberId,
-        name: barberData.name,
-        salonId: barberData.linkedId || barberData.salonId,
-      });
 
       setBarber(barberData);
       loadDashboardData(barberId, barberData);
@@ -174,8 +172,6 @@ export default function BarberDashboard() {
           rating: barberData?.rating || 4.8, // ✅ Use passed barberData
           earnings: totalEarnings,
         });
-
-        console.log("Loaded bookings:", data.length);
       }
     } catch (error) {
       console.error("Error loading bookings:", error);
@@ -254,16 +250,12 @@ export default function BarberDashboard() {
       const barberSession = sessionStorage.getItem("barberSession");
       const barberData = JSON.parse(barberSession);
 
-      console.log("[Frontend] Barber data:", barberData);
-
       const payload = {
         barberId: barberData._id || barberData.id,
         salonId: barberData.linkedId || barberData.salonId,
         reason: absentReason,
         date: new Date().toISOString().split("T")[0],
       };
-
-      console.log("[Frontend] Sending payload:", payload);
 
       const res = await fetch("/api/barber/attendance/mark-absent", {
         method: "POST",
@@ -296,8 +288,6 @@ export default function BarberDashboard() {
         salonId: barber.linkedId || barber.salonId,
       };
 
-      console.log("🚀 SENDING CHECK-IN REQUEST:", payload);
-
       const res = await fetch("/api/walkin/verify-arrival", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -305,12 +295,6 @@ export default function BarberDashboard() {
       });
 
       const data = await res.json();
-
-      console.log("📦 RESPONSE RECEIVED:", {
-        status: res.status,
-        ok: res.ok,
-        data: data,
-      });
 
       if (!res.ok) {
         console.error("❌ CHECK-IN FAILED:", data?.message);
@@ -330,7 +314,6 @@ export default function BarberDashboard() {
       }
 
       // SUCCESS
-      console.log("✅ CHECK-IN SUCCESS:", data.booking.customerName);
       showSuccess(`${data.booking.customerName} checked in successfully!`);
       setScanResult({
         success: true,
