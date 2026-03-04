@@ -67,8 +67,8 @@
 
 .authCard {
   background: var(--background-primary);
-  border-radius: var(--radius-3xl);
-  padding: var(--space-12);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-8);
   max-width: 520px;
   width: 100%;
   box-shadow: var(--shadow-luxury);
@@ -342,6 +342,28 @@
 [data-theme="dark"] .requirementMet {
   color: #10b981 !important;
 }
+.otherLoginText {
+  margin-top: 14px;
+  text-align: left;
+
+  font-size: 1rem;
+  font-weight: 700;
+
+  color: var(--primary);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.otherLoginText:hover {
+  text-decoration: underline;
+}
+
+.otherLoginText:active {
+  transform: scale(0.97);
+}
 
 /* ===== MOBILE OPTIMIZATIONS ===== */
 @media (max-width: 640px) {
@@ -408,7 +430,7 @@
   font-size: 2rem;
   font-weight: 700;
   text-align: center;
-  margin: var(--space-6) 0 var(--space-2);
+  margin: var(--space-3) 0 var(--space-2);
   background: linear-gradient(
     135deg,
     var(--primary) 0%,
@@ -546,7 +568,7 @@
 }
 
 .authLinks {
-  margin-top: var(--space-8);
+  margin-top: var(--space-2);
   text-align: center;
 }
 

@@ -66,6 +66,108 @@ export default function UserRegisterPage() {
     }
   }, []);
 
+  useEffect(() => {
+    let intervalId = null;
+    let initialized = false;
+
+    const initGoogle = () => {
+      if (
+        initialized ||
+        !window.google ||
+        !window.google.accounts ||
+        !window.google.accounts.id
+      ) {
+        return;
+      }
+
+      initialized = true;
+
+      console.log(
+        "GOOGLE CLIENT ID:",
+        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+      );
+
+      window.google.accounts.id.initialize({
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        callback: async (res) => {
+          try {
+            const response = await fetch("/api/auth/user/register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                method: "google",
+                idToken: res.credential,
+              }),
+            });
+
+            let data = null;
+            const contentType = response.headers.get("content-type");
+
+            if (contentType && contentType.includes("application/json")) {
+              data = await response.json();
+            } else {
+              const text = await response.text();
+              console.error("Non-JSON response from register API:", text);
+              showError("Server error during Google registration");
+              return;
+            }
+
+            if (response.status === 409 && data.canLinkGoogle) {
+              showError("Account already exists. Please login to link Google.");
+
+              sessionStorage.setItem(
+                "pendingGoogleLink",
+                JSON.stringify({
+                  email: data.email,
+                  idToken: res.credential,
+                }),
+              );
+
+              setTimeout(() => {
+                window.location.href = "/auth/login?linkGoogle=true";
+              }, 1200);
+
+              return;
+            }
+
+            if (!response.ok) {
+              showError(data.message || "Google registration failed");
+              return;
+            }
+
+            showSuccess("Registered with Google successfully");
+            setTimeout(() => {
+              router.push("/auth/login");
+            }, 1500);
+          } catch (err) {
+            console.error("Google register failed:", err);
+            showError("Google sign-in failed");
+          }
+        },
+        use_fedcm_for_prompt: false,
+      });
+
+      const container = document.getElementById("google-btn");
+
+      if (container) {
+        window.google.accounts.id.renderButton(container, {
+          theme: "outline",
+          size: "large",
+          type: "standard",
+          width: 280,
+        });
+      }
+
+      clearInterval(intervalId);
+    };
+
+    intervalId = setInterval(initGoogle, 100);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
   // CHECK PASSWORD REQUIREMENTS IN REAL-TIME
   useEffect(() => {
     const password = formData.password;
@@ -627,6 +729,9 @@ export default function UserRegisterPage() {
             </button>
           </div>
         )}
+
+        <div id="google-btn"> Register with Google</div>
+
         <p className={styles.authLink}>
           Already have an account?{" "}
           <button

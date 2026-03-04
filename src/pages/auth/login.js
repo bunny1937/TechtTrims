@@ -6,6 +6,7 @@ import { setUserData } from "../../lib/cookieAuth";
 import { showSuccess, showError } from "../../lib/toast";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import styles from "../../styles/Auth/UserAuth.module.css";
+import Script from "next/script";
 
 export default function UnifiedLogin() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export default function UnifiedLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [showVerificationPrompt, setShowVerificationPrompt] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [showOtherLogins, setShowOtherLogins] = useState(false);
+  const [googleScriptLoaded, setGoogleScriptLoaded] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -27,6 +30,8 @@ export default function UnifiedLogin() {
       router.push("/user/dashboard");
     } else if (document.cookie.includes("salonAuth=true")) {
       router.push("/salons/dashboard");
+    } else if (document.cookie.includes("barberAuth=true")) {
+      router.push("/barber/dashboard");
     }
   }, [router]);
 
@@ -64,28 +69,166 @@ export default function UnifiedLogin() {
     }
   };
 
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => {
+      if (window.google) {
+        window.google.accounts.id.initialize({
+          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          callback: handleGoogleCallback,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+
+        const googleBtn = document.getElementById("google-signin-btn");
+        if (googleBtn) {
+          window.google.accounts.id.renderButton(googleBtn, {
+            theme: "outline",
+            size: "large",
+            text: "signin_with",
+            width: 280,
+          });
+        }
+      }
+    };
+
+    document.body.appendChild(script);
+
+    return () => {
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+  }, []);
+
+  // ✅ FIXED: Google Sign-In callback
+  const handleGoogleCallback = async (response) => {
+    if (!response.credential) {
+      setError("Google login failed - no credential received");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const apiResponse = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // ✅ CRITICAL
+        body: JSON.stringify({
+          method: "google",
+          idToken: response.credential,
+        }),
+      });
+
+      const data = await apiResponse.json();
+
+      if (apiResponse.ok) {
+        // ✅ CRITICAL: Store user data (SAME as email/password)
+
+        // ✅ CRITICAL: Redirect (SAME as email/password)
+        setTimeout(() => {
+          window.location.href = data.redirectTo;
+        }, 500);
+      } else {
+        setError(data.message || "Google login failed");
+      }
+    } catch (error) {
+      console.error("❌ Google login error:", error);
+      setError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // ✅ CRITICAL FIX: Disable FedCM and use popup flow
+  const initializeGoogleSignIn = () => {
+    if (!window.google?.accounts?.id) {
+      console.error("Google Sign-In library not loaded");
+      return;
+    }
+
+    try {
+      // 🔥 DISABLE FedCM - This is the key fix!
+      window.google.accounts.id.initialize({
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        callback: handleGoogleCallback,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        ux_mode: "popup", // 🔥 Force popup mode
+        use_fedcm_for_prompt: false, // 🔥 Disable FedCM
+      });
+
+      const container = document.getElementById("google-btn");
+      if (container) {
+        window.google.accounts.id.renderButton(container, {
+          theme: "outline",
+          size: "large",
+          text: "signin_with",
+          width: 280,
+          logo_alignment: "left",
+        });
+        console.log("✅ Google Sign-In button rendered");
+      }
+    } catch (error) {
+      console.error("❌ Google Sign-In initialization error:", error);
+    }
+  };
+
+  // ✅ Initialize when script loads
+  useEffect(() => {
+    if (googleScriptLoaded && mounted) {
+      const timer = setTimeout(() => {
+        initializeGoogleSignIn();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [googleScriptLoaded, mounted]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
+    const pendingGoogleLink = sessionStorage.getItem("pendingGoogleLink");
+    let googleIdToken = null;
+
+    if (pendingGoogleLink) {
+      try {
+        googleIdToken = JSON.parse(pendingGoogleLink).idToken;
+      } catch {
+        sessionStorage.removeItem("pendingGoogleLink");
+      }
+    }
+
     try {
-      // ✅ NO ROLE - backend auto-detects from email
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          identifier: formData.email,
-          password: formData.password,
-          rememberMe,
-        }),
-      });
+      const response = await fetch(
+        googleIdToken ? "/api/auth/login?linkGoogle=true" : "/api/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            identifier: formData.email,
+            password: formData.password,
+            rememberMe,
+            ...(googleIdToken && { googleIdToken }),
+          }),
+        },
+      );
 
       if (response.ok) {
         const data = await response.json();
 
-        // ✅ Auto-redirect based on detected role
+        if (googleIdToken) {
+          sessionStorage.removeItem("pendingGoogleLink");
+          showSuccess("Google account linked successfully!");
+        }
+
         if (data.role === "USER") {
           const userWithGender = {
             ...data.user,
@@ -102,27 +245,21 @@ export default function UnifiedLogin() {
             `Welcome back, ${data.user.salonName || data.user.name}!`,
           );
           router.push(data.redirectTo || "/salons/dashboard");
-        }
-        // ✅ NEW: BARBER role handling
-        else if (data.user && data.role === "BARBER") {
-          // ✅ Save BOTH flags AND the actual barber data
+        } else if (data.user && data.role === "BARBER") {
           sessionStorage.setItem("hasOnboarded", "true");
           sessionStorage.setItem("barberSession", JSON.stringify(data.user));
-
-          console.log("✅ Barber logged in:", data.user.name);
-
           showSuccess(`Welcome back, ${data.user.name}!`);
           router.push("/barber/dashboard");
         }
       } else {
-        const error = await response.json();
+        const errorData = await response.json();
 
-        if (response.status === 403 && error.requiresVerification) {
-          setUnverifiedEmail(error.email);
+        if (response.status === 403 && errorData.requiresVerification) {
+          setUnverifiedEmail(errorData.email);
           setShowVerificationPrompt(true);
-          setError(error.message);
+          setError(errorData.message);
         } else {
-          setError(error.message || "Login failed");
+          setError(errorData.message || "Login failed");
         }
       }
     } catch (error) {
@@ -177,169 +314,217 @@ export default function UnifiedLogin() {
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.authCard}>
-        {/* Back to Home Button */}
-        <button onClick={() => router.push("/")} className={styles.backButton}>
-          <ArrowLeft size={16} />
-          Back to Home
-        </button>
+    <>
+      {/* ✅ Load Google Sign-In script */}
+      <Script
+        src="https://accounts.google.com/gsi/client"
+        strategy="afterInteractive"
+        onLoad={() => {
+          console.log("✅ Google Sign-In script loaded");
+          setGoogleScriptLoaded(true);
+        }}
+        onError={(e) => {
+          console.error("❌ Failed to load Google Sign-In script:", e);
+        }}
+      />
 
-        <h1 className={styles.title}>Welcome Back</h1>
-        <p className={styles.subtitle}>Login to your TechTrims account</p>
+      <div className={styles.container}>
+        <div className={styles.authCard}>
+          <button
+            onClick={() => router.push("/")}
+            className={styles.backButton}
+          >
+            <ArrowLeft size={16} />
+            Back to Home
+          </button>
 
-        {showVerificationPrompt && (
-          <div className={styles.verificationPrompt}>
-            <p>Your email is not verified yet.</p>
-            <button
-              onClick={handleResendVerification}
-              disabled={isLoading}
-              className={styles.resendButton}
-            >
-              {isLoading ? "Sending..." : "Resend Verification Email"}
-            </button>
-          </div>
-        )}
+          <h1 className={styles.title}>Welcome Back</h1>
+          <p className={styles.subtitle}>Login to your TechTrims account</p>
 
-        {showForgotPassword ? (
-          <form onSubmit={handleForgotPassword} className={styles.form}>
-            <div className={styles.formGroup}>
-              <label>Email Address</label>
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={forgotEmail}
-                onChange={(e) => setForgotEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            {error && (
-              <div className={styles.error}>
-                <span>⚠ {error}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={styles.submitButton}
-            >
-              {isLoading && <span className={styles.spinner}></span>}
-              {isLoading ? "Sending..." : "Send Reset Link"}
-            </button>
-
-            <div className={styles.authLinks}>
+          {showVerificationPrompt && (
+            <div className={styles.verificationPrompt}>
+              <p>Your email is not verified yet.</p>
               <button
-                type="button"
-                onClick={() => {
-                  setShowForgotPassword(false);
-                  setError("");
-                }}
-                className={styles.linkButton}
+                onClick={handleResendVerification}
+                disabled={isLoading}
+                className={styles.resendButton}
               >
-                Back to Login
+                {isLoading ? "Sending..." : "Resend Verification Email"}
               </button>
             </div>
-          </form>
-        ) : (
-          <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.formGroup}>
-              <label>Email Address</label>
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                required
-              />
-            </div>
+          )}
 
-            <div className={styles.formGroup}>
-              <label>Password</label>
-              <div className={styles.passwordInputWrapper}>
+          {showForgotPassword ? (
+            <form onSubmit={handleForgotPassword} className={styles.form}>
+              <div className={styles.formGroup}>
+                <label>Email Address</label>
                 <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  className={styles.passwordInput}
+                  type="email"
+                  placeholder="Enter your email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className={styles.passwordToggle}
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
               </div>
-            </div>
 
-            <div className={styles.checkbox}>
-              <input
-                type="checkbox"
-                id="rememberMe"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-              />
-              <label htmlFor="rememberMe">Keep me logged in for 30 days</label>
-            </div>
+              {error && (
+                <div className={styles.error}>
+                  <span>⚠ {error}</span>
+                </div>
+              )}
 
-            {error && (
-              <div className={styles.error}>
-                <span>⚠ {error}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={styles.submitButton}
-            >
-              {isLoading && <span className={styles.spinner}></span>}
-              {isLoading ? "Logging in..." : "Login"}
-            </button>
-
-            <div className={styles.authLinks}>
               <button
-                type="button"
-                onClick={() => setShowForgotPassword(true)}
-                className={styles.linkButton}
+                type="submit"
+                disabled={isLoading}
+                className={styles.submitButton}
               >
-                Forgot Password?
+                {isLoading && <span className={styles.spinner}></span>}
+                {isLoading ? "Sending..." : "Send Reset Link"}
               </button>
 
-              <div className={styles.divider}>
-                <span>or</span>
+              <div className={styles.authLinks}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setError("");
+                  }}
+                  className={styles.linkButton}
+                >
+                  Back to Login
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleSubmit} className={styles.form}>
+              <div className={styles.formGroup}>
+                <label>Email Address</label>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  required
+                  disabled={isLoading}
+                />
               </div>
 
-              <p className={styles.authLink}>
-                Don&lsquo;t have an account? <br />
+              <div className={styles.formGroup}>
+                <label>Password</label>
+                <div className={styles.passwordInputWrapper}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    className={styles.passwordInput}
+                    required
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className={styles.passwordToggle}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.checkbox}>
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={isLoading}
+                />
+                <label htmlFor="rememberMe">
+                  Keep me logged in for 30 days
+                </label>
+              </div>
+
+              {error && (
+                <div className={styles.error}>
+                  <span>⚠ {error}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={styles.submitButton}
+              >
+                {isLoading && <span className={styles.spinner}></span>}
+                {isLoading ? "Logging in..." : "Login"}
+              </button>
+
+              {/* ✅ Google Sign-In Button Container */}
+              <div
+                id="google-btn"
+                style={{
+                  marginTop: "1rem",
+                  display: "flex",
+                  justifyContent: "center",
+                  minHeight: "40px",
+                }}
+              />
+
+              {/* <p
+                className={styles.otherLoginText}
+                onClick={() => setShowOtherLogins(true)}
+                style={{ cursor: "pointer" }}
+              >
+                Other ways to login?
+              </p> */}
+              {/* {showOtherLogins && (
+                <OtherLoginModal onClose={() => setShowOtherLogins(false)} />
+              )} */}
+
+              <div className={styles.authLinks}>
                 <button
                   type="button"
-                  onClick={() => router.push("/auth/user/register")}
+                  onClick={() => setShowForgotPassword(true)}
                   className={styles.linkButton}
+                  disabled={isLoading}
                 >
-                  Register as User
+                  Forgot Password?
                 </button>
-                {" or "}
-                <button
-                  type="button"
-                  onClick={() => router.push("/auth/salon/register")}
-                  className={styles.linkButton}
-                >
-                  Register as Salon
-                </button>
-              </p>
-            </div>
-          </form>
-        )}
+
+                <div className={styles.divider}>
+                  <span>or</span>
+                </div>
+
+                <p className={styles.authLink}>
+                  Don&apos;t have an account? <br />
+                  <button
+                    type="button"
+                    onClick={() => router.push("/auth/user/register")}
+                    className={styles.linkButton}
+                    disabled={isLoading}
+                  >
+                    Register as User
+                  </button>
+                  {" or "}
+                  <button
+                    type="button"
+                    onClick={() => router.push("/auth/salon/register")}
+                    className={styles.linkButton}
+                    disabled={isLoading}
+                  >
+                    Register as Salon
+                  </button>
+                </p>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
