@@ -11,15 +11,27 @@ export default async function handler(req, res) {
     const {
       salonId,
       barberId,
+      services, // ✅ NEW: array
       service,
       price,
       customerName,
       customerPhone,
       customerEmail,
       userId,
-      estimatedDuration = 45,
     } = req.body;
 
+    // ✅ Handle both formats
+    const servicesList =
+      services ||
+      (service
+        ? [
+            {
+              name: service,
+              price: req.body.price,
+              duration: FIXED_DURATION,
+            },
+          ]
+        : []);
     /* ---------------- VALIDATION ---------------- */
 
     if (!salonId || !barberId || !service) {
@@ -62,9 +74,9 @@ export default async function handler(req, res) {
     /* ---------------- TIME & QUEUE ---------------- */
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + estimatedDuration * 60 * 1000);
-
+    const FIXED_DURATION = 30;
     const bookingCode = await generateBookingCode(salonId); // ✅ Dynamic
+    const expiresAt = new Date(now.getTime() + FIXED_DURATION * 60 * 1000);
 
     const bookingDoc = {
       // Relations
@@ -79,13 +91,14 @@ export default async function handler(req, res) {
       userId: userId ? new ObjectId(userId) : null,
 
       // Service
-      service,
+      services: servicesList, // ✅ Array
+      service: services ? services.map((s) => s.name).join(", ") : service,
       price: Number(price) || 0,
 
       // 🔥 ADD BOOKING CODE
       bookingCode,
 
-      estimatedDuration,
+      estimatedDuration: FIXED_DURATION,
 
       // WALK-IN QUEUE CORE
       bookingType: "WALKIN",

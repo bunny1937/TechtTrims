@@ -9,6 +9,7 @@ export default async function handler(req, res) {
   try {
     const {
       salonId,
+      services, // ✅ NEW
       service,
       barber,
       barberId,
@@ -23,6 +24,18 @@ export default async function handler(req, res) {
       price,
       userId,
     } = req.body;
+
+    const FIXED_DURATION = 30;
+
+    const servicesList =
+      services && services.length > 0
+        ? services.map((s) => ({
+            ...s,
+            duration: FIXED_DURATION,
+          }))
+        : service
+          ? [{ name: service, price: price, duration: FIXED_DURATION }]
+          : [];
 
     // ✅ FIXED: customerPhone can be empty string, but still validate others
     if (!salonId || !service || !date || !time) {
@@ -87,7 +100,6 @@ export default async function handler(req, res) {
 
     // Calculate scheduled time
     const scheduledFor = new Date(`${date}T${time}:00`);
-    const oneHourBefore = new Date(scheduledFor.getTime() - 60 * 60 * 1000);
     const twoHoursBefore = new Date(
       scheduledFor.getTime() - 2 * 60 * 60 * 1000,
     );
@@ -96,8 +108,8 @@ export default async function handler(req, res) {
       bookingCode,
       salonId: ObjectId.isValid(salonId) ? new ObjectId(salonId) : salonId,
       salonName: salon.salonName || "Unknown Salon",
-      service,
-      barber: barber || "Unassigned",
+      services: servicesList, // ✅ Array
+      service: services ? services.map((s) => s.name).join(", ") : service, // ✅ String for display      barber: barber || "Unassigned",
       barberId:
         barberId && ObjectId.isValid(barberId) ? new ObjectId(barberId) : null,
       date,
@@ -123,7 +135,8 @@ export default async function handler(req, res) {
       arrivedAt: null,
       serviceStartedAt: null,
       serviceEndedAt: null,
-      estimatedDuration: null,
+      estimatedDuration: FIXED_DURATION,
+
       actualServiceMinutes: null,
       isExpired: false,
 
