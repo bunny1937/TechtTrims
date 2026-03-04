@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       .toArray();
 
     // Calculate stats (cache this for 5 min)
-    const stats = await db
+    const statsAgg = await db
       .collection("bookings")
       .aggregate([
         {
@@ -71,8 +71,9 @@ export default async function handler(req, res) {
         {
           $group: {
             _id: null,
-            avgRating: { $avg: "$feedback.ratings.overall" },
+            overall: { $avg: "$feedback.ratings.overall" },
             totalReviews: { $sum: 1 },
+
             positiveCount: {
               $sum: {
                 $cond: [{ $gte: ["$feedback.ratings.overall", 4] }, 1, 0],
@@ -99,6 +100,61 @@ export default async function handler(req, res) {
             },
           },
         },
+        {
+          $addFields: {
+            positivePercentage: {
+              $cond: [
+                { $eq: ["$totalReviews", 0] },
+                0,
+                {
+                  $round: [
+                    {
+                      $multiply: [
+                        { $divide: ["$positiveCount", "$totalReviews"] },
+                        100,
+                      ],
+                    },
+                    0,
+                  ],
+                },
+              ],
+            },
+            mediumPercentage: {
+              $cond: [
+                { $eq: ["$totalReviews", 0] },
+                0,
+                {
+                  $round: [
+                    {
+                      $multiply: [
+                        { $divide: ["$mediumCount", "$totalReviews"] },
+                        100,
+                      ],
+                    },
+                    0,
+                  ],
+                },
+              ],
+            },
+            criticalPercentage: {
+              $cond: [
+                { $eq: ["$totalReviews", 0] },
+                0,
+                {
+                  $round: [
+                    {
+                      $multiply: [
+                        { $divide: ["$criticalCount", "$totalReviews"] },
+                        100,
+                      ],
+                    },
+                    0,
+                  ],
+                },
+              ],
+            },
+          },
+        },
       ])
       .toArray();
 
@@ -113,7 +169,16 @@ export default async function handler(req, res) {
         submittedAt: r.feedback.submittedAt,
         serviceDate: r.feedback.serviceDate,
       })),
-      stats: stats[0] || { avgRating: 0, totalReviews: 0 },
+      stats: statsAgg[0] || {
+        overall: 0,
+        totalReviews: 0,
+        positiveCount: 0,
+        mediumCount: 0,
+        criticalCount: 0,
+        positivePercentage: 0,
+        mediumPercentage: 0,
+        criticalPercentage: 0,
+      },
       totalPages: Math.ceil(totalReviews / limit),
       currentPage: page,
     });

@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ message: "Method Not Allowed" });
   }
-  // ✅ Add cache headers - salons don't change often
+
   res.setHeader(
     "Cache-Control",
     "public, s-maxage=60, stale-while-revalidate=120",
@@ -52,14 +52,13 @@ export default async function handler(req, res) {
           location: 1,
           salonName: 1,
           stats: 1,
-          stats: 1,
           ratings: 1,
           operatingHours: 1,
           profilePicture: 1,
           salonGender: 1,
           isVerified: 1,
-          salonGender: 1,
         })
+
         .limit(30)
         .toArray();
 

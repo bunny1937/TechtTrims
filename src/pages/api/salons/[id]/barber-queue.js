@@ -66,31 +66,36 @@ export default async function handler(req, res) {
       }
       // ORANGE status - calculate priority based on booking type and appointment time
       else if (b.queueStatus === "ORANGE") {
-        // PREBOOK gets +1000 base priority
-        if (b.bookingType === "PREBOOK") {
-          priority += 1000;
+        // ❌ WALKIN cannot be ORANGE unless arrived
+        if (b.bookingType === "WALKIN" && !b.arrivedAt) {
+          priority = -1000; // force out of priority
+        }
 
-          // If appointment is within 30 mins, add urgency bonus
-          if (b.scheduledFor) {
-            const timeUntilAppointment = new Date(b.scheduledFor) - now;
-            const minsUntilAppointment = timeUntilAppointment / (60 * 1000);
+        // ✅ PREBOOK logic
+        if (b.bookingType === "PREBOOK" && b.scheduledFor) {
+          const scheduled = new Date(b.scheduledFor);
+          const oneHourBefore = new Date(scheduled.getTime() - 60 * 60 * 1000);
 
-            if (minsUntilAppointment <= 30 && minsUntilAppointment >= 0) {
-              priority += 500;
-            }
-            // Bonus for appointments happening RIGHT NOW or past due
-            if (minsUntilAppointment <= 0) {
-              priority += 1000;
-            }
+          // Only priority if inside window or late
+          if (now >= oneHourBefore) {
+            priority += 1000;
+
+            const minsDiff = (scheduled - now) / (60 * 1000);
+            if (minsDiff <= 0)
+              priority += 1000; // late bonus
+            else if (minsDiff <= 30) priority += 500; // urgency
+          } else {
+            priority = -1000; // too early → not priority
           }
         }
 
-        // Earlier arrivals get slight priority (fairness)
+        // ✅ Arrival fairness (applies to both)
         if (b.arrivedAt) {
-          const minutesSinceArrival = (now - new Date(b.arrivedAt)) / (60 * 1000);
-          priority += Math.floor(minutesSinceArrival); // +1 per minute waited
+          const waited = (now - new Date(b.arrivedAt)) / (60 * 1000);
+          priority += Math.floor(waited);
         }
       }
+
       // RED status - lowest priority (not arrived yet)
       else if (b.queueStatus === "RED") {
         priority = -1000;
@@ -105,37 +110,48 @@ export default async function handler(req, res) {
     // Separate by status AFTER sorting
     const serving = bookingsWithPriority.find((b) => b.queueStatus === "GREEN");
     const orangeBookings = bookingsWithPriority.filter(
-      (b) => b.queueStatus === "ORANGE"
+      (b) =>
+        b.queueStatus === "ORANGE" &&
+        // PREBOOK: only if inside window or late
+        ((b.bookingType === "PREBOOK" &&
+          b.scheduledFor &&
+          now >=
+            new Date(new Date(b.scheduledFor).getTime() - 60 * 60 * 1000)) ||
+          // WALKIN: only if arrived
+          (b.bookingType === "WALKIN" && b.arrivedAt)),
     );
     const redBookings = bookingsWithPriority.filter(
-      (b) => b.queueStatus === "RED"
+      (b) =>
+        b.queueStatus === "RED" ||
+        (b.queueStatus === "ORANGE" &&
+          b.bookingType === "WALKIN" &&
+          !b.arrivedAt),
     );
 
     // ✅ CALCULATE PERSONAL WAIT TIME FOR EACH BOOKING
     const queue = bookingsWithPriority.map((booking, index) => {
       let personalWait = 0;
 
-    // If you're in ORANGE, calculate wait based on your position
-if (booking.queueStatus === "ORANGE") {
-  const myPosition = orangeBookings.findIndex((b) =>
-    b._id.equals(booking._id)
-  );
+      // If you're in ORANGE, calculate wait based on your position
+      if (booking.queueStatus === "ORANGE") {
+        const myPosition = orangeBookings.findIndex((b) =>
+          b._id.equals(booking._id),
+        );
 
-  // Add remaining time of current GREEN customer + 5 min buffer
-  if (serving?.expectedCompletionTime) {
-    const remaining = Math.ceil(
-      (new Date(serving.expectedCompletionTime) - now) / 1000 / 60
-    );
-    personalWait = Math.max(0, remaining) + 5; // ✅ ADD 5 MIN BUFFER
-  } else if (serving) {
-    // If someone is serving but no completion time, assume 15 mins left + buffer
-    personalWait = 20;
-  }
+        // Add remaining time of current GREEN customer + 5 min buffer
+        if (serving?.expectedCompletionTime) {
+          const remaining = Math.ceil(
+            (new Date(serving.expectedCompletionTime) - now) / 1000 / 60,
+          );
+          personalWait = Math.max(0, remaining) + 5; // ✅ ADD 5 MIN BUFFER
+        } else if (serving) {
+          // If someone is serving but no completion time, assume 15 mins left + buffer
+          personalWait = 20;
+        }
 
-  // Add 35 mins for each person AHEAD of you (30 min service + 5 min buffer)
-  personalWait += myPosition * 35; // ✅ CHANGED FROM 30 TO 35
-}
-
+        // Add 35 mins for each person AHEAD of you (30 min service + 5 min buffer)
+        personalWait += myPosition * 35; // ✅ CHANGED FROM 30 TO 35
+      }
 
       return {
         _id: booking._id.toString(),
@@ -162,7 +178,7 @@ if (booking.queueStatus === "ORANGE") {
     let globalEstimatedWait = 0;
     if (serving?.expectedCompletionTime) {
       const remaining = Math.ceil(
-        (new Date(serving.expectedCompletionTime) - now) / 1000 / 60
+        (new Date(serving.expectedCompletionTime) - now) / 1000 / 60,
       );
       globalEstimatedWait = Math.max(0, remaining);
     }
@@ -183,8 +199,8 @@ if (booking.queueStatus === "ORANGE") {
                   Math.ceil(
                     (new Date(serving.expectedCompletionTime) - now) /
                       1000 /
-                      60
-                  )
+                      60,
+                  ),
                 )
               : 0,
           }
