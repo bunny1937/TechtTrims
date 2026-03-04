@@ -7,10 +7,74 @@ import {
 } from "../../../../lib/brevo_email/brevoConfig";
 import { otpEmailTemplate } from "../../../../lib/brevo_email/brevoTemplates";
 import { generateCSRFToken } from "../../../../lib/middleware/csrf";
+import { verifyGoogleIdToken } from "@/lib/auth/googleVerifier";
+import User from "@/models/User";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
+  }
+  if (req.body.method === "google") {
+    const { idToken } = req.body;
+
+    const googleUser = await verifyGoogleIdToken(idToken);
+
+    // 🚨 COLLISION PROTECTION
+    const client = await clientPromise;
+    const db = client.db("techtrims");
+    const authIdentities = db.collection("auth_identities");
+
+    const existingIdentity = await authIdentities.findOne({
+      identifier: googleUser.email,
+    });
+
+    if (existingIdentity) {
+      return res.status(409).json({
+        message: "Account already exists. Please login to link Google.",
+        code: "ACCOUNT_EXISTS",
+        canLinkGoogle: true,
+        email: googleUser.email,
+      });
+    }
+
+    // Create USER document
+
+    const users = db.collection("users");
+
+    // Create USER document
+    const userInsert = await users.insertOne({
+      email: googleUser.email,
+      name: googleUser.name,
+      avatar: googleUser.picture,
+      role: "USER",
+      isVerified: true,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const userId = userInsert.insertedId;
+
+    // Create auth_identity
+    await authIdentities.insertOne({
+      role: "USER",
+      identifier: googleUser.email,
+      provider: "google",
+      providerSubject: googleUser.providerSubject,
+      passwordHash: null,
+      linkedId: userId,
+      isActive: true,
+      isVerified: true,
+      loginAttempts: 0,
+      lockedUntil: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "User registered with Google successfully",
+    });
   }
 
   try {
@@ -128,7 +192,7 @@ export default async function handler(req, res) {
       // Update existing pending registration
       await pendingUsers.updateOne(
         { email: sanitizedEmail },
-        { $set: userData }
+        { $set: userData },
       );
       console.log("📝 Updated pending registration for:", sanitizedEmail);
     } else {
