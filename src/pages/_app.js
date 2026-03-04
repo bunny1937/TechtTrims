@@ -14,7 +14,9 @@ import "leaflet/dist/leaflet.css";
 // ✅ LAZY LOAD HEAVY COMPONENTS
 const NetworkStatus = dynamic(() => import("../components/NetworkStatus"), {
   ssr: false,
+  loading: () => null,
 });
+
 const OnboardingLogoutButton = dynamic(
   () => import("../components/OnBoardingLogout"),
   { ssr: false },
@@ -34,8 +36,10 @@ function MyApp({ Component, pageProps }) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [userGender, setUserGender] = useState(null);
-  const [selectedGender, setSelectedGender] = useState("all");
-
+  const [selectedGender, setSelectedGender] = useState(() => {
+    if (typeof window === "undefined") return "all";
+    return sessionStorage.getItem("selectedGender") || "all";
+  });
   const hasCheckedOnboarding = useRef(false);
   // Check if user needs onboarding - RUN ONCE
   useEffect(() => {
@@ -124,8 +128,9 @@ function MyApp({ Component, pageProps }) {
           } else {
             const initialGender =
               parsedData.gender === "Male" ? "Male" : "Female";
-            setSelectedGender(initialGender);
+
             sessionStorage.setItem("selectedGender", initialGender);
+            setSelectedGender(initialGender);
           }
         }
       } catch (error) {
@@ -265,7 +270,7 @@ function MyApp({ Component, pageProps }) {
         }}
       />
 
-      <NetworkStatus />
+      {mounted && <NetworkStatus />}
       {mounted && !hideHeader && (
         <header className={styles.header}>
           <div className={styles.headerContent}>

@@ -479,6 +479,28 @@ h6 {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+/* NetworkStatus.module.css */
+
+.networkMessage {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .networkMessage {
+    display: inline;
+  }
+}
+
+.networkDesktop {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .networkDesktop {
+    display: block;
+  }
+}
+
 /* Responsive Typography */
 @media (max-width: 768px) {
   .text-6xl {

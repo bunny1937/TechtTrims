@@ -81,32 +81,12 @@ export default function NetworkStatus() {
         >
           <span style={{ fontSize: "18px" }}>{config.icon}</span>
           <span>{config.title}</span>
-          <span
-            style={{
-              display: "none",
-              "@media (min-width: 640px)": { display: "inline" },
-            }}
-          >
-            — {config.message}
-          </span>
+          <span className="networkMessage">— {config.message}</span>
         </div>
       </div>
 
       {/* Desktop floating notification */}
-      <div
-        style={{
-          position: "fixed",
-          top: "16px",
-          left: "16px",
-          zIndex: 50,
-          display: "none",
-          "@media (min-width: 640px)": { display: "block" },
-          transform: showNotification
-            ? "translateX(0) opacity(1)"
-            : "translateX(-100%) opacity(0)",
-          transition: "all 0.3s",
-        }}
-      >
+      <div className="networkDesktop">
         <div
           style={{
             ...config.bgStyle,

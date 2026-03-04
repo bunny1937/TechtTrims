@@ -23,23 +23,11 @@ export default function Document() {
           type="font/otf"
           crossOrigin="anonymous"
         />
-        <link
-          rel="preload"
-          as="image"
-          href="https://ik.imagekit.io/m1qb6qo6qv/admin/general/heroimage_by5odOwuF.webp?tr=w-600,h-400,q-80,f-webp"
-          fetchpriority="high"
-        />
+
         {/* ✅ DNS prefetch */}
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://ik.imagekit.io" />
 
-        {/* ✅ CRITICAL: Async font loading - Reduced from 9 to 3 weights! */}
-        <link
-          rel="preload"
-          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@400;600;700&display=swap"
-          as="style"
-          onLoad="this.onload=null;this.rel='stylesheet'"
-        />
         <noscript>
           <link
             rel="stylesheet"
@@ -84,6 +72,11 @@ export default function Document() {
             `,
           }}
         />
+        <script
+          src="https://accounts.google.com/gsi/client"
+          async
+          defer
+        ></script>
       </Head>
       <body>
         <Main />
