@@ -45,3 +45,5 @@ backup*
 *.backup
 
 REPO_CONTEXT.txt
+changes-since-last-commit.txt
+changes.patch
