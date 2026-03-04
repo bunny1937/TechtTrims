@@ -1,9 +1,15 @@
+import { useState } from "react";
 import { Navigation } from "lucide-react";
 import styles from "../styles/LocationPermissionModal.module.css";
 import { useLocation } from "@/hooks/useLocation";
 import ManualLocationOverlay from "@/components/Maps/ManualLocationOverlay";
 
-export default function LocationPermissionModal({ show, onAllow, onDeny }) {
+export default function LocationPermissionModal({
+  show,
+  onAllow,
+  onDeny,
+  retryLocation,
+}) {
   const { setManualLocation } = useLocation();
   const [showManual, setShowManual] = useState(false);
 

@@ -173,7 +173,7 @@ export const useLocation = () => {
   }, [userLocation]);
 
   const setManualLocation = (coords) => {
-    if (!coords?.lat || !coords?.lng) return;
+    if (coords?.lat == null || coords?.lng == null) return;
 
     const normalized = {
       latitude: coords.lat,

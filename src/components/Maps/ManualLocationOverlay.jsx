@@ -16,6 +16,35 @@ const Marker = dynamic(() => import("react-leaflet").then((m) => m.Marker), {
   ssr: false,
 });
 
+function InvalidateMapSize() {
+  const map = useMap();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [map]);
+
+  return null;
+}
+
+function ClickToSetMarker({ setPosition }) {
+  useMapEvents({
+    click(e) {
+      setPosition([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+
+  return null;
+}
+function RecenterMap({ position }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(position);
+  }, [map, position]);
+  return null;
+}
 export default function ManualLocationOverlay({ onConfirm, onClose }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -27,18 +56,6 @@ export default function ManualLocationOverlay({ onConfirm, onClose }) {
     const t = setTimeout(searchLocation, 500);
     return () => clearTimeout(t);
   }, [query]);
-
-  const InvalidateMapSize = () => {
-    const map = useMap();
-
-    useEffect(() => {
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 300);
-    }, [map]);
-
-    return null;
-  };
 
   const manualMarkerIcon = new L.Icon({
     iconUrl: "/leaflet/marker-icon.png",
@@ -53,35 +70,33 @@ export default function ManualLocationOverlay({ onConfirm, onClose }) {
   // 🔍 SEARCH USING NOMINATIM (FREE)
   const searchLocation = async () => {
     if (!query.trim()) return;
-
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?` +
-        `q=${encodeURIComponent(query)}` +
-        `&format=json` +
-        `&addressdetails=1` +
-        `&limit=8`,
-      {
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "TechTrims/1.0 (contact@techtrims.com)",
-          Referer: "http://localhost:3000",
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+          `q=${encodeURIComponent(query)}` +
+          `&format=json` +
+          `&addressdetails=1` +
+          `&limit=8`,
+        {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "TechTrims/1.0 (contact@techtrims.com)",
+            Referer:
+              typeof window !== "undefined" ? window.location.origin : "",
+          },
         },
-      },
-    );
-
-    const data = await res.json();
-    setResults(data);
+      );
+      if (!res.ok) {
+        console.error("Nominatim search failed:", res.status);
+        return;
+      }
+      const data = await res.json();
+      setResults(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Location search error:", error);
+      setResults([]);
+    }
   };
-
-  function ClickToSetMarker({ setPosition }) {
-    useMapEvents({
-      click(e) {
-        setPosition([e.latlng.lat, e.latlng.lng]);
-      },
-    });
-
-    return null;
-  }
 
   return (
     <div className={styles.overlay}>
@@ -119,6 +134,8 @@ export default function ManualLocationOverlay({ onConfirm, onClose }) {
               className={styles.leafletMap}
             >
               <InvalidateMapSize />
+              <RecenterMap position={position} />
+
               <ClickToSetMarker setPosition={setPosition} />
 
               <TileLayer url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}" />
