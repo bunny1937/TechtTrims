@@ -51,16 +51,6 @@ export default async function handler(req, res) {
       .sort({ createdAt: 1 })
       .toArray();
 
-    console.log("📊 [QUEUE LOGIC]", {
-      barber: barberIdString,
-      allBookingsFound: allBookings.length,
-      statuses: allBookings.map((b) => ({
-        name: b.customerName,
-        status: b.queueStatus,
-        arrived: !!b.arrivedAt,
-      })),
-    });
-
     // ✅ SEPARATE: Currently Serving
     const serving = allBookings.filter((e) => e.queueStatus === "GREEN");
 
@@ -86,19 +76,22 @@ export default async function handler(req, res) {
         name: customer.customerName,
         timeLeft,
         startedAt: customer.serviceStartedAt,
+        estimatedDuration: customer.estimatedDuration || duration,
         isCurrentUser: customerId && customer._id.toString() === customerId,
       };
     }
 
     // ✅ PRIORITY QUEUE: Arrived customers first
-    const priorityQueue = arrived.map((customer, idx) => ({
-      id: customer._id.toString(),
-      name: customer.customerName,
-      position: idx + 1,
-      queue: "arrived", // Golden
-      isCurrentUser: customerId && customer._id.toString() === customerId,
-    }));
-
+    const priorityQueue = arrived
+      .sort((a, b) => new Date(a.arrivedAt) - new Date(b.arrivedAt))
+      .map((customer, idx) => ({
+        id: customer._id.toString(),
+        name: customer.customerName,
+        arrivedAt: customer.arrivedAt, // ← REQUIRED for sort in confirmation.js
+        position: idx + 1,
+        queue: "arrived",
+        isCurrentUser: customerId && customer._id.toString() === customerId,
+      }));
     // ✅ TEMPORARY QUEUE: Booked but not arrived
     const tempQueue = booked.map((customer, idx) => {
       const expiryTime = customer.expiresAt
@@ -122,14 +115,65 @@ export default async function handler(req, res) {
     // Combine for display
     const waitingCustomers = [...priorityQueue, ...tempQueue];
 
+    // Fetch dummy (offline) users for this salon+barber
+    let dummyUsers = [];
+    try {
+      let salonObjId;
+      try {
+        salonObjId = new ObjectId(salonId);
+      } catch {
+        salonObjId = salonId;
+      }
+      // Single barber doc fetch
+      const barberDoc = barberObjectId
+        ? await db
+            .collection("barbers")
+            .findOne({ _id: barberObjectId }, { projection: { name: 1 } })
+        : null;
+
+      dummyUsers = await db
+        .collection("dummyusers")
+        .find({
+          salonId: salonObjId,
+          status: { $nin: ["completed", "cancelled"] },
+          ...(barberDoc
+            ? {
+                $or: [
+                  { barberId: barberObjectId },
+                  { barberName: barberDoc.name },
+                ],
+              }
+            : {}),
+        })
+        .sort({ arrivedAt: 1 })
+        .toArray();
+    } catch (e) {
+      // silent — dummies are supplementary
+    }
+
     res.status(200).json({
       success: true,
       currentCustomer,
       waitingCustomers,
-      queueStats: {
+      dummyUsers: dummyUsers.map((d) => ({
+        _id: d._id.toString(),
+        name: d.name,
+        phone: d.phone,
+        service: d.service,
+        price: d.price,
+        serviceTime: d.serviceTime,
+        barberName: d.barberName,
+        bookingCode: d.bookingCode,
+        arrivedAt: d.arrivedAt,
+        status: d.status,
+        serviceStartedAt: d.serviceStartedAt || null,
+        expectedFinishTime: d.expectedFinishTime || null,
+      })),
+      barberStats: {
         serving: serving.length,
-        arrived: arrived.length, // Golden
-        booked: booked.length, // Grey
+        waiting: arrived.length,
+        temporary: booked.length,
+        offline: dummyUsers.length,
       },
       totalInQueue: arrived.length + booked.length,
       lastUpdated: new Date().toISOString(),

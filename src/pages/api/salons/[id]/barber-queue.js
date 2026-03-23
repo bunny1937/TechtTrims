@@ -184,6 +184,20 @@ export default async function handler(req, res) {
     }
     globalEstimatedWait += orangeBookings.length * 30;
 
+    // Fetch dummies for this specific barber
+    let dummyUsers = [];
+    try {
+      dummyUsers = await db
+        .collection("dummyusers")
+        .find({
+          salonId: salonObjectId,
+          status: { $nin: ["completed", "cancelled", "claimed"] },
+          $or: [{ barberId: barberObjectId }, { barberName: barber.name }],
+        })
+        .sort({ arrivedAt: 1 })
+        .toArray();
+    } catch {}
+
     res.status(200).json({
       success: true,
       chairNumber: barber.chairNumber || 1,
@@ -209,8 +223,22 @@ export default async function handler(req, res) {
       bookedCount: redBookings.length,
       waitingCount: orangeBookings.length,
       totalRedQueue: redBookings.length,
-      estimatedWait: globalEstimatedWait, // ✅ Global wait for salon display
+      estimatedWait: globalEstimatedWait,
       totalInQueue: queue.length,
+      dummyUsers: dummyUsers.map((d) => ({
+        _id: d._id.toString(),
+        name: d.name,
+        phone: d.phone,
+        service: d.service,
+        price: d.price,
+        serviceTime: d.serviceTime,
+        barberName: d.barberName,
+        bookingCode: d.bookingCode,
+        arrivedAt: d.arrivedAt,
+        status: d.status,
+        serviceStartedAt: d.serviceStartedAt || null,
+        expectedFinishTime: d.expectedFinishTime || null,
+      })),
       timestamp: now.toISOString(),
     });
   } catch (error) {
