@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     const normalizedEmail = email.toLowerCase().trim();
 
     // Verify CSRF
-    const csrfValid = await validateCSRFToken(normalizedEmail, csrfToken);
+    const csrfValid = await validateCSRFToken(csrfToken);
     if (!csrfValid) {
       console.log("❌ CSRF validation failed");
       return res.status(403).json({
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     }
 
     // OTP SUCCESS - now consume CSRF token
-    await consumeCSRFToken(normalizedEmail);
+    await consumeCSRFToken();
 
     const client = await clientPromise;
     const db = client.db("techtrims");
@@ -86,6 +86,24 @@ export default async function handler(req, res) {
       const result = await users.insertOne(newUser);
       console.log("✅ User created with ID:", result.insertedId);
 
+      const authIdentities = db.collection("auth_identities");
+
+      await authIdentities.insertOne({
+        role: "USER",
+        identifier: pendingUser.email, // email used for login
+        provider: "local", // important (not google)
+        providerSubject: null,
+        passwordHash: pendingUser.hashedPassword, // 🔥 critical
+        linkedId: result.insertedId, // link to users collection
+        isActive: true,
+        isVerified: true,
+        loginAttempts: 0,
+        lockedUntil: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastLoginAt: null,
+      });
+
       // Delete pending registration
       await pendingUsers.deleteOne({ email: normalizedEmail });
       console.log("🗑️ Deleted pending registration");
@@ -105,7 +123,7 @@ export default async function handler(req, res) {
       } catch (contactError) {
         console.log(
           "Brevo contact add error:",
-          contactError.response?.body || contactError.message
+          contactError.response?.body || contactError.message,
         );
       }
 
@@ -140,7 +158,7 @@ export default async function handler(req, res) {
             verifiedAt: new Date(),
           },
         },
-        { returnDocument: "after" }
+        { returnDocument: "after" },
       );
 
       const user = result.value || result;
@@ -162,7 +180,7 @@ export default async function handler(req, res) {
       } catch (contactError) {
         console.log(
           "Brevo contact add (may already exist):",
-          contactError.message
+          contactError.message,
         );
       }
 

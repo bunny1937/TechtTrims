@@ -223,7 +223,7 @@ export default function UserRegisterPage() {
           setStep(2);
           setRegisteredEmail(data.email);
           setCsrfToken(data.csrfToken);
-          setOtpTimer(600);
+          setOtpTimer(300);
           setCanResend(false);
 
           showSuccess("Verification email sent! Please enter OTP.");
@@ -286,7 +286,7 @@ export default function UserRegisterPage() {
 
           showSuccess("OTP sent to your email! Please verify.");
           setStep(2);
-          setOtpTimer(600);
+          setOtpTimer(300);
           setCanResend(false);
           return;
         }
@@ -318,7 +318,7 @@ export default function UserRegisterPage() {
       const payload = {
         email: registeredEmail,
         otp: otp.trim(),
-        csrfToken: csrfToken,
+        csrfToken: String(csrfToken), // force correct value
       };
 
       console.log("📤 Sending payload:", payload); // ← ADD THIS
@@ -331,7 +331,12 @@ export default function UserRegisterPage() {
 
       const data = await response.json();
       console.log("📥 Response:", data); // ← ADD THIS
-
+      console.log("🚨 FINAL PAYLOAD CHECK:", {
+        email: registeredEmail,
+        otp: otp,
+        csrfToken: csrfToken,
+        typeofCSRF: typeof csrfToken,
+      });
       if (response.ok) {
         showSuccess("Email verified successfully!");
         setTimeout(() => router.push("/auth/login"), 1500);
@@ -379,7 +384,7 @@ export default function UserRegisterPage() {
         }
 
         showSuccess(data.message || "OTP resent successfully!");
-        setOtpTimer(600);
+        setOtpTimer(300);
         setOtp("");
       } else {
         showError(data.message || "Failed to resend OTP");

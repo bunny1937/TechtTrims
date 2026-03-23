@@ -30,10 +30,10 @@ export default async function handler(req, res) {
     const clientIp = getClientIp(req);
 
     // Rate limiting by EMAIL
-    const emailRateCheck = checkRateLimit(
+    const emailRateCheck = await checkRateLimit(
       `otp-email-${normalizedEmail}`,
       3,
-      15 * 60 * 1000
+      15 * 60 * 1000,
     );
 
     if (!emailRateCheck.allowed) {
@@ -43,15 +43,15 @@ export default async function handler(req, res) {
     }
 
     // Rate limiting by IP
-    const ipRateCheck = checkRateLimit(
+    const ipRateCheck = await checkRateLimit(
       `otp-ip-${clientIp}`,
       10,
-      60 * 60 * 1000
+      60 * 60 * 1000,
     );
 
     if (!ipRateCheck.allowed) {
       return res.status(429).json({
-        message: "Too many requests from your network. Please try again later.",
+        message: `Too many OTP requests. Try again in ${Math.ceil(emailRateCheck.resetIn)} minutes.`,
       });
     }
 

@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import clientPromise from "../mongodb";
 
-const OTP_EXPIRY = 10 * 60 * 1000; // 10 minutes
+const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes
 const MAX_ATTEMPTS = 5; // Max 5 wrong attempts
 const MAX_RESENDS = 3; // Max 3 OTP resends per hour
 const LOCKOUT_TIME = 15 * 60 * 1000; // 15 min lockout after max attempts
@@ -17,12 +17,11 @@ export async function generateOTP(email) {
 
   const existing = await db.collection("otps").findOne({ email });
   const now = new Date();
-
   // Locked out?
   if (existing && existing.lockedUntil && now < existing.lockedUntil) {
     const remainingMinutes = Math.ceil((existing.lockedUntil - now) / 60000);
     throw new Error(
-      `Too many attempts. Try again in ${remainingMinutes} minutes.`
+      `Too many attempts. Try again in ${remainingMinutes} minutes.`,
     );
   }
 
@@ -60,8 +59,9 @@ export async function generateOTP(email) {
         createdAt: now,
       },
     },
-    { upsert: true }
+    { upsert: true },
   );
+  console.log("🧾 SAVING OTP:", otp, "for", email);
 
   if (process.env.NODE_ENV === "development") {
     console.log(`[OTP Generated] ${email}: ${otp} (Resend #${resendCount})`);
