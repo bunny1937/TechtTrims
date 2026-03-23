@@ -1,5 +1,5 @@
 // components/LocationCheckOverlay.js
-import React from "react";
+import LocationPermissionModal from "../LocationPermissionModal";
 import styles from "../../styles/Home.module.css";
 
 export default function LocationCheckOverlay({
@@ -11,8 +11,17 @@ export default function LocationCheckOverlay({
   setIsLoading,
   userGender,
 }) {
+  const handleLocationGranted = ({ latitude, longitude }) => {
+    setIsLoading(true);
+    loadNearbySalons(latitude, longitude, userGender);
+    setActiveOverlay(null);
+  };
   return (
     <div className={styles.locationCheckOverlay}>
+      <LocationPermissionModal
+        show={true}
+        onLocationGranted={handleLocationGranted}
+      />
       <div className={styles.locationCheckBox}>
         <h2 className={styles.locationCheckTitle}>📍 Location Required</h2>
         <p className={styles.locationCheckSubtitle}>
