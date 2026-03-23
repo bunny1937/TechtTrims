@@ -17,10 +17,7 @@ const NetworkStatus = dynamic(() => import("../components/NetworkStatus"), {
   loading: () => null,
 });
 
-const OnboardingLogoutButton = dynamic(
-  () => import("../components/OnBoardingLogout"),
-  { ssr: false },
-);
+// );
 const Toaster = dynamic(
   () => import("react-hot-toast").then((mod) => ({ default: mod.Toaster })),
   { ssr: false },
@@ -46,7 +43,6 @@ function MyApp({ Component, pageProps }) {
     // Skip check for auth, onboarding, AND admin pages
     if (
       router.pathname.startsWith("/auth") ||
-      router.pathname.startsWith("/onboarding") ||
       router.pathname.startsWith("/admin")
     ) {
       return;
@@ -82,19 +78,10 @@ function MyApp({ Component, pageProps }) {
           router.push("/auth/barber/login");
         }
       }
-    } else {
-      if (!router.pathname.startsWith("/auth")) {
-        const hasOnboarded = sessionStorage.getItem("hasOnboarded");
-        if (!hasOnboarded && router.pathname !== "/onboarding") {
-          router.replace("/onboarding");
-        }
-      }
     }
   }, [router.pathname]);
 
-  const hideHeader =
-    router.pathname.startsWith("/onboarding") ||
-    router.pathname.startsWith("/auth");
+  const hideHeader = router.pathname.startsWith("/auth");
 
   useEffect(() => {
     setMounted(true);
@@ -283,9 +270,9 @@ function MyApp({ Component, pageProps }) {
             </div>
 
             <nav className={styles.desktopNav}>
-              <div className={styles.navLinks}>
+              {/* <div className={styles.navLinks}>
                 <OnboardingLogoutButton />
-              </div>
+              </div> */}
 
               <div className={styles.headerActions}>
                 <button
@@ -515,7 +502,7 @@ function MyApp({ Component, pageProps }) {
             {isMobileMenuOpen && (
               <div className={styles.mobileNav}>
                 <div className={styles.mobileNavLinks}>
-                  <OnboardingLogoutButton />
+                  {/* <OnboardingLogoutButton /> */}
                   <div className={styles.mobileNavDivider}></div>
 
                   {(UserDataManager.isLoggedIn() ||

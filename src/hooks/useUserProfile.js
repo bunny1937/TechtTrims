@@ -45,7 +45,7 @@ export function useUserProfile() {
     // Check if user has completed onboarding
     const hasOnboarded = sessionStorage.getItem("hasOnboarded");
     if (!hasOnboarded) {
-      router.push("/onboarding");
+      router.push("/auth/login");
       return;
     }
 

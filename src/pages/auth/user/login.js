@@ -100,7 +100,10 @@ export default function UnifiedLogin() {
           sessionStorage.setItem("hasOnboarded", "true");
           await UserDataManager.fetchAndStoreUserData();
           showSuccess(`Welcome back, ${result.user.name}!`);
-          router.push("/user/dashboard");
+          const redirectTarget =
+            sessionStorage.getItem("redirectAfterLogin") || "/user/dashboard";
+          sessionStorage.removeItem("redirectAfterLogin");
+          router.push(redirectTarget);
         } else {
           const error = await response.json();
           if (response.status === 403 && error.requiresVerification) {
