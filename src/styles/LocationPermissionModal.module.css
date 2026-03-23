@@ -1,0 +1,121 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal {
+  background: var(--background-primary, #ffffff);
+  color: var(--text-primary, #111827);
+  border-radius: 20px;
+  padding: 32px 24px;
+  width: 340px;
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.icon {
+  color: var(--gold-primary, #d4af37);
+  margin-bottom: 4px;
+}
+
+.modal h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.safeMsg {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.allowButton {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(
+    135deg,
+    var(--gold-primary, #d4af37),
+    var(--gold-dark, #b8962e)
+  );
+  color: #1a1a1a;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+  margin-top: 4px;
+}
+
+.allowButton:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.manualBtn {
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  color: var(--gold-primary, #d4af37);
+  border: 2px solid var(--gold-primary, #d4af37);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.manualBtn:hover {
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.waitingBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border-color, #e5e7eb);
+  border-top: 3px solid var(--gold-primary, #d4af37);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.errorMsg {
+  font-size: 13px;
+  color: #dc2626;
+  margin: 0;
+  line-height: 1.5;
+  background: #fef2f2;
+  border-radius: 8px;
+  padding: 10px 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
