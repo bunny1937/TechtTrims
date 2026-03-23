@@ -1,23 +1,36 @@
 import React, { useState, useEffect } from "react";
 import styles from "../../styles/WalkinQueue.module.css";
+import { showWarning, showSuccess, showError } from "../../lib/toast";
 
-export default function QueueDisplay({ barberId, salonId, customerId }) {
+export default function QueueDisplay({
+  barberId,
+  salonId,
+  customerId,
+  defaultBarberName = "",
+}) {
   const [queueData, setQueueData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [dummyUsers, setDummyUsers] = useState([]);
 
-  console.log("🟢 QueueDisplay received:", { barberId, salonId, customerId });
+  // Offline form state
+  const [showOfflineForm, setShowOfflineForm] = useState(false);
+  const [offlineLoading, setOfflineLoading] = useState(false);
+  const [offlineForm, setOfflineForm] = useState({
+    name: "",
+    phone: "",
+    service: "",
+    price: "",
+    serviceTime: "",
+    barberName: defaultBarberName,
+  });
 
   const fetchQueueStatus = async () => {
     if (!barberId || !salonId) {
-      console.log("⏭️ QueueDisplay: Missing barberId or salonId");
       setLoading(false);
       return;
     }
-
     try {
-      console.log("🔵 Fetching queue for:", { barberId, salonId });
-
       const response = await fetch("/api/walkin/queue-status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -27,20 +40,15 @@ export default function QueueDisplay({ barberId, salonId, customerId }) {
           customerId: customerId?.toString?.() || customerId,
         }),
       });
-
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        console.error("❌ API Error:", response.status, err);
         throw new Error(err.error || `HTTP ${response.status}`);
       }
-
       const data = await response.json();
-      console.log("✅ Queue data received:", data);
-
       setQueueData(data);
+      setDummyUsers(data.dummyUsers || []);
       setError(null);
     } catch (err) {
-      console.error("❌ Error fetching queue:", err.message);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -48,11 +56,55 @@ export default function QueueDisplay({ barberId, salonId, customerId }) {
   };
 
   useEffect(() => {
-    console.log("🟡 QueueDisplay useEffect triggered");
     fetchQueueStatus();
     const interval = setInterval(fetchQueueStatus, 3000);
     return () => clearInterval(interval);
   }, [barberId, salonId]);
+
+  const handleAddOffline = async () => {
+    const { name, phone, service, price, serviceTime, barberName } =
+      offlineForm;
+    if (!name || !phone || !service || !price || !serviceTime || !barberName) {
+      showWarning("All fields are required");
+      return;
+    }
+    setOfflineLoading(true);
+    try {
+      const res = await fetch("/api/dummy-user/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId,
+          barberName,
+          name,
+          phone,
+          service,
+          price,
+          serviceTime,
+          createdBy: "barber",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      showSuccess(
+        `Code: ${data.dummy.bookingCode} | Share: /walkin/confirmation?bookingCode=${data.dummy.bookingCode}&isDummy=true`,
+      );
+      setOfflineForm({
+        name: "",
+        phone: "",
+        service: "",
+        price: "",
+        serviceTime: "",
+        barberName: defaultBarberName,
+      });
+      setShowOfflineForm(false);
+      fetchQueueStatus(); // ✅ FIXED: was fetchDummyUsers() which doesn't exist
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      setOfflineLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -61,7 +113,6 @@ export default function QueueDisplay({ barberId, salonId, customerId }) {
       </div>
     );
   }
-
   if (error) {
     return (
       <div style={{ textAlign: "center", padding: "20px", color: "#dc2626" }}>
@@ -69,7 +120,6 @@ export default function QueueDisplay({ barberId, salonId, customerId }) {
       </div>
     );
   }
-
   if (!queueData) {
     return (
       <div style={{ textAlign: "center", padding: "20px", color: "#9ca3af" }}>
@@ -87,6 +137,148 @@ export default function QueueDisplay({ barberId, salonId, customerId }) {
 
   return (
     <div style={{ background: "white", padding: "20px", borderRadius: "12px" }}>
+      {/* Header with Add Offline button */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "16px",
+        }}
+      >
+        <div style={{ fontWeight: "700", fontSize: "16px", color: "#111827" }}>
+          Live Queue
+        </div>
+        <button
+          onClick={() => setShowOfflineForm(true)}
+          style={{
+            background: "#f97316",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            padding: "8px 14px",
+            fontWeight: "600",
+            fontSize: "13px",
+            cursor: "pointer",
+          }}
+        >
+          + Add Offline Customer
+        </button>
+      </div>
+
+      {/* Offline Customer Form Modal */}
+      {showOfflineForm && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              padding: "24px",
+              width: "340px",
+              maxWidth: "92vw",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+            }}
+          >
+            <h3
+              style={{ margin: "0 0 6px", fontWeight: "700", fontSize: "18px" }}
+            >
+              Add Offline Customer
+            </h3>
+            <p
+              style={{
+                fontSize: "13px",
+                color: "#f97316",
+                marginBottom: "16px",
+                fontWeight: "500",
+              }}
+            >
+              💡 Ask them to register on TechTrims for easy online booking next
+              time!
+            </p>
+            {[
+              { key: "name", placeholder: "Customer Name", type: "text" },
+              { key: "phone", placeholder: "Phone Number", type: "tel" },
+              {
+                key: "service",
+                placeholder: "Service (e.g. Haircut)",
+                type: "text",
+              },
+              { key: "price", placeholder: "Price (₹)", type: "number" },
+              {
+                key: "serviceTime",
+                placeholder: "Service Time (minutes)",
+                type: "number",
+              },
+              { key: "barberName", placeholder: "Barber Name", type: "text" },
+            ].map(({ key, placeholder, type }) => (
+              <input
+                key={key}
+                type={type}
+                placeholder={placeholder}
+                value={offlineForm[key]}
+                onChange={(e) =>
+                  setOfflineForm((p) => ({ ...p, [key]: e.target.value }))
+                }
+                style={{
+                  display: "block",
+                  width: "100%",
+                  marginBottom: "10px",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                  boxSizing: "border-box",
+                }}
+              />
+            ))}
+            <button
+              onClick={handleAddOffline}
+              disabled={offlineLoading}
+              style={{
+                width: "100%",
+                padding: "12px",
+                background: "#f97316",
+                color: "#fff",
+                border: "none",
+                borderRadius: "10px",
+                fontWeight: "700",
+                fontSize: "15px",
+                cursor: "pointer",
+                marginBottom: "8px",
+                opacity: offlineLoading ? 0.7 : 1,
+              }}
+            >
+              {offlineLoading ? "Adding..." : "Add to Queue"}
+            </button>
+            <button
+              onClick={() => setShowOfflineForm(false)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                background: "#f3f4f6",
+                border: "none",
+                borderRadius: "10px",
+                fontWeight: "600",
+                fontSize: "14px",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
       <div
         style={{
@@ -120,6 +312,16 @@ export default function QueueDisplay({ barberId, salonId, customerId }) {
           </div>
           <div style={{ fontSize: "12px", color: "#6b7280" }}>Booked</div>
         </div>
+        {dummyUsers.length > 0 && (
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{ fontSize: "24px", fontWeight: "700", color: "#f97316" }}
+            >
+              🟤 {dummyUsers.length}
+            </div>
+            <div style={{ fontSize: "12px", color: "#6b7280" }}>Offline</div>
+          </div>
+        )}
       </div>
 
       {/* Current Customer */}
@@ -143,7 +345,7 @@ export default function QueueDisplay({ barberId, salonId, customerId }) {
       )}
 
       {/* Waiting */}
-      {waitingCustomers && waitingCustomers.length > 0 && (
+      {waitingCustomers.length > 0 && (
         <div style={{ marginBottom: "12px" }}>
           <div
             style={{ fontWeight: "700", marginBottom: "8px", color: "#374151" }}
@@ -168,8 +370,126 @@ export default function QueueDisplay({ barberId, salonId, customerId }) {
         </div>
       )}
 
-      {/* Booked */}
-      {temporaryBookings && temporaryBookings.length > 0 && (
+      {/* Offline (Dummy) Customers — orange badge */}
+      {dummyUsers.length > 0 && (
+        <div style={{ marginBottom: "12px" }}>
+          <div
+            style={{ fontWeight: "700", marginBottom: "8px", color: "#374151" }}
+          >
+            🟤 Offline Customers ({dummyUsers.length})
+          </div>
+          {dummyUsers.map((d) => (
+            <div
+              key={d._id}
+              style={{
+                background: "#fff3e0",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                marginBottom: "8px",
+                border: "2px solid #f97316",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "4px",
+                }}
+              >
+                <span
+                  style={{
+                    fontWeight: "700",
+                    color: "#92400e",
+                    fontSize: "14px",
+                  }}
+                >
+                  {d.name}
+                </span>
+                <span
+                  style={{
+                    background: "#f97316",
+                    color: "#fff",
+                    borderRadius: "6px",
+                    fontSize: "11px",
+                    fontWeight: "700",
+                    padding: "2px 8px",
+                  }}
+                >
+                  OFFLINE
+                </span>
+              </div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#78350f",
+                  lineHeight: "1.6",
+                }}
+              >
+                📞 {d.phone} &nbsp;|&nbsp; ✂️ {d.service} — ₹{d.price}
+              </div>
+              <div style={{ fontSize: "12px", color: "#78350f" }}>
+                ⏱ {d.serviceTime} min &nbsp;|&nbsp; 👤 {d.barberName}
+              </div>
+              <div
+                style={{ fontSize: "11px", color: "#a16207", marginTop: "2px" }}
+              >
+                Arrived:{" "}
+                {new Date(d.arrivedAt).toLocaleTimeString("en-IN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                })}
+              </div>
+              <div
+                style={{ fontSize: "11px", color: "#a16207", marginTop: "2px" }}
+              >
+                Status:{" "}
+                <span
+                  style={{
+                    fontWeight: "700",
+                    color:
+                      d.status === "in-service"
+                        ? "#10b981"
+                        : d.status === "completed"
+                          ? "#6b7280"
+                          : "#f97316",
+                  }}
+                >
+                  {d.status === "in-service"
+                    ? "🟢 In Service"
+                    : d.status === "completed"
+                      ? "✔ Done"
+                      : "🟠 Waiting"}
+                </span>
+              </div>
+              {d.serviceStartedAt && (
+                <div style={{ fontSize: "11px", color: "#a16207" }}>
+                  Started:{" "}
+                  {new Date(d.serviceStartedAt).toLocaleTimeString("en-IN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                  })}
+                </div>
+              )}
+              {d.expectedFinishTime && (
+                <div style={{ fontSize: "11px", color: "#a16207" }}>
+                  Est. Finish:{" "}
+                  {new Date(d.expectedFinishTime).toLocaleTimeString("en-IN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Booked (Temporary) */}
+      {temporaryBookings.length > 0 && (
         <div>
           <div
             style={{ fontWeight: "700", marginBottom: "8px", color: "#374151" }}

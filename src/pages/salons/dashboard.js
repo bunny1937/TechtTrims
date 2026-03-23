@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import OwnerSidebar from "../../components/OwnerSidebar";
 import styles from "../../styles/SalonDashboard.module.css";
 import { showError, showSuccess, showWarning } from "@/lib/toast";
+import QueueDisplay from "@/components/Walkin/QueueDisplay";
 
 // Time Remaining Component
 function TimeRemaining({ endTime }) {
@@ -56,6 +57,7 @@ export default function DashboardPage() {
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [timeEstimate, setTimeEstimate] = useState(30);
   const [bookingToStart, setBookingToStart] = useState(null);
+  const [dummyToStart, setDummyToStart] = useState(null);
   const [scanResult, setScanResult] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState(null);
@@ -92,11 +94,118 @@ export default function DashboardPage() {
   const [assigningBarber, setAssigningBarber] = useState(null);
   const [closingCountdown, setClosingCountdown] = useState(null);
   const [showClosingAlert, setShowClosingAlert] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+
+  // Offline customer form
+  const [showOfflineForm, setShowOfflineForm] = useState(false);
+  const [offlineLoading, setOfflineLoading] = useState(false);
+  const [offlineForm, setOfflineForm] = useState({
+    name: "",
+    phone: "",
+    service: "",
+    price: "",
+    serviceTime: "",
+    barberName: "",
+  });
+
+  const [dummyCustomers, setDummyCustomers] = useState([]);
+
+  const loadDummyCustomers = async (salonId) => {
+    try {
+      const res = await fetch(`/api/dummy-user/active?salonId=${salonId}`);
+      const data = await res.json();
+      setDummyCustomers(data.dummies || []);
+    } catch (e) {
+      console.error("loadDummyCustomers error:", e);
+    }
+  };
+
+  const handleDummyAddTime = async (dummyId, additionalMinutes) => {
+    const key = `dummy-extend-${dummyId}-${additionalMinutes}`;
+    setActionLoading((prev) => ({ ...prev, [key]: true }));
+    try {
+      const res = await fetch("/api/dummy-user/start-service", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dummyId,
+          serviceTime:
+            (dummyCustomers.find((d) => d._id === dummyId)?.serviceTime || 30) +
+            additionalMinutes,
+          addTime: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      showSuccess(`Added ${additionalMinutes} minutes!`);
+      loadDummyCustomers(salon?._id || salon?.id);
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      setActionLoading((prev) => {
+        const copy = { ...prev };
+        delete copy[key];
+        return copy;
+      });
+    }
+  };
+
+  const handleAddOffline = async () => {
+    const { name, phone, service, price, serviceTime, barberName } =
+      offlineForm;
+    if (!name || !phone || !service || !price || !serviceTime || !barberName) {
+      showWarning("All fields are required");
+      return;
+    }
+    setOfflineLoading(true);
+    try {
+      const res = await fetch("/api/dummy-user/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          salonId: salon?.id || salon?._id,
+          barberName,
+          name,
+          phone,
+          service,
+          price,
+          serviceTime,
+          createdBy: "salon",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      showSuccess(`Offline customer added! Code: ${data.dummy.bookingCode}`);
+      // Show the confirmation URL for the customer:
+      showSuccess(
+        `Share with customer: /walkin/confirmation?bookingCode=${data.dummy.bookingCode}&isDummy=true`,
+      );
+      setOfflineForm({
+        name: "",
+        phone: "",
+        service: "",
+        price: "",
+        serviceTime: "",
+        barberName: "",
+      });
+      setShowOfflineForm(false);
+      loadDummyCustomers(salon?._id || salon?.id);
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      setOfflineLoading(false);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
+  useEffect(() => {
+    const salonId = salon?._id || salon?.id;
+    if (!salonId) return;
+    const interval = setInterval(() => loadDummyCustomers(salonId), 5000);
+    return () => clearInterval(interval);
+  }, [salon?._id, salon?.id]);
   // Service time notification system
   useEffect(() => {
     const activeBookings = bookings.filter(
@@ -429,6 +538,7 @@ export default function DashboardPage() {
     setSalon(salonData);
     loadBookings(salonData._id, selectedDate);
     loadBarbers(salonData._id);
+    loadDummyCustomers(salonData._id);
   }, [router, router.isReady, loadBookings, selectedDate, loadBarbers]);
 
   // ✅ Only this check can come after all hooks
@@ -830,6 +940,155 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.dashboardWrapper}>
+      {/* Offline Customer Modal */}
+      {showOfflineForm && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              padding: "24px",
+              width: "360px",
+              maxWidth: "92vw",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+            }}
+          >
+            <h3
+              style={{ margin: "0 0 6px", fontWeight: "700", fontSize: "18px" }}
+            >
+              Add Offline Customer
+            </h3>
+            <p
+              style={{
+                fontSize: "13px",
+                color: "#f97316",
+                marginBottom: "16px",
+                fontWeight: "500",
+              }}
+            >
+              💡 Encourage them to register on TechTrims for easy online
+              booking!
+            </p>
+
+            {/* Barber selector — unique to salon dashboard */}
+            <select
+              value={offlineForm.barberName}
+              onChange={(e) =>
+                setOfflineForm((p) => ({ ...p, barberName: e.target.value }))
+              }
+              style={{
+                display: "block",
+                width: "100%",
+                marginBottom: "10px",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            >
+              <option value="">Select Barber</option>
+              {barbers.map((b) => (
+                <option key={b._id} value={b.name}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+
+            {[
+              { key: "name", placeholder: "Customer Name", type: "text" },
+              { key: "phone", placeholder: "Phone Number", type: "tel" },
+              {
+                key: "service",
+                placeholder: "Service (e.g. Haircut)",
+                type: "text",
+              },
+              { key: "price", placeholder: "Price (₹)", type: "number" },
+              {
+                key: "serviceTime",
+                placeholder: "Service Time (minutes)",
+                type: "number",
+              },
+            ].map(({ key, placeholder, type }) => (
+              <input
+                key={key}
+                type={type}
+                placeholder={placeholder}
+                value={offlineForm[key]}
+                onChange={(e) =>
+                  setOfflineForm((p) => ({ ...p, [key]: e.target.value }))
+                }
+                style={{
+                  display: "block",
+                  width: "100%",
+                  marginBottom: "10px",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                  boxSizing: "border-box",
+                }}
+              />
+            ))}
+
+            <button
+              onClick={handleAddOffline}
+              disabled={offlineLoading}
+              style={{
+                width: "100%",
+                padding: "12px",
+                background: "#f97316",
+                color: "#fff",
+                border: "none",
+                borderRadius: "10px",
+                fontWeight: "700",
+                fontSize: "15px",
+                cursor: "pointer",
+                marginBottom: "8px",
+                opacity: offlineLoading ? 0.7 : 1,
+              }}
+            >
+              {offlineLoading ? "Adding..." : "Add to Queue"}
+            </button>
+            <button
+              onClick={() => {
+                setShowOfflineForm(false);
+                setOfflineForm({
+                  name: "",
+                  phone: "",
+                  service: "",
+                  price: "",
+                  serviceTime: "",
+                  barberName: "",
+                });
+              }}
+              style={{
+                width: "100%",
+                padding: "10px",
+                background: "#f3f4f6",
+                border: "none",
+                borderRadius: "10px",
+                fontWeight: "600",
+                fontSize: "14px",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Closing Alert Banner */}
       {showClosingAlert && closingCountdown > 0 && (
         <div
@@ -1022,6 +1281,22 @@ export default function DashboardPage() {
                 >
                   🕐 Set Closing Time
                 </button>
+
+                <button
+                  onClick={() => setShowOfflineForm(true)}
+                  style={{
+                    background: "#f97316",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "10px",
+                    padding: "12px 20px",
+                    fontWeight: "700",
+                    fontSize: "14px",
+                    cursor: "pointer",
+                  }}
+                >
+                  + Add Offline Customer
+                </button>
               </div>
             </div>
             <button
@@ -1098,6 +1373,339 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Live Queue + Offline Customers — mirrors barber dashboard */}
+          <div style={{ marginBottom: "24px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "12px",
+              }}
+            >
+              <h3
+                style={{
+                  fontWeight: "700",
+                  fontSize: "16px",
+                  color: "#374151",
+                  margin: 0,
+                }}
+              >
+                📋 Live Queue
+              </h3>
+            </div>
+
+            {/* Stats row */}
+            <div
+              style={{
+                display: "flex",
+                gap: "16px",
+                marginBottom: "16px",
+                flexWrap: "wrap",
+              }}
+            >
+              {[
+                {
+                  label: "Serving",
+                  value: bookings.filter((b) => b.queueStatus === "GREEN")
+                    .length,
+                  color: "#10b981",
+                },
+                {
+                  label: "Waiting",
+                  value: bookings.filter((b) => b.queueStatus === "ORANGE")
+                    .length,
+                  color: "#f59e0b",
+                },
+                {
+                  label: "Booked",
+                  value: bookings.filter((b) => b.queueStatus === "RED").length,
+                  color: "#6b7280",
+                },
+                {
+                  label: "Offline",
+                  value: dummyCustomers.length,
+                  color: "#92400e",
+                },
+              ].map(({ label, value, color }) => (
+                <div
+                  key={label}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "#fff",
+                    borderRadius: "10px",
+                    padding: "10px 16px",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                    minWidth: "100px",
+                  }}
+                >
+                  <span style={{ fontSize: "22px", fontWeight: "800", color }}>
+                    {value}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Offline Customers cards — same as barber dashboard */}
+            {dummyCustomers.length > 0 && (
+              <div>
+                <h4
+                  style={{
+                    fontWeight: "700",
+                    fontSize: "14px",
+                    color: "#92400e",
+                    marginBottom: "10px",
+                  }}
+                >
+                  🟤 Offline Customers ({dummyCustomers.length})
+                </h4>
+                {dummyCustomers.map((d) => (
+                  <div
+                    key={d._id}
+                    style={{
+                      background: "#fff3e0",
+                      border: "2px solid #f97316",
+                      borderRadius: "10px",
+                      padding: "14px 16px",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontWeight: "700",
+                          color: "#92400e",
+                          fontSize: "15px",
+                        }}
+                      >
+                        {d.name}
+                      </span>
+                      <span
+                        style={{
+                          background:
+                            d.status === "in-service" ? "#10b981" : "#f97316",
+                          color: "#fff",
+                          borderRadius: "6px",
+                          fontSize: "11px",
+                          fontWeight: "700",
+                          padding: "2px 9px",
+                        }}
+                      >
+                        {d.status === "in-service" ? "IN SERVICE" : "OFFLINE"}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        color: "#78350f",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      📞 {d.phone} &nbsp;|&nbsp; ✂️ {d.service} — ₹{d.price}{" "}
+                      &nbsp;|&nbsp; ⏱ {d.serviceTime} min &nbsp;|&nbsp; 👤{" "}
+                      {d.barberName}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "#a16207",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Code: <strong>{d.bookingCode}</strong> &nbsp;|&nbsp;
+                      Arrived:{" "}
+                      {new Date(d.arrivedAt).toLocaleTimeString("en-IN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}
+                    </div>
+                    {d.status === "in-service" && d.serviceStartedAt && (
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: "700",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        {(() => {
+                          const elapsed = Math.floor(
+                            (new Date() - new Date(d.serviceStartedAt)) / 60000,
+                          );
+                          const total = d.serviceTime || 30;
+                          const isOvertime = elapsed > total;
+                          return (
+                            <span
+                              style={{
+                                color: isOvertime ? "#ef4444" : "#10b981",
+                              }}
+                            >
+                              ⏱️ {elapsed}m / {total}m{" "}
+                              {isOvertime
+                                ? "⚠️ Overtime"
+                                : `— ${total - elapsed}m left`}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    {/* Actions */}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "8px",
+                        flexWrap: "wrap",
+                        marginTop: "8px",
+                      }}
+                    >
+                      {(d.status === "active" || d.status === "claimed") &&
+                        (() => {
+                          const STARTABLE = ["active", "claimed"];
+                          const anyInService = dummyCustomers.some(
+                            (x) => x.status === "in-service",
+                          );
+                          const firstWaiting = [...dummyCustomers]
+                            .filter((x) => STARTABLE.includes(x.status))
+                            .sort(
+                              (a, b) =>
+                                new Date(a.arrivedAt) - new Date(b.arrivedAt),
+                            )[0];
+                          const canStart =
+                            !anyInService && firstWaiting?._id === d._id;
+                          return (
+                            <button
+                              onClick={() => {
+                                if (!canStart) {
+                                  showWarning(
+                                    anyInService
+                                      ? "Finish current service first"
+                                      : "Wait for your turn",
+                                  );
+                                  return;
+                                }
+                                setDummyToStart(d);
+                                setTimeEstimate(Number(d.serviceTime) || 30);
+                                setShowTimeModal(true);
+                              }}
+                              style={{
+                                padding: "8px 14px",
+                                background: canStart ? "#3b82f6" : "#9ca3af",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: "8px",
+                                fontWeight: "700",
+                                fontSize: "13px",
+                                cursor: canStart ? "pointer" : "not-allowed",
+                                opacity: canStart ? 1 : 0.6,
+                              }}
+                            >
+                              {canStart ? "▶ Start Service" : "⏳ Wait"}
+                            </button>
+                          );
+                        })()}
+                      {d.status === "in-service" && (
+                        <>
+                          <button
+                            onClick={() => handleDummyAddTime(d._id, 5)}
+                            disabled={
+                              !!actionLoading[`dummy-extend-${d._id}-5`]
+                            }
+                            style={{
+                              padding: "8px 12px",
+                              background: "#f59e0b",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: "8px",
+                              fontWeight: "700",
+                              fontSize: "13px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {actionLoading[`dummy-extend-${d._id}-5`]
+                              ? "..."
+                              : "+5min"}
+                          </button>
+                          <button
+                            onClick={() => handleDummyAddTime(d._id, 10)}
+                            disabled={
+                              !!actionLoading[`dummy-extend-${d._id}-10`]
+                            }
+                            style={{
+                              padding: "8px 12px",
+                              background: "#f59e0b",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: "8px",
+                              fontWeight: "700",
+                              fontSize: "13px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {actionLoading[`dummy-extend-${d._id}-10`]
+                              ? "..."
+                              : "+10min"}
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(
+                                  "/api/dummy-user/complete-service",
+                                  {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({ dummyId: d._id }),
+                                  },
+                                );
+                                const data = await res.json();
+                                if (!res.ok) throw new Error(data.message);
+                                showSuccess(`${d.name}'s service completed!`);
+                                loadDummyCustomers(salon?._id || salon?.id);
+                              } catch (e) {
+                                showError(e.message);
+                              }
+                            }}
+                            style={{
+                              padding: "8px 14px",
+                              background: "#10b981",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: "8px",
+                              fontWeight: "700",
+                              fontSize: "13px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✅ Complete Service
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -1552,6 +2160,321 @@ export default function DashboardPage() {
                             </span>
                           )}
                         </summary>
+                        <QueueDisplay
+                          barberId={barber._id}
+                          salonId={salon?.id || salon?._id}
+                          customerId={null}
+                          defaultBarberName={barber.name}
+                        />
+
+                        {/* Offline Walk-in Customers for this barber */}
+                        {dummyCustomers.filter(
+                          (d) => d.barberName === barber.name,
+                        ).length > 0 && (
+                          <div style={{ marginTop: "16px" }}>
+                            <h4
+                              style={{
+                                fontWeight: "700",
+                                fontSize: "14px",
+                                color: "#92400e",
+                                marginBottom: "10px",
+                              }}
+                            >
+                              🟤 Offline Walk-in Customers (
+                              {
+                                dummyCustomers.filter(
+                                  (d) => d.barberName === barber.name,
+                                ).length
+                              }
+                              )
+                            </h4>
+                            {dummyCustomers
+                              .filter((d) => d.barberName === barber.name)
+                              .map((d) => (
+                                <div
+                                  key={d._id}
+                                  style={{
+                                    background: "#fff3e0",
+                                    border: "2px solid #f97316",
+                                    borderRadius: "10px",
+                                    padding: "14px 16px",
+                                    marginBottom: "12px",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      marginBottom: "6px",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontWeight: "700",
+                                        color: "#92400e",
+                                        fontSize: "15px",
+                                      }}
+                                    >
+                                      {d.name}
+                                    </span>
+                                    <span
+                                      style={{
+                                        background:
+                                          d.status === "in-service"
+                                            ? "#10b981"
+                                            : "#f97316",
+                                        color: "#fff",
+                                        borderRadius: "6px",
+                                        fontSize: "11px",
+                                        fontWeight: "700",
+                                        padding: "2px 9px",
+                                      }}
+                                    >
+                                      {d.status === "in-service"
+                                        ? "IN SERVICE"
+                                        : "OFFLINE"}
+                                    </span>
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "13px",
+                                      color: "#78350f",
+                                      marginBottom: "4px",
+                                    }}
+                                  >
+                                    📞 {d.phone} &nbsp;|&nbsp; ✂️ {d.service} —
+                                    ₹{d.price} &nbsp;|&nbsp; ⏱ {d.serviceTime}{" "}
+                                    min
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "#a16207",
+                                      marginBottom: "10px",
+                                    }}
+                                  >
+                                    Code: <strong>{d.bookingCode}</strong>{" "}
+                                    &nbsp;|&nbsp; Arrived:{" "}
+                                    {new Date(d.arrivedAt).toLocaleTimeString(
+                                      "en-IN",
+                                      {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        hour12: true,
+                                      },
+                                    )}
+                                  </div>
+                                  {d.status === "in-service" &&
+                                    d.serviceStartedAt && (
+                                      <div
+                                        style={{
+                                          fontSize: "13px",
+                                          fontWeight: "700",
+                                          color: "#10b981",
+                                          marginBottom: "8px",
+                                        }}
+                                      >
+                                        {(() => {
+                                          const elapsed = Math.floor(
+                                            (new Date() -
+                                              new Date(d.serviceStartedAt)) /
+                                              60000,
+                                          );
+                                          const total = d.serviceTime || 30;
+                                          const isOvertime = elapsed > total;
+                                          return (
+                                            <span
+                                              style={{
+                                                color: isOvertime
+                                                  ? "#ef4444"
+                                                  : "#10b981",
+                                              }}
+                                            >
+                                              ⏱️ {elapsed}m / {total}m{" "}
+                                              {isOvertime
+                                                ? "⚠️ Overtime"
+                                                : `— ${total - elapsed}m left`}
+                                            </span>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: "8px",
+                                      flexWrap: "wrap",
+                                      marginTop: "8px",
+                                    }}
+                                  >
+                                    {/* Start Service with restrictions */}
+                                    {(d.status === "active" ||
+                                      d.status === "claimed") &&
+                                      (() => {
+                                        const STARTABLE = ["active", "claimed"];
+                                        const anyInService =
+                                          dummyCustomers.some(
+                                            (x) => x.status === "in-service",
+                                          );
+                                        const firstWaiting = [...dummyCustomers]
+                                          .filter(
+                                            (x) =>
+                                              STARTABLE.includes(x.status) &&
+                                              x.barberName === barber.name,
+                                          )
+                                          .sort(
+                                            (a, b) =>
+                                              new Date(a.arrivedAt) -
+                                              new Date(b.arrivedAt),
+                                          )[0];
+                                        const canStart =
+                                          !anyInService &&
+                                          firstWaiting?._id === d._id;
+                                        return (
+                                          <button
+                                            onClick={() => {
+                                              if (!canStart) {
+                                                showWarning(
+                                                  anyInService
+                                                    ? "Finish current service first"
+                                                    : "Wait for your turn",
+                                                );
+                                                return;
+                                              }
+                                              setDummyToStart(d);
+                                              setTimeEstimate(
+                                                Number(d.serviceTime) || 30,
+                                              );
+                                              setShowTimeModal(true);
+                                            }}
+                                            style={{
+                                              padding: "8px 14px",
+                                              background: canStart
+                                                ? "#3b82f6"
+                                                : "#9ca3af",
+                                              color: "#fff",
+                                              border: "none",
+                                              borderRadius: "8px",
+                                              fontWeight: "700",
+                                              fontSize: "13px",
+                                              cursor: canStart
+                                                ? "pointer"
+                                                : "not-allowed",
+                                              opacity: canStart ? 1 : 0.6,
+                                            }}
+                                          >
+                                            {canStart
+                                              ? "▶ Start Service"
+                                              : "⏳ Wait"}
+                                          </button>
+                                        );
+                                      })()}
+
+                                    {/* +5 / +10 / Complete — only when in-service */}
+                                    {d.status === "in-service" && (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            handleDummyAddTime(d._id, 5)
+                                          }
+                                          disabled={
+                                            !!actionLoading[
+                                              `dummy-extend-${d._id}-5`
+                                            ]
+                                          }
+                                          style={{
+                                            padding: "8px 12px",
+                                            background: "#f59e0b",
+                                            color: "#fff",
+                                            border: "none",
+                                            borderRadius: "8px",
+                                            fontWeight: "700",
+                                            fontSize: "13px",
+                                            cursor: "pointer",
+                                          }}
+                                        >
+                                          {actionLoading[
+                                            `dummy-extend-${d._id}-5`
+                                          ]
+                                            ? "..."
+                                            : "+5min"}
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            handleDummyAddTime(d._id, 10)
+                                          }
+                                          disabled={
+                                            !!actionLoading[
+                                              `dummy-extend-${d._id}-10`
+                                            ]
+                                          }
+                                          style={{
+                                            padding: "8px 12px",
+                                            background: "#f59e0b",
+                                            color: "#fff",
+                                            border: "none",
+                                            borderRadius: "8px",
+                                            fontWeight: "700",
+                                            fontSize: "13px",
+                                            cursor: "pointer",
+                                          }}
+                                        >
+                                          {actionLoading[
+                                            `dummy-extend-${d._id}-10`
+                                          ]
+                                            ? "..."
+                                            : "+10min"}
+                                        </button>
+                                        <button
+                                          onClick={async () => {
+                                            try {
+                                              const res = await fetch(
+                                                "/api/dummy-user/complete-service",
+                                                {
+                                                  method: "POST",
+                                                  headers: {
+                                                    "Content-Type":
+                                                      "application/json",
+                                                  },
+                                                  body: JSON.stringify({
+                                                    dummyId: d._id,
+                                                  }),
+                                                },
+                                              );
+                                              const data = await res.json();
+                                              if (!res.ok)
+                                                throw new Error(data.message);
+                                              showSuccess(
+                                                `${d.name}'s service completed!`,
+                                              );
+                                              loadDummyCustomers(
+                                                salon?._id || salon?.id,
+                                              );
+                                            } catch (e) {
+                                              showError(e.message);
+                                            }
+                                          }}
+                                          style={{
+                                            padding: "8px 14px",
+                                            background: "#10b981",
+                                            color: "#fff",
+                                            border: "none",
+                                            borderRadius: "8px",
+                                            fontWeight: "700",
+                                            fontSize: "13px",
+                                            cursor: "pointer",
+                                          }}
+                                        >
+                                          ✅ Complete Service
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        )}
 
                         {/* NEW: Booking Assignment Section */}
                         <div className={styles.assignBookingSection}>
@@ -2451,79 +3374,166 @@ export default function DashboardPage() {
         </div>
       )}
       {/* Time Estimate Modal */}
-      {showTimeModal && (
-        <div className={styles.scannerModal}>
+      {showTimeModal && (bookingToStart || dummyToStart) && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
           <div
-            className={styles.scannerContent}
-            style={{ position: "relative" }}
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              padding: "28px 24px",
+              width: "340px",
+              maxWidth: "92vw",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+              position: "relative",
+            }}
           >
-            {/* Loading overlay */}
-            {actionLoading[`modal-start-${bookingToStart?._id}`] && (
-              <div className={styles.modalLoadingOverlay}>
-                <div className={styles.spinner} />
-                <p>Starting service...</p>
-              </div>
-            )}
-
             <button
               onClick={() => {
                 setShowTimeModal(false);
                 setBookingToStart(null);
+                setDummyToStart(null);
                 setTimeEstimate(30);
               }}
-              className={styles.closeModal}
-              disabled={!!actionLoading[`modal-start-${bookingToStart?._id}`]}
+              style={{
+                position: "absolute",
+                top: "12px",
+                right: "16px",
+                background: "none",
+                border: "none",
+                fontSize: "18px",
+                cursor: "pointer",
+                color: "#6b7280",
+              }}
             >
               ✕
             </button>
 
-            <h2>⏱️ Estimate Service Time</h2>
-            <p className={styles.modalSubtext}>
-              For: <strong>{bookingToStart?.customerName}</strong>
+            <h2
+              style={{ margin: "0 0 4px", fontSize: "18px", fontWeight: "700" }}
+            >
+              Estimate Service Time
+            </h2>
+            <p
+              style={{ margin: "0 0 20px", fontSize: "14px", color: "#6b7280" }}
+            >
+              For{" "}
+              <strong style={{ color: "#111" }}>
+                {dummyToStart
+                  ? dummyToStart.name
+                  : bookingToStart?.customerName}
+              </strong>
             </p>
 
-            <div className={styles.timeInput}>
-              <label>How long will this service take?</label>
-              <div className={styles.timeButtons}>
-                {[15, 20, 30, 45, 60].map((mins) => (
-                  <button
-                    key={mins}
-                    onClick={() => setTimeEstimate(mins)}
-                    className={`${styles.timeOption} ${
-                      timeEstimate === mins ? styles.selected : ""
-                    }`}
-                    disabled={
-                      !!actionLoading[`modal-start-${bookingToStart?._id}`]
-                    }
-                  >
-                    {mins} mins
-                  </button>
-                ))}
-              </div>
-
-              <div className={styles.customTime}>
-                <input
-                  type="number"
-                  value={timeEstimate}
-                  onChange={(e) =>
-                    setTimeEstimate(parseInt(e.target.value) || 30)
-                  }
-                  min="5"
-                  max="120"
-                  className={styles.timeNumberInput}
-                  disabled={
-                    !!actionLoading[`modal-start-${bookingToStart?._id}`]
-                  }
-                />
-                <span>minutes</span>
-              </div>
+            <label
+              style={{
+                fontSize: "13px",
+                fontWeight: "600",
+                color: "#374151",
+                display: "block",
+                marginBottom: "10px",
+              }}
+            >
+              How long will this service take?
+            </label>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                flexWrap: "wrap",
+                marginBottom: "14px",
+              }}
+            >
+              {[15, 20, 30, 45, 60].map((mins) => (
+                <button
+                  key={mins}
+                  onClick={() => setTimeEstimate(mins)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border:
+                      timeEstimate === mins
+                        ? "2px solid #f97316"
+                        : "2px solid #e5e7eb",
+                    background: timeEstimate === mins ? "#fff7ed" : "#f9fafb",
+                    color: timeEstimate === mins ? "#f97316" : "#374151",
+                    fontWeight: timeEstimate === mins ? "700" : "500",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {mins} mins
+                </button>
+              ))}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                marginBottom: "20px",
+              }}
+            >
+              <input
+                type="number"
+                value={timeEstimate}
+                onChange={(e) =>
+                  setTimeEstimate(
+                    Math.min(120, Math.max(5, parseInt(e.target.value) || 30)),
+                  )
+                }
+                min="5"
+                max="120"
+                style={{
+                  width: "80px",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  border: "2px solid #e5e7eb",
+                  fontSize: "16px",
+                  fontWeight: "700",
+                  textAlign: "center",
+                }}
+              />
+              <span style={{ fontSize: "14px", color: "#6b7280" }}>
+                minutes
+              </span>
             </div>
 
             <button
               onClick={async () => {
+                if (dummyToStart) {
+                  try {
+                    const res = await fetch("/api/dummy-user/start-service", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        dummyId: dummyToStart._id,
+                        serviceTime: timeEstimate,
+                      }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.message);
+                    showSuccess(`Service started for ${dummyToStart.name}!`);
+                    setShowTimeModal(false);
+                    setDummyToStart(null);
+                    setTimeEstimate(30);
+                    loadDummyCustomers(salon?._id || salon?.id);
+                  } catch (e) {
+                    showError(e.message);
+                  }
+                  return;
+                }
                 const key = `modal-start-${bookingToStart._id}`;
                 setActionLoading((prev) => ({ ...prev, [key]: true }));
-
                 try {
                   await updateBookingStatus(
                     bookingToStart._id,
@@ -2533,8 +3543,8 @@ export default function DashboardPage() {
                   setShowTimeModal(false);
                   setBookingToStart(null);
                   setTimeEstimate(30);
-                } catch (error) {
-                  console.error("Error starting service:", error);
+                } catch (e) {
+                  console.error(e);
                 } finally {
                   setActionLoading((prev) => {
                     const copy = { ...prev };
@@ -2543,23 +3553,20 @@ export default function DashboardPage() {
                   });
                 }
               }}
-              disabled={
-                !bookingToStart ||
-                !!actionLoading[`modal-start-${bookingToStart?._id}`]
-              }
-              className={styles.verifyBtn}
+              disabled={!bookingToStart && !dummyToStart}
               style={{
-                opacity: actionLoading[`modal-start-${bookingToStart?._id}`]
-                  ? 0.6
-                  : 1,
-                cursor: actionLoading[`modal-start-${bookingToStart?._id}`]
-                  ? "not-allowed"
-                  : "pointer",
+                width: "100%",
+                padding: "12px",
+                background: "#f97316",
+                color: "#fff",
+                border: "none",
+                borderRadius: "10px",
+                fontWeight: "700",
+                fontSize: "15px",
+                cursor: "pointer",
               }}
             >
-              {actionLoading[`modal-start-${bookingToStart?._id}`]
-                ? "Starting..."
-                : `Start Service (${timeEstimate} mins)`}
+              Start Service ({timeEstimate} mins)
             </button>
           </div>
         </div>

@@ -13,7 +13,9 @@ const formatTimeAgo = (date) => {
   const diff = Math.floor((now - new Date(date)) / 1000 / 60);
   if (diff < 1) return "Just now";
   if (diff < 60) return `${diff}m ago`;
-  return `${Math.floor(diff / 60)}h ago`;
+  const hours = Math.floor(diff / 60);
+  const mins = diff % 60;
+  return mins > 0 ? `${hours}h ${mins}m ago` : `${hours}h ago`;
 };
 
 // Format expiry countdown
@@ -86,9 +88,102 @@ export default function WalkinConfirmation() {
 
   // ==================== useEffects - START ====================
 
+  // ADD this after: const router = useRouter();
+  const { bookingCode: qCode, isDummy } = router.query;
+
+  useEffect(() => {
+    if (!isDummy || !qCode) return;
+    const fetchDummy = async () => {
+      const res = await fetch(`/api/dummy-user/active?code=${qCode}`);
+      const data = await res.json();
+      if (!data.dummy) return;
+      const d = data.dummy;
+
+      let salonName = "";
+      let queueInfoData = {
+        status: "AVAILABLE",
+        position: 1,
+        estimatedWait: 0,
+        serving: 0,
+        arrived: 0,
+        booked: 0,
+      };
+
+      // Declare matchedBarber in outer scope so it's accessible for both
+      // queueInfoData AND setBooking
+      let matchedBarber = null;
+      let sData = null;
+      try {
+        const sRes = await fetch(
+          `/api/walkin/salon-state?salonId=${d.salonId?.toString?.() || d.salonId}`,
+        );
+        sData = await sRes.json();
+        matchedBarber = (sData.barbers || []).find(
+          // ← let, not const
+          (b) => b.name === d.barberName,
+        );
+        salonName = sData.salonName || "";
+        // How long the customer has been waiting since they arrived
+        const waitedMins = d.arrivedAt
+          ? Math.floor((new Date() - new Date(d.arrivedAt)) / 1000 / 60)
+          : 0;
+
+        queueInfoData = {
+          status: matchedBarber?.status || "AVAILABLE",
+          position:
+            d.status === "in-service" ? 0 : matchedBarber?.queueCount || 1,
+          estimatedWait: waitedMins, // show how long they've been waiting
+          serving: 0,
+          arrived: 0,
+          booked: 0,
+        };
+      } catch {}
+
+      setQueueInfo(queueInfoData);
+
+      const queueStatus =
+        d.status === "in-service"
+          ? "GREEN"
+          : d.status === "completed"
+            ? "COMPLETED"
+            : "ORANGE"; // active, claimed → still in queue
+
+      // matchedBarber already resolved above — no re-declaration needed
+      setBooking((prev) => ({
+        ...prev,
+        bookingCode: d.bookingCode,
+        customerName: d.name,
+        customerPhone: d.phone,
+        service: d.service,
+        price: d.price,
+        salonId: d.salonId?.toString(),
+        salonName,
+        chairNumber: matchedBarber?.chairNumber || prev?.chairNumber || null,
+        estimatedDuration: d.serviceTime,
+        queueStatus,
+        arrivedAt: d.arrivedAt,
+        serviceStartedAt: d.serviceStartedAt || null,
+        serviceEndedAt: d.expectedFinishTime || null,
+        barberName: d.barberName,
+        isDummy: true,
+      }));
+
+      if (queueStatus === "COMPLETED" && !showFeedback) {
+        setShowFeedback(true);
+        showSuccess("Service completed! Please leave feedback.");
+      }
+
+      setLoading(false);
+    };
+
+    fetchDummy();
+    const t = setInterval(fetchDummy, 5000);
+    return () => clearInterval(t);
+  }, [isDummy, qCode]);
+
   // 1. Fetch booking details on component mount (ORIGINAL)
   useEffect(() => {
-    if (!bookingId) return;
+    if (!bookingId || isDummy) return;
 
     const fetchBooking = async () => {
       try {
@@ -185,7 +280,7 @@ export default function WalkinConfirmation() {
 
   // ✅ Replace with THIS
   useEffect(() => {
-    if (!bookingId) return;
+    if (!bookingId || isDummy) return;
 
     const pollStatus = async () => {
       try {
@@ -300,39 +395,247 @@ export default function WalkinConfirmation() {
 
   // NEW: Fetch barber's specific queue every 5 seconds
   useEffect(() => {
-    if (!booking?.barberId || !booking?.salonId) return;
-
-    console.log("🔄 Fetching barber queue for:", {
-      salonId: booking.salonId,
-      barberId: booking.barberId,
-    });
+    // For dummy users we use barberName + salonId; for real bookings we use barberId
+    const hasDummy =
+      booking?.isDummy && booking?.salonId && booking?.barberName;
+    const hasReal = !booking?.isDummy && booking?.barberId && booking?.salonId;
+    if (!hasDummy && !hasReal) return;
 
     const fetchBarberQueue = async () => {
       try {
-        const res = await fetch(
-          `/api/salons/${booking.salonId}/barber-queue?barberId=${booking.barberId}`,
-        );
-        if (res.ok) {
-          const data = await res.json();
-          // Filter expired from queue
-          const now = new Date();
-          const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
-          const activeQueue = (data.queue || []).filter((q) => {
-            if (q.isExpired) return false;
-            if (q.queueStatus === "RED" && !q.arrivedAt && q.expiresAt) {
-              // ✅ Only check expiry if expiresAt exists (walk-ins)
-              return new Date(q.expiresAt) > bufferTime;
-            }
-            return true; // ✅ Include prebooks without expiresAt
+        // Dummy path: fetch via queue-status using salonId+barberName resolved to barberId
+        if (hasDummy) {
+          // Get salon state to find barberId for this barber by name
+          const sRes = await fetch(
+            `/api/walkin/salon-state?salonId=${booking.salonId}`,
+          );
+          if (!sRes.ok) return;
+          const sData = await sRes.json();
+          const matchedBarber = (sData.barbers || []).find(
+            (b) => b.name === booking.barberName,
+          );
+          if (!matchedBarber) return;
+
+          // Now fetch full queue-status for this barber
+          const qRes = await fetch(`/api/walkin/queue-status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              barberId: matchedBarber.barberId,
+              salonId: booking.salonId,
+            }),
           });
+          if (!qRes.ok) return;
+          const qData = await qRes.json();
+
+          // Build barberQueueData in the same shape the UI expects
+          const serving = qData.currentCustomer || null;
+          const priorityQueue =
+            qData.waitingCustomers?.filter((c) => c.queue === "arrived") || [];
+          const tempQueue =
+            qData.waitingCustomers?.filter((c) => c.queue === "booked") || [];
+
+          // Also include dummy users in the queue display
+          const dummyUsers = (qData.dummyUsers || []).filter(
+            (d) => d.status !== "completed" && d.status !== "cancelled",
+          );
+
+          // Build unified queue array for the horizontal queue flow
+          // Normalize online queue entries — queue-status returns `name` not `customerName`
+          const normalizedPriority = priorityQueue.map((c) => ({
+            _id: c.id,
+            id: c.id,
+            customerName: c.name, // fix: queue-status uses `name`
+            arrivedAt: c.arrivedAt,
+            createdAt: c.createdAt,
+            queueStatus: "ORANGE",
+          }));
+
+          const normalizedTemp = tempQueue.map((c) => ({
+            _id: c.id,
+            id: c.id,
+            customerName: c.name,
+            // queue-status returns expiresIn (minutes left), not expiresAt (ISO date)
+            // reconstruct expiresAt so formatExpiry() works correctly
+            expiresAt: c.expiresAt
+              ? c.expiresAt
+              : c.expiresIn != null
+                ? new Date(Date.now() + c.expiresIn * 60 * 1000).toISOString()
+                : null,
+            createdAt: c.createdAt,
+            queueStatus: "RED",
+          }));
+
+          // Add dummy (offline) users as ORANGE cards — they are physically present
+          const dummyOrangeQueue = dummyUsers
+            .filter((d) => d.status === "active" || d.status === "claimed")
+            .map((d) => ({
+              _id: d._id,
+              id: d._id,
+              customerName: d.name,
+              arrivedAt: d.arrivedAt,
+              bookingCode: d.bookingCode,
+              queueStatus: "ORANGE",
+              isDummy: true,
+            }));
+
+          // Serving: prefer online, fall back to dummy in-service
+          const servingDummy = dummyUsers.find(
+            (d) => d.status === "in-service",
+          );
+          const effectiveServing = serving
+            ? { ...serving, customerName: serving.name || serving.customerName }
+            : servingDummy
+              ? {
+                  _id: servingDummy._id,
+                  customerName: servingDummy.name,
+                  isDummy: true,
+                  startedAt: servingDummy.serviceStartedAt || null,
+                  estimatedDuration: servingDummy.serviceTime || 30,
+                }
+              : null;
+
+          // Build unified queue: online ORANGE + dummy ORANGE + online RED
+          // Sort by arrivedAt — whoever physically arrived first is #1, online or offline
+          const allOrange = [...normalizedPriority, ...dummyOrangeQueue].sort(
+            (a, b) => {
+              const aTime = a.arrivedAt ? new Date(a.arrivedAt) : new Date();
+              const bTime = b.arrivedAt ? new Date(b.arrivedAt) : new Date();
+              return aTime - bTime;
+            },
+          );
+
+          const queue = [...allOrange, ...normalizedTemp];
 
           setBarberQueueData({
-            ...data,
-            queue: Array.isArray(activeQueue) ? activeQueue : [],
+            chairNumber: matchedBarber.chairNumber || 1,
+            serving: effectiveServing,
+            queue,
+            priorityQueueCount: allOrange.length, // use merged sorted array length
+            bookedCount: normalizedTemp.length,
+            dummyUsers,
           });
-        } else {
-          console.error("❌ Queue fetch failed:", res.status);
+          return;
         }
+
+        // Real booking path — use queue-status POST so dummyUsers are included
+        const res = await fetch("/api/walkin/queue-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            barberId: booking.barberId,
+            salonId: booking.salonId,
+            customerId: booking._id || booking.id,
+          }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const now = new Date();
+        const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
+
+        // Normalize online queue — queue-status returns `name` not `customerName`
+        const onlineOrange = (data.waitingCustomers || [])
+          .filter((c) => c.queue === "arrived")
+          .map((c) => ({
+            _id: c.id,
+            id: c.id,
+            customerName: c.name,
+            arrivedAt: c.arrivedAt,
+            createdAt: c.createdAt,
+            queueStatus: "ORANGE",
+          }));
+
+        const onlineRed = (data.waitingCustomers || [])
+          .filter((c) => c.queue === "booked")
+          .map((c) => ({
+            _id: c.id,
+            id: c.id,
+            customerName: c.name,
+            expiresAt: c.expiresAt
+              ? c.expiresAt
+              : c.expiresIn != null
+                ? new Date(Date.now() + c.expiresIn * 60 * 1000).toISOString()
+                : null,
+            createdAt: c.createdAt,
+            queueStatus: "RED",
+          }))
+          .filter((c) => {
+            if (!c.expiresAt) return true;
+            return new Date(c.expiresAt) > bufferTime;
+          });
+
+        // Dummy (offline) users as ORANGE — physically present
+        const dummyUsers = (data.dummyUsers || []).filter(
+          (d) => d.status !== "completed" && d.status !== "cancelled",
+        );
+        const dummyOrangeQueue = dummyUsers
+          .filter((d) => d.status === "active" || d.status === "claimed")
+          .map((d) => ({
+            _id: d._id,
+            id: d._id,
+            customerName: d.name,
+            arrivedAt: d.arrivedAt,
+            bookingCode: d.bookingCode,
+            queueStatus: "ORANGE",
+            isDummy: true,
+          }));
+
+        // Serving
+        const servingDummy = dummyUsers.find((d) => d.status === "in-service");
+        const servingOnline = data.currentCustomer
+          ? {
+              _id: data.currentCustomer.id,
+              customerName: data.currentCustomer.name,
+              startedAt: data.currentCustomer.startedAt,
+            }
+          : null;
+        const effectiveServing =
+          servingOnline ||
+          (servingDummy
+            ? {
+                _id: servingDummy._id,
+                customerName: servingDummy.name,
+                isDummy: true,
+                startedAt: servingDummy.serviceStartedAt || null,
+                estimatedDuration: servingDummy.serviceTime || 30,
+              }
+            : null);
+
+        // Get chairNumber from salon-state by matching barberName
+        let chairNumber = booking.chairNumber || 1;
+        try {
+          const sRes = await fetch(
+            `/api/walkin/salon-state?salonId=${booking.salonId}`,
+          );
+          if (sRes.ok) {
+            const sData = await sRes.json();
+            const matched = (sData.barbers || []).find(
+              (b) =>
+                b.barberId ===
+                (booking.barberId?.toString?.() || booking.barberId),
+            );
+            if (matched) chairNumber = matched.chairNumber || 1;
+          }
+        } catch {}
+
+        // Sort ORANGE by arrivedAt — whoever arrived first is #1 regardless of online/offline
+        const allOrange = [...onlineOrange, ...dummyOrangeQueue].sort(
+          (a, b) => {
+            const aTime = a.arrivedAt ? new Date(a.arrivedAt) : new Date();
+            const bTime = b.arrivedAt ? new Date(b.arrivedAt) : new Date();
+            return aTime - bTime;
+          },
+        );
+
+        setBarberQueueData({
+          chairNumber,
+          serving: effectiveServing,
+          queue: [...allOrange, ...onlineRed],
+          priorityQueueCount: allOrange.length,
+          bookedCount: onlineRed.length,
+          dummyUsers,
+        });
       } catch (err) {
         console.error("❌ Error fetching barber queue:", err);
       }
@@ -341,7 +644,12 @@ export default function WalkinConfirmation() {
     fetchBarberQueue();
     const interval = setInterval(fetchBarberQueue, 5000);
     return () => clearInterval(interval);
-  }, [booking?.barberId, booking?.salonId]); // ✅ Depend on booking data
+  }, [
+    booking?.barberId,
+    booking?.salonId,
+    booking?.isDummy,
+    booking?.barberName,
+  ]);
 
   // ==================== useEffects - END ====================
 
@@ -357,26 +665,39 @@ export default function WalkinConfirmation() {
 
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/bookings/update`, {
+      const feedbackPayload = {
+        ratings,
+        comment,
+        submittedAt: new Date(),
+        serviceDate: booking.completedAt || booking.createdAt,
+        customerPhone: booking.customerPhone,
+        price: booking.price,
+        barberName: booking.barberName,
+      };
+
+      // Dummy users have no bookingId — store feedback on the dummyusers doc instead
+      const isDummyUser = booking?.isDummy || !!qCode;
+
+      const endpoint = isDummyUser
+        ? `/api/dummy-user/feedback`
+        : `/api/bookings/update`;
+
+      const body = isDummyUser
+        ? JSON.stringify({
+            bookingCode: qCode || booking.bookingCode,
+            feedback: feedbackPayload,
+          })
+        : JSON.stringify({ bookingId, feedback: feedbackPayload });
+
+      const response = await fetch(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingId,
-          feedback: {
-            ratings,
-            comment,
-            submittedAt: new Date(),
-            serviceDate: booking.completedAt || booking.createdAt,
-            customerPhone: booking.customerPhone,
-            price: booking.price,
-            barberName: booking.barberName,
-          },
-        }),
+        body,
       });
 
       if (response.ok) {
+        showSuccess("Thank you for your feedback! 🙏");
         if (isAuthenticated()) {
-          // Uses your existing helper
           router.push("/user/dashboard");
         } else {
           const prefillData = {
@@ -532,7 +853,7 @@ export default function WalkinConfirmation() {
 
     return (
       <div className={feedbackStyles.pageContainer}>
-        {process.env.NODE_ENV === "development" && (
+        {/* {process.env.NODE_ENV === "development" && (
           <div
             style={{
               background: "#fff3cd",
@@ -547,7 +868,7 @@ export default function WalkinConfirmation() {
             <div>queueStatus: {booking?.queueStatus}</div>
             <div>isExpired: {String(booking?.isExpired)}</div>
           </div>
-        )}
+        )} */}
 
         <div className={feedbackStyles.content}>
           <div className={feedbackStyles.card}>
@@ -804,7 +1125,7 @@ export default function WalkinConfirmation() {
             </div>
           )}
         {/* NEW: Queue Visualization */}
-        {queueInfo && (
+        {/* {queueInfo && (
           <div className={styles.queueVisualizationContainer}>
             <h3>📍 Your Queue Position</h3>
             <div
@@ -951,7 +1272,136 @@ export default function WalkinConfirmation() {
               </div>
             </div>
           </div>
-        )}
+        )} */}
+        {/* Dummy user queue section */}
+        {/* {booking?.isDummy && queueInfo && (
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              padding: "20px",
+              margin: "16px 0",
+              boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 16px",
+                fontSize: "16px",
+                fontWeight: "700",
+                textAlign: "center",
+              }}
+            >
+              🪑 {booking.barberName}&apos;s Queue
+            </h3>
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                justifyContent: "center",
+                marginBottom: "16px",
+              }}
+            >
+              <div
+                style={{
+                  flex: 1,
+                  background: "#dcfce7",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "28px",
+                    fontWeight: "800",
+                    color: "#16a34a",
+                  }}
+                >
+                  {queueInfo.serving || 0}
+                </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#15803d",
+                    fontWeight: "600",
+                  }}
+                >
+                  NOW SERVING
+                </div>
+              </div>
+              <div
+                style={{
+                  flex: 1,
+                  background: "#fef3c7",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "28px",
+                    fontWeight: "800",
+                    color: "#d97706",
+                  }}
+                >
+                  {queueInfo.arrived || 0}
+                </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#b45309",
+                    fontWeight: "600",
+                  }}
+                >
+                  PRIORITY QUEUE
+                </div>
+              </div>
+              <div
+                style={{
+                  flex: 1,
+                  background: "#f3f4f6",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "28px",
+                    fontWeight: "800",
+                    color: "#6b7280",
+                  }}
+                >
+                  {queueInfo.booked || 0}
+                </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#4b5563",
+                    fontWeight: "600",
+                  }}
+                >
+                  TEMPORARY QUEUE
+                </div>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: "16px",
+                fontSize: "12px",
+                justifyContent: "center",
+                color: "#6b7280",
+              }}
+            >
+              <span>🟢 Serving Now - Currently getting service</span>
+              <span>🟡 Priority Queue - Arrived at salon</span>
+              <span>⬜ Temporary Queue - Booked (30 min expiry)</span>
+            </div>
+          </div>
+        )} */}
 
         {barberQueueData && (
           <div className={styles.modernQueueContainer}>
@@ -1032,12 +1482,57 @@ export default function WalkinConfirmation() {
                       <div className={styles.pulseRing} />
                     </div>
                     <div className={styles.servingName}>
-                      {barberQueueData.serving.customerName}
+                      {barberQueueData.serving.customerName ||
+                        barberQueueData.serving.name}
                     </div>
                     <div className={styles.servingBadge}>NOW SERVING</div>
-                    {barberQueueData.serving._id === booking._id && (
+                    {(barberQueueData.serving._id === booking._id ||
+                      (booking.isDummy &&
+                        barberQueueData.serving.isDummy &&
+                        barberQueueData.serving._id ===
+                          booking.bookingCode)) && (
                       <div className={styles.youPill}>YOU</div>
                     )}
+                    {barberQueueData.serving &&
+                      barberQueueData.serving.startedAt &&
+                      (() => {
+                        const elapsed = Math.floor(
+                          (new Date() -
+                            new Date(barberQueueData.serving.startedAt)) /
+                            60000,
+                        );
+                        const total =
+                          barberQueueData.serving.estimatedDuration || 30;
+                        const remaining = total - elapsed;
+                        const isOvertime = remaining < 0;
+                        return (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              padding: "6px 12px",
+                              margin: "8px 0",
+                              background: isOvertime ? "#fee2e2" : "#dcfce7",
+                              border: `1px solid ${isOvertime ? "#ef4444" : "#10b981"}`,
+                              borderRadius: "999px",
+                              fontSize: "12px",
+                              fontWeight: "600",
+                              color: isOvertime ? "#ef4444" : "#065f46",
+                            }}
+                          >
+                            <span>
+                              {elapsed}m / {total}m
+                            </span>
+                            <span>·</span>
+                            <span>
+                              {isOvertime
+                                ? `+${Math.abs(remaining)}m overtime ⚠️`
+                                : `${remaining}m left`}
+                            </span>
+                          </div>
+                        );
+                      })()}
                   </div>
                 ) : (
                   <div className={styles.emptyChairState}>
@@ -1048,9 +1543,11 @@ export default function WalkinConfirmation() {
             </div>
 
             {/* Horizontal Queue Flow */}
-            <div className={styles.queueFlowContainer}>
-              {/* <div className={styles.queueArrow}>→</div> */}
 
+            {/* Horizontal Queue Flow */}
+            <div className={styles.queueFlowContainer}>
+              {" "}
+              {/* <div className={styles.queueArrow}>→</div> */}
               <div className={styles.horizontalQueue}>
                 {/* Priority Queue Golden */}
                 {Array.isArray(barberQueueData?.queue) &&
@@ -1062,7 +1559,10 @@ export default function WalkinConfirmation() {
                         booking._id?.toString() || booking.id?.toString();
                       const customerIdStr =
                         customer._id?.toString() || customer.id?.toString();
-                      const isYou = bookingIdStr === customerIdStr;
+                      const isYou = booking.isDummy
+                        ? customer.bookingCode &&
+                          customer.bookingCode === booking.bookingCode
+                        : bookingIdStr === customerIdStr;
                       const createdAtDate = customer.createdAt
                         ? new Date(customer.createdAt)
                         : null;
@@ -1137,6 +1637,22 @@ export default function WalkinConfirmation() {
                             {formatTimeAgo(customer.arrivedAt)}
                           </div>
                           {isYou && <div className={styles.youPill}>YOU</div>}
+                          {customer.isDummy && (
+                            <div
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: "700",
+                                color: "#92400e",
+                                background: "#fff3e0",
+                                border: "1px solid #f97316",
+                                borderRadius: "4px",
+                                padding: "1px 5px",
+                                marginTop: "2px",
+                              }}
+                            >
+                              OFFLINE
+                            </div>
+                          )}
                           <div
                             className={styles.statusDot}
                             style={{ background: "#fbbf24" }}
@@ -1155,7 +1671,11 @@ export default function WalkinConfirmation() {
                         booking._id?.toString() || booking.id?.toString();
                       const customerIdStr =
                         customer._id?.toString() || customer.id?.toString();
-                      const isYou = bookingIdStr === customerIdStr;
+                      // For dummy users: match by bookingCode since they have no _id in the queue list
+                      const isYou = booking.isDummy
+                        ? customer.bookingCode &&
+                          customer.bookingCode === booking.bookingCode
+                        : bookingIdStr === customerIdStr;
 
                       const priorityCount = barberQueueData.queue.filter(
                         (c) => c.queueStatus === "ORANGE",
@@ -1280,15 +1800,93 @@ export default function WalkinConfirmation() {
             </div>
 
             {/* Estimated Wait */}
-            {booking.queueStatus === "ORANGE" &&
-              hasArrived &&
-              !isServing &&
-              queueInfo?.estimatedWait !== undefined && (
+            {/* Wait Time — shown for all statuses except GREEN/COMPLETED */}
+            {!isServing &&
+              booking.queueStatus !== "GREEN" &&
+              booking.queueStatus !== "COMPLETED" && (
                 <div className={styles.waitTimeCard}>
                   <span className={styles.waitIcon}>⏱️</span>
                   <span className={styles.waitText}>
-                    Estimated Wait Time:{" "}
-                    <strong>{queueInfo.estimatedWait} minutes</strong>
+                    {booking.queueStatus === "RED" ? (
+                      // Not arrived yet — show expiry urgency
+                      <>
+                        Arrive within:{" "}
+                        <strong>
+                          {booking.expiresAt
+                            ? (() => {
+                                const mins = Math.max(
+                                  0,
+                                  Math.ceil(
+                                    (new Date(booking.expiresAt) - new Date()) /
+                                      1000 /
+                                      60,
+                                  ),
+                                );
+                                return `${mins} minutes`;
+                              })()
+                            : "30 minutes"}
+                        </strong>{" "}
+                        to secure your spot
+                      </>
+                    ) : (
+                      // Arrived (ORANGE) — show both waiting time and estimated wait
+                      <>
+                        {booking.arrivedAt && (
+                          <>
+                            Waiting for:{" "}
+                            <strong>
+                              {(() => {
+                                const mins = Math.floor(
+                                  (new Date() - new Date(booking.arrivedAt)) /
+                                    1000 /
+                                    60,
+                                );
+                                const h = Math.floor(mins / 60);
+                                const m = mins % 60;
+                                return h > 0 ? `${h}h ${m}m` : `${m} min`;
+                              })()}
+                            </strong>
+                            {" · "}
+                          </>
+                        )}
+                        Est. wait:{" "}
+                        <strong>
+                          {(() => {
+                            // For dummy: position-based estimate using serviceTime of those ahead
+                            // For online: use queueInfo.estimatedWait from queue-position API
+                            const wait = booking.isDummy
+                              ? (() => {
+                                  const queue = barberQueueData?.queue || [];
+                                  const myPos = queue
+                                    .filter((c) => c.queueStatus === "ORANGE")
+                                    .findIndex((c) =>
+                                      booking.isDummy
+                                        ? c.bookingCode === booking.bookingCode
+                                        : c._id?.toString() ===
+                                          booking._id?.toString(),
+                                    );
+                                  if (myPos <= 0) return 0;
+                                  // Sum serviceTime of everyone ahead in queue
+                                  return queue
+                                    .filter((c) => c.queueStatus === "ORANGE")
+                                    .slice(0, myPos)
+                                    .reduce(
+                                      (sum, c) => sum + (c.serviceTime || 35),
+                                      0,
+                                    );
+                                })()
+                              : (queueInfo?.estimatedWait ?? 0);
+                            const h = Math.floor(wait / 60);
+                            const m = wait % 60;
+                            return wait === 0
+                              ? "You're next!"
+                              : h > 0
+                                ? `${h}h ${m}m`
+                                : `${m} min`;
+                          })()}
+                        </strong>
+                      </>
+                    )}
                   </span>
                 </div>
               )}
