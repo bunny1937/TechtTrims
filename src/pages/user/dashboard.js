@@ -7,7 +7,7 @@ import Link from "next/link";
 import { UserDataManager } from "../../lib/userData";
 import { removeAuthToken } from "../../lib/cookieAuth";
 import { getAuthToken } from "../../lib/cookieAuth";
-import { showConfirm, showSuccess } from "@/lib/toast";
+import { showConfirm, showSuccess, showWarning, showError } from "@/lib/toast";
 
 export default function UserDashboard() {
   const router = useRouter();
@@ -22,6 +22,12 @@ export default function UserDashboard() {
   const [payments, setPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Offline booking code claim
+  const [showCodeEntry, setShowCodeEntry] = useState(false);
+  const [bookingCode, setBookingCode] = useState("");
+  const [claimName, setClaimName] = useState("");
+  const [claimPhone, setClaimPhone] = useState("");
+  const [claimLoading, setClaimLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -140,6 +146,55 @@ export default function UserDashboard() {
     });
   };
 
+  const handleClaimCode = async () => {
+    if (bookingCode.length !== 6 || !claimName || !claimPhone) {
+      showWarning("Please fill all fields. Code must be 6 digits.");
+      return;
+    }
+    setClaimLoading(true);
+    try {
+      const res = await fetch("/api/dummy-user/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          bookingCode: bookingCode.trim().toUpperCase(),
+          name: claimName.trim(),
+          phone: claimPhone.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      showSuccess("Booking successfully linked to your account!");
+      // Only redirect after confirmed success
+      setShowCodeEntry(false);
+      setBookingCode("");
+      setClaimName("");
+      setClaimPhone("");
+      router.push(
+        `/walkin/confirmation?bookingCode=${bookingCode.trim().toUpperCase()}&isDummy=true`,
+      );
+
+      setShowCodeEntry(false);
+      setBookingCode("");
+      setClaimName("");
+      setClaimPhone("");
+
+      // Refresh bookings list
+      const bookingsRes = await fetch("/api/user/bookings", {
+        credentials: "include",
+      });
+      if (bookingsRes.ok) {
+        const bookingsData = await bookingsRes.json();
+        setBookings(Array.isArray(bookingsData) ? bookingsData : []);
+      }
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      setClaimLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className={styles.loading}>
@@ -218,7 +273,167 @@ export default function UserDashboard() {
       <div className={styles.content}>
         {activeTab === "bookings" && (
           <div className={styles.bookings}>
-            <h1>My Bookings ({bookings.length})</h1>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "16px",
+                flexWrap: "wrap",
+                gap: "10px",
+              }}
+            >
+              <h1 style={{ margin: 0 }}>My Bookings ({bookings.length})</h1>
+              <button
+                onClick={() => setShowCodeEntry(true)}
+                style={{
+                  background: "#f97316",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "10px 18px",
+                  fontWeight: "600",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                }}
+              >
+                Enter Booking Code
+              </button>
+            </div>
+
+            {/* Offline Booking Code Entry Modal */}
+            {showCodeEntry && (
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.55)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 9999,
+                }}
+              >
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: "16px",
+                    padding: "24px",
+                    width: "320px",
+                    maxWidth: "92vw",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+                  }}
+                >
+                  <h3 style={{ margin: "0 0 8px", fontWeight: "700" }}>
+                    Enter Booking Code
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      color: "#6b7280",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    Enter the 6-digit code given to you at the salon to link
+                    your visit to this account.
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="6-digit Code"
+                    value={bookingCode}
+                    maxLength={6}
+                    onChange={(e) =>
+                      setBookingCode(e.target.value.replace(/\D/g, ""))
+                    }
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      marginBottom: "10px",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "15px",
+                      boxSizing: "border-box",
+                      letterSpacing: "4px",
+                      textAlign: "center",
+                      fontWeight: "700",
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Your Name (as given at salon)"
+                    value={claimName}
+                    onChange={(e) => setClaimName(e.target.value)}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      marginBottom: "10px",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "14px",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Your Phone Number"
+                    value={claimPhone}
+                    onChange={(e) => setClaimPhone(e.target.value)}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      marginBottom: "16px",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "14px",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    onClick={handleClaimCode}
+                    disabled={claimLoading}
+                    style={{
+                      width: "100%",
+                      padding: "12px",
+                      background: "#f97316",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "10px",
+                      fontWeight: "700",
+                      fontSize: "15px",
+                      cursor: "pointer",
+                      marginBottom: "8px",
+                      opacity: claimLoading ? 0.7 : 1,
+                    }}
+                  >
+                    {claimLoading ? "Verifying..." : "Link to My Account"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCodeEntry(false);
+                      setBookingCode("");
+                      setClaimName("");
+                      setClaimPhone("");
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      background: "#f3f4f6",
+                      border: "none",
+                      borderRadius: "10px",
+                      fontWeight: "600",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className={styles.bookingsList}>
               {bookings.map((booking) => (
                 <div
@@ -352,6 +567,119 @@ export default function UserDashboard() {
               <Link href="/" className={styles.backLink}>
                 Home
               </Link>
+              {/* Offline Booking Code Claim */}
+              <div
+                style={{
+                  margin: "20px 0",
+                  padding: "16px",
+                  background: "#fff3e0",
+                  borderRadius: "12px",
+                  border: "2px solid #f97316",
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: "700",
+                    color: "#92400e",
+                    marginBottom: "8px",
+                  }}
+                >
+                  📋 Got a walk-in booking code from the salon?
+                </div>
+                {!showCodeEntry ? (
+                  <button
+                    onClick={() => setShowCodeEntry(true)}
+                    style={{
+                      background: "#f97316",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "10px 20px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Enter Booking Code
+                  </button>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                      maxWidth: "320px",
+                    }}
+                  >
+                    <input
+                      placeholder="6-digit Code"
+                      maxLength={6}
+                      value={bookingCode}
+                      onChange={(e) => setBookingCode(e.target.value)}
+                      style={{
+                        padding: "10px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        fontSize: "14px",
+                      }}
+                    />
+                    <input
+                      placeholder="Your Name"
+                      value={claimName}
+                      onChange={(e) => setClaimName(e.target.value)}
+                      style={{
+                        padding: "10px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        fontSize: "14px",
+                      }}
+                    />
+                    <input
+                      placeholder="Your Phone"
+                      value={claimPhone}
+                      onChange={(e) => setClaimPhone(e.target.value)}
+                      style={{
+                        padding: "10px",
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db",
+                        fontSize: "14px",
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={handleClaimCode}
+                        disabled={claimLoading}
+                        style={{
+                          flex: 1,
+                          padding: "10px",
+                          background: "#f97316",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "8px",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {claimLoading ? "Linking..." : "Link Booking"}
+                      </button>
+                      <button
+                        onClick={() => setShowCodeEntry(false)}
+                        style={{
+                          flex: 1,
+                          padding: "10px",
+                          background: "#f3f4f6",
+                          border: "none",
+                          borderRadius: "8px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <h1>Dashboard Overview</h1>
             </div>
 

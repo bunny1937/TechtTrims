@@ -52,12 +52,14 @@ const formatTimeRemaining = (expiryDate) => {
 export default function SalonDetail({ initialSalon }) {
   const router = useRouter();
   const { id, mode } = router.query;
-  const [bookingMode, setBookingMode] = useState(mode || "prebook");
+  const [bookingMode, setBookingMode] = useState(mode || "walkin");
   const [salonStats, setSalonStats] = useState({
     availableNow: 0,
     totalWaiting: 0,
     totalBooked: 0,
     avgWaitTime: 0,
+    totalServing: 0,
+    totalOffline: 0,
   });
   const [barberStates, setBarberStates] = useState([]);
   const [userInfo, setUserInfo] = useState(null);
@@ -100,6 +102,8 @@ export default function SalonDetail({ initialSalon }) {
     barbers: null,
     bookings: null,
   });
+  const [showLoginGuard, setShowLoginGuard] = useState(false);
+  const [dummyUsers, setDummyUsers] = useState([]);
 
   useEffect(() => {
     const fetchCSRFToken = async () => {
@@ -157,7 +161,6 @@ export default function SalonDetail({ initialSalon }) {
   // ✅ OPTIMIZED: Memoized fetch with cache comparison
   const fetchAllBookings = useCallback(async () => {
     if (!id) return;
-
     try {
       await fetch("/api/walkin/booking/mark-expired", { method: "POST" });
       const res = await fetch(`/api/salons/${id}/bookings-detailed`, {
@@ -165,6 +168,14 @@ export default function SalonDetail({ initialSalon }) {
       });
       const data = await res.json();
 
+      // Fetch offline dummy users for this salon
+      try {
+        const dummyRes = await fetch(`/api/dummy-user/active?salonId=${id}`);
+        const dummyData = await dummyRes.json();
+        setDummyUsers(dummyData.dummies || []);
+      } catch (e) {
+        // silent
+      }
       const now = new Date();
       const bufferTime = new Date(now.getTime() - 5 * 60 * 1000);
       const activeBookings = data.bookings.filter((b) => {
@@ -199,20 +210,27 @@ export default function SalonDetail({ initialSalon }) {
 
   // ✅ OPTIMIZED: Memoized with cache
   const fetchBarberStates = useCallback(async () => {
-    if (bookingMode !== "walkin" || !id) return;
-
+    if (!id) return;
     try {
       const res = await fetch(`/api/walkin/salon-state?salonId=${id}`);
       const data = await res.json();
 
-      // Only update if changed
       if (
         JSON.stringify(data.barbers) !==
         JSON.stringify(dataCache.current.barbers)
       ) {
         dataCache.current.barbers = data.barbers;
-        setBarberStates(data.barbers);
+        setBarberStates(data.barbers || []); // ← never set undefined
       }
+      // ✅ THIS WAS MISSING — update salonStats from salon-state response
+      setSalonStats({
+        availableNow: data.availableNow ?? 0,
+        totalWaiting: data.totalWaiting ?? 0,
+        totalBooked: data.totalBooked ?? 0,
+        avgWaitTime: data.avgWaitTime ?? 0,
+        totalServing: data.totalServing ?? 0,
+        totalOffline: data.totalOffline ?? 0,
+      });
     } catch (error) {
       console.error("Error fetching barber states:", error);
     }
@@ -220,14 +238,14 @@ export default function SalonDetail({ initialSalon }) {
 
   // Initial fetch
   useEffect(() => {
-    if (bookingMode === "walkin" && id) {
+    if (id) {
       fetchBarberStates();
     }
   }, [bookingMode, id, fetchBarberStates]);
 
   // ✅ NEW: Dynamic polling based on activity
   useEffect(() => {
-    if (!id || !isOnline || bookingMode !== "walkin") return;
+    if (!id || !isOnline) return;
 
     let pollInterval = 5000; // Start with 5 seconds
 
@@ -759,7 +777,17 @@ export default function SalonDetail({ initialSalon }) {
 
   const handleBooking = async () => {
     if (isWalkinBooking || isBooking) return;
+
+    // LOGIN GUARD — check auth before booking
+    const currentUserInfo = UserDataManager.getStoredUserData();
+    const userToken = localStorage.getItem("userToken");
+    if (!userToken && !currentUserInfo?.id) {
+      setShowLoginGuard(true); // new state — show login required dialog
+      return;
+    }
+
     setIsWalkinBooking(true);
+
     // ✅ Basic service validation (required for both modes)
     if (selectedServices.length === 0) {
       setIsWalkinBooking(false);
@@ -1430,15 +1458,18 @@ export default function SalonDetail({ initialSalon }) {
                     const barberState =
                       bookingMode === "walkin" && Array.isArray(barberStates)
                         ? barberStates.find(
-                            (b) => b.barberId === barber._id.toString(),
+                            (b) => b.barberId === barber._id?.toString(),
                           )
                         : null;
 
                     // NEW: Get per-barber queue data
                     const barberBookings =
                       allBookings?.filter(
-                        (b) => b.barberId === barber._id.toString(),
+                        (b) =>
+                          b.barberId?.toString() === barber._id?.toString() ||
+                          b.barber === barber.name,
                       ) || [];
+
                     const greenBookings = barberBookings.filter(
                       (b) => b.queueStatus === "GREEN",
                     );
@@ -1506,16 +1537,22 @@ export default function SalonDetail({ initialSalon }) {
                                       ✅ Available Now
                                     </span>
                                   )}
+                                  {barberState.status === "HAS_QUEUE" && (
+                                    <span className={styles.hasQueueNow}>
+                                      🟡 Has Queue (+{barberState.queueCount})
+                                    </span>
+                                  )}
                                   {barberState.status === "OCCUPIED" && (
                                     <span className={styles.occupiedNow}>
                                       🟢 Busy ({barberState.timeLeft}m left)
                                     </span>
                                   )}
-                                  {orangeBookings.length > 0 && (
-                                    <span className={styles.queueBadge}>
-                                      {orangeBookings.length} in priority queue
-                                    </span>
-                                  )}
+                                  {barberState.status === "OCCUPIED" &&
+                                    barberState.queueCount > 0 && (
+                                      <span className={styles.queueBadge}>
+                                        +{barberState.queueCount} in queue
+                                      </span>
+                                    )}
                                 </>
                               )}
                             </div>
@@ -1552,14 +1589,25 @@ export default function SalonDetail({ initialSalon }) {
                                 <span className={styles.pausedWait}>
                                   Temporarily Unavailable
                                 </span>
-                              ) : barberState.status === "AVAILABLE" ? (
+                              ) : barberState.status === "AVAILABLE" &&
+                                barberState.queueCount === 0 ? (
                                 <span className={styles.noWait}>No Wait</span>
+                              ) : barberState.status === "HAS_QUEUE" ||
+                                (barberState.status === "AVAILABLE" &&
+                                  barberState.queueCount > 0) ? (
+                                <span className={styles.waitTime}>
+                                  ~
+                                  {barberState.offlineWaitMins ||
+                                    barberState.queueCount * 35}
+                                  m wait
+                                </span>
                               ) : (
                                 <span className={styles.waitTime}>
                                   ~
-                                  {barberState.timeLeft +
-                                    orangeBookings.length * 45}{" "}
-                                  mins
+                                  {(barberState.timeLeft || 0) +
+                                    (barberState.offlineWaitMins ||
+                                      barberState.queueCount * 35)}
+                                  m wait
                                 </span>
                               )}
                             </div>
@@ -1610,10 +1658,7 @@ export default function SalonDetail({ initialSalon }) {
                     <span className={styles.statIcon}>🟢</span>
                     <div className={styles.statContent}>
                       <span className={styles.statValue}>
-                        {
-                          allBookings.filter((b) => b.queueStatus === "GREEN")
-                            .length
-                        }
+                        {salonStats.totalServing}
                       </span>
                       <span className={styles.statLabel}>Now Serving</span>
                     </div>
@@ -1622,10 +1667,7 @@ export default function SalonDetail({ initialSalon }) {
                     <span className={styles.statIcon}>🟠</span>
                     <div className={styles.statContent}>
                       <span className={styles.statValue}>
-                        {
-                          allBookings.filter((b) => b.queueStatus === "ORANGE")
-                            .length
-                        }
+                        {salonStats.totalWaiting}
                       </span>
                       <span className={styles.statLabel}>Priority Queue</span>
                     </div>
@@ -1634,10 +1676,7 @@ export default function SalonDetail({ initialSalon }) {
                     <span className={styles.statIcon}>⚫</span>
                     <div className={styles.statContent}>
                       <span className={styles.statValue}>
-                        {
-                          allBookings.filter((b) => b.queueStatus === "RED")
-                            .length
-                        }
+                        {salonStats.totalBooked}
                       </span>
                       <span className={styles.statLabel}>
                         Booked (Not Arrived)
@@ -1657,10 +1696,23 @@ export default function SalonDetail({ initialSalon }) {
 
                 {/* Per-Barber Queue Display */}
                 <div className={styles.barbersQueueContainer}>
+                  {(() => {
+                    console.log("allBookings:", allBookings);
+                    console.log("availableBarbers:", availableBarbers);
+                    console.log("barberStates:", barberStates);
+                    return null;
+                  })()}
                   {availableBarbers.map((barber, barberIndex) => {
                     const barberBookings = allBookings.filter(
-                      (b) => b.barberId === barber._id,
+                      (b) =>
+                        b.barberId?.toString() === barber._id?.toString() ||
+                        b.barber === barber.name,
                     );
+
+                    const barberDummies = dummyUsers.filter(
+                      (d) => d.barberName === barber.name,
+                    );
+
                     const greenBooking = barberBookings.find(
                       (b) => b.queueStatus === "GREEN",
                     );
@@ -1687,7 +1739,9 @@ export default function SalonDetail({ initialSalon }) {
                           </div>
                           <div className={styles.queueCount}>
                             <span className={styles.countBadge}>
-                              {orangeBookings.length + redBookings.length}{" "}
+                              {orangeBookings.length +
+                                redBookings.length +
+                                barberDummies.length}{" "}
                               waiting
                             </span>
                           </div>
@@ -1724,7 +1778,10 @@ export default function SalonDetail({ initialSalon }) {
                         {/* Queue Line */}
                         <div className={styles.queueLineContainer}>
                           <div className={styles.queueLineLabel}>
-                            QUEUE ({orangeBookings.length + redBookings.length}{" "}
+                            QUEUE (
+                            {orangeBookings.length +
+                              redBookings.length +
+                              barberDummies.length}{" "}
                             waiting)
                           </div>
                           <div className={styles.queueLine}>
@@ -1786,12 +1843,136 @@ export default function SalonDetail({ initialSalon }) {
                               );
                             })}
 
-                            {/* Empty State */}
-                            {barberBookings.length === 0 && (
-                              <div className={styles.emptyQueue}>
-                                <span>No one in queue</span>
-                              </div>
-                            )}
+                            {barberBookings.length === 0 &&
+                              dummyUsers.filter(
+                                (d) => d.barberName === barber.name,
+                              ).length === 0 && <div>No one in queue</div>}
+
+                            {/* Offline customers for this barber */}
+                            {dummyUsers
+                              .filter((d) => d.barberName === barber.name)
+                              .map((d) => (
+                                <div
+                                  key={d._id}
+                                  style={{
+                                    background: "#fff3e0",
+                                    border: "2px solid #f97316",
+                                    borderRadius: "8px",
+                                    padding: "10px 12px",
+                                    marginBottom: "8px",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      marginBottom: "4px",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontWeight: "700",
+                                        color: "#92400e",
+                                        fontSize: "13px",
+                                      }}
+                                    >
+                                      {d.name}
+                                    </span>
+                                    <span
+                                      style={{
+                                        background:
+                                          d.status === "in-service"
+                                            ? "#10b981"
+                                            : d.status === "completed"
+                                              ? "#6b7280"
+                                              : "#f97316",
+                                        color: "#fff",
+                                        borderRadius: "5px",
+                                        fontSize: "10px",
+                                        fontWeight: "700",
+                                        padding: "2px 7px",
+                                      }}
+                                    >
+                                      {d.status === "in-service"
+                                        ? "IN SERVICE"
+                                        : d.status === "completed"
+                                          ? "DONE"
+                                          : "OFFLINE"}
+                                    </span>
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "#78350f",
+                                    }}
+                                  >
+                                    📞 {d.phone} &nbsp;|&nbsp; ✂️ {d.service} —
+                                    ₹{d.price}
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "#78350f",
+                                    }}
+                                  >
+                                    ⏱ {d.serviceTime} min
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "#a16207",
+                                      marginTop: "2px",
+                                    }}
+                                  >
+                                    Arrived:{" "}
+                                    {new Date(d.arrivedAt).toLocaleTimeString(
+                                      "en-IN",
+                                      {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        hour12: true,
+                                      },
+                                    )}
+                                  </div>
+                                  {d.serviceStartedAt && (
+                                    <div
+                                      style={{
+                                        fontSize: "11px",
+                                        color: "#10b981",
+                                        marginTop: "2px",
+                                      }}
+                                    >
+                                      Started:{" "}
+                                      {new Date(
+                                        d.serviceStartedAt,
+                                      ).toLocaleTimeString("en-IN", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        hour12: true,
+                                      })}
+                                    </div>
+                                  )}
+                                  {d.expectedFinishTime && (
+                                    <div
+                                      style={{
+                                        fontSize: "11px",
+                                        color: "#f97316",
+                                        marginTop: "2px",
+                                      }}
+                                    >
+                                      Est. Done:{" "}
+                                      {new Date(
+                                        d.expectedFinishTime,
+                                      ).toLocaleTimeString("en-IN", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        hour12: true,
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
                           </div>
                         </div>
 
@@ -1802,7 +1983,11 @@ export default function SalonDetail({ initialSalon }) {
                               Serving:
                             </span>
                             <span className={styles.quickStatValue}>
-                              {greenBooking ? "1" : "0"}
+                              {(barberStates || []).find(
+                                (bs) => bs.barberId === barber._id?.toString(),
+                              )?.status === "OCCUPIED"
+                                ? "1"
+                                : "0"}
                             </span>
                           </div>
                           <div className={styles.quickStat}>
@@ -1810,7 +1995,9 @@ export default function SalonDetail({ initialSalon }) {
                               Priority:
                             </span>
                             <span className={styles.quickStatValue}>
-                              {orangeBookings.length}
+                              {barberStates.find(
+                                (bs) => bs.barberId === barber._id?.toString(),
+                              )?.queueCount ?? 0}
                             </span>
                           </div>
                           <div className={styles.quickStat}>
@@ -1818,7 +2005,11 @@ export default function SalonDetail({ initialSalon }) {
                               Booked:
                             </span>
                             <span className={styles.quickStatValue}>
-                              {redBookings.length}
+                              {
+                                barberBookings.filter(
+                                  (b) => b.queueStatus === "RED",
+                                ).length
+                              }
                             </span>
                           </div>
                           <div className={styles.quickStat}>
@@ -1826,20 +2017,17 @@ export default function SalonDetail({ initialSalon }) {
                               Est. Wait:
                             </span>
                             <span className={styles.quickStatValue}>
-                              {greenBooking
-                                ? Math.max(
-                                    0,
-                                    Math.ceil(
-                                      (new Date(
-                                        greenBooking.expectedCompletionTime,
-                                      ) -
-                                        new Date()) /
-                                        1000 /
-                                        60,
-                                    ),
-                                  ) +
-                                  orangeBookings.length * 30
-                                : orangeBookings.length * 30}
+                              {(() => {
+                                const bs = barberStates.find(
+                                  (bs) =>
+                                    bs.barberId === barber._id?.toString(),
+                                );
+                                return bs
+                                  ? (bs.timeLeft || 0) +
+                                      (bs.offlineWaitMins ||
+                                        (bs.queueCount || 0) * 35)
+                                  : 0;
+                              })()}
                               m
                             </span>
                           </div>
@@ -2149,6 +2337,30 @@ export default function SalonDetail({ initialSalon }) {
         </div>
       )}
       <ReviewsSection salonId={salon._id} />
+      {showLoginGuard && (
+        <div className={styles.loginGuardOverlay}>
+          <div className={styles.loginGuardModal}>
+            <h3>Login Required</h3>
+            <p>Please login or register as a user to continue booking.</p>
+            <span
+              className={styles.loginGuardLink}
+              onClick={() => {
+                // Save current salon URL so user is redirected back after login
+                sessionStorage.setItem("redirectAfterLogin", router.asPath);
+                router.push("/auth/userlogin");
+              }}
+            >
+              Sign In / Register
+            </span>
+            <button
+              onClick={() => setShowLoginGuard(false)}
+              className={styles.loginGuardClose}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
