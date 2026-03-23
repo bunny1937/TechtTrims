@@ -56,7 +56,7 @@ export default function SalonBarbersPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const salonSession = localStorage.getItem("salonSession");
+      const salonSession = sessionStorage.getItem("salonSession");
 
       if (salonSession) {
         try {

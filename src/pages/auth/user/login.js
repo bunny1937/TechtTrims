@@ -39,8 +39,8 @@ export default function UnifiedLogin() {
       if (document.cookie.includes("userAuth=true"))
         router.push("/user/dashboard");
     } else {
-      const salonToken = localStorage.getItem("salonToken");
-      const salonSession = localStorage.getItem("salonSession");
+      const salonToken = sessionStorage.getItem("salonToken");
+      const salonSession = sessionStorage.getItem("salonSession");
       if (salonToken || salonSession) router.push("/salons/dashboard");
     }
   }, [mounted, role, router]);
@@ -122,8 +122,8 @@ export default function UnifiedLogin() {
         });
         if (response.ok) {
           const data = await response.json();
-          localStorage.setItem("salonToken", data.token);
-          localStorage.setItem("salonSession", JSON.stringify(data.salon));
+          sessionStorage.setItem("salonToken", data.token);
+          sessionStorage.setItem("salonSession", JSON.stringify(data.salon));
           showSuccess(`Welcome back, ${data.salon.salonName}!`);
           window.location.href = "/salons/dashboard";
         } else {

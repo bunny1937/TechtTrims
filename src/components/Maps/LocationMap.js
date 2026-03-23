@@ -725,60 +725,6 @@ const LocationMap = ({ location, userLocation, salonName, address, phone }) => {
           <MapPin size={16} />
           {clickMode ? "Click..." : "Pin"}
         </button>
-        {/* <button
-          className={styles.recenterButton}
-          onClick={() => {
-            if (!navigator.geolocation) {
-              alert("Geolocation not supported by your browser");
-              return;
-            }
-
-            // This triggers the "Turn on Location Accuracy" dialog on Android
-            navigator.geolocation.getCurrentPosition(
-              (position) => {
-                const coords = {
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude,
-                };
-
-                sessionStorage.setItem(
-                  "liveUserLocation",
-                  JSON.stringify(coords)
-                );
-                localStorage.setItem(
-                  "cachedUserLocation",
-                  JSON.stringify(coords)
-                );
-
-                if (mapRef.current) {
-                  mapRef.current.setView([coords.lat, coords.lng], 15);
-                }
-
-                alert("📍 Location updated!");
-              },
-              (error) => {
-                if (error.code === 1) {
-                  alert(
-                    "⚠️ Location permission denied. Please enable in settings."
-                  );
-                } else if (error.code === 2) {
-                  alert(
-                    "⚠️ Location unavailable. Please turn on location services."
-                  );
-                } else {
-                  alert("⚠️ Could not get location. Please try again.");
-                }
-              },
-              {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0,
-              }
-            );
-          }}
-        >
-          📍 Use My Location
-        </button> */}
 
         <button
           className={styles.liveLocationTopBtn}

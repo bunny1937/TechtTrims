@@ -542,36 +542,7 @@ export default function Home({ initialSalons = [] }) {
                   </p>
                 </div>
               </div>
-              {/* ✅ BANNER ABOVE TABS - Show when NO location */}
-              {!memoizedUserLocation && (
-                <div className={styles.fallbackBanner}>
-                  <div className={styles.bannerContent}>
-                    <div className={styles.bannerIcon}>📍</div>
-                    <h3 className={styles.bannerTitle}>
-                      Want to see nearby salons?
-                    </h3>
 
-                    <p className={styles.loginNotice}>
-                      Please login or complete onboarding to view salons near
-                      you
-                    </p>
-                    <div className={styles.bannerActions}>
-                      <button
-                        onClick={() => router.push("/auth/login")}
-                        className={styles.bannerBtnPrimary}
-                      >
-                        Login
-                      </button>
-                      <button
-                        onClick={() => router.push("/onboarding")}
-                        className={styles.bannerBtnSecondary}
-                      >
-                        Complete Onboarding
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
               {/* Booking Mode Tabs */}
               <div className={styles.bookingModeToggle}>
                 <button

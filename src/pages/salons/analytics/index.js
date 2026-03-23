@@ -32,7 +32,7 @@ export default function AnalyticsPage() {
   });
 
   useEffect(() => {
-    const salonSession = localStorage.getItem("salonSession");
+    const salonSession = sessionStorage.getItem("salonSession");
     if (!salonSession) {
       router.push("/auth/login");
       return;

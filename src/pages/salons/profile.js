@@ -31,7 +31,7 @@ export default function SalonProfilePage() {
   };
 
   useEffect(() => {
-    const salonSession = localStorage.getItem("salonSession");
+    const salonSession = sessionStorage.getItem("salonSession");
     if (!salonSession) {
       router.push("/auth/login");
       return;
@@ -86,7 +86,7 @@ export default function SalonProfilePage() {
         setFormData(result.salon);
 
         // Update localStorage
-        localStorage.setItem("salonSession", JSON.stringify(result.salon));
+        sessionStorage.setItem("salonSession", JSON.stringify(result.salon));
       } else {
         throw new Error("Failed to update");
       }

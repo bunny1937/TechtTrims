@@ -227,8 +227,8 @@ export class UserDataManager {
   static clearSalonData() {
     if (typeof window === "undefined") return;
 
-    localStorage.removeItem("salonToken");
-    localStorage.removeItem("salonSession");
+    sessionStorage.removeItem("salonToken");
+    sessionStorage.removeItem("salonSession");
     localStorage.removeItem("ownerToken");
   }
 
@@ -237,8 +237,8 @@ export class UserDataManager {
 
     removeAuthToken();
     sessionStorage.clear();
-    localStorage.removeItem("salonToken");
-    localStorage.removeItem("salonSession");
+    sessionStorage.removeItem("salonToken");
+    sessionStorage.removeItem("salonSession");
     localStorage.removeItem("ownerToken");
     localStorage.removeItem("adminToken");
     localStorage.removeItem("adminData");
@@ -257,8 +257,8 @@ export class UserDataManager {
 
     const userToken = getAuthToken();
     const authenticatedUserData = getUserData();
-    const salonToken = localStorage.getItem("salonToken");
-    const salonSession = localStorage.getItem("salonSession");
+    const salonToken = sessionStorage.getItem("salonToken");
+    const salonSession = sessionStorage.getItem("salonSession");
 
     return !!(userToken || authenticatedUserData || salonToken || salonSession);
   }
@@ -288,8 +288,8 @@ export class UserDataManager {
 
     const userToken = getAuthToken();
     const authenticatedUserData = getUserData();
-    const salonToken = localStorage.getItem("salonToken");
-    const salonSession = localStorage.getItem("salonSession");
+    const salonToken = sessionStorage.getItem("salonToken");
+    const salonSession = sessionStorage.getItem("salonSession");
 
     return !!(userToken || authenticatedUserData || salonToken || salonSession);
   }

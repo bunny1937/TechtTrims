@@ -51,7 +51,7 @@ class SalonDataManagerClass {
 
     try {
       sessionStorage.removeItem("salonSession");
-      localStorage.removeItem("salonToken");
+      sessionStorage.removeItem("salonToken");
       this.salonData = null;
     } catch (error) {
       console.error("Error clearing salon data:", error);

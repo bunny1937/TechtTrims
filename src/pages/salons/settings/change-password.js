@@ -66,7 +66,7 @@ export default function ChangePasswordPage() {
     setLoading(true);
 
     try {
-      const salonSession = localStorage.getItem("salonSession");
+      const salonSession = sessionStorage.getItem("salonSession");
       if (!salonSession) {
         router.push("/auth/login");
         return;

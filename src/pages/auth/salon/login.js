@@ -13,8 +13,8 @@ export default function SalonLogin() {
 
   useEffect(() => {
     // Only redirect if already logged in as salon
-    const salonToken = localStorage.getItem("salonToken");
-    const salonSession = localStorage.getItem("salonSession");
+    const salonToken = sessionStorage.getItem("salonToken");
+    const salonSession = sessionStorage.getItem("salonSession");
 
     if (salonToken || salonSession) {
       router.push("/salons/dashboard");
@@ -35,8 +35,8 @@ export default function SalonLogin() {
 
       if (response.ok) {
         const data = await response.json(); // ✅ ONLY ONE PARSE
-        localStorage.setItem("salonToken", data.token);
-        localStorage.setItem("salonSession", JSON.stringify(data.salon));
+        sessionStorage.setItem("salonToken", data.token);
+        sessionStorage.setItem("salonSession", JSON.stringify(data.salon));
 
         showSuccess(`Welcome back, ${data.salon.salonName}!`);
 

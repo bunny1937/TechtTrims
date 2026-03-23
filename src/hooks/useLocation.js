@@ -257,10 +257,6 @@ export const useLocation = () => {
 
       lastUpdateRef.current = Date.now();
 
-      // ✅ REMOVED - Storage saving now handled by useEffect
-      // sessionStorage.setItem("userLocation", JSON.stringify(newLocation));
-      // localStorage.setItem("cachedUserLocation", JSON.stringify(newLocation));
-
       // Start continuous monitoring
       startWatchingLocation();
 

@@ -270,8 +270,8 @@ const SalonRegisterForm = () => {
           email: result.salon.email,
         };
 
-        localStorage.setItem("salonSession", JSON.stringify(salonSession));
-        localStorage.setItem("salonToken", result.token);
+        sessionStorage.setItem("salonSession", JSON.stringify(salonSession));
+        sessionStorage.setItem("salonToken", result.token);
         showSuccess(
           `Salon registered successfully! ${
             result.barbersCreated || 0
